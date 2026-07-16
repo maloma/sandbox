@@ -4,8 +4,6 @@
 
 ## Participant Link
 
-После активации GitHub Pages:
-
 `https://maloma.github.io/sandbox/`
 
 ## Как проходит тест
@@ -30,8 +28,8 @@
 
 Workflow: `.github/workflows/pages.yml`.
 
-Одноразовая настройка:
+GitHub Pages source: `GitHub Actions`.
 
-`Settings → Pages → Build and deployment → Source → GitHub Actions`
+Initial deployment trigger: 2026-07-16.
 
 # END OF FILE
