@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'debt.html'
       - '.nojekyll'
       - 'README.md'
       - '.github/workflows/pages.yml'
