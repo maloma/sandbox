@@ -48,7 +48,7 @@ $('cancelEdit').onclick=()=>{resetForm();$('date').value=state.lastDate||new Dat
 $('operations').onclick=e=>{const item=e.target.closest('.item[data-id]');if(item)beginEdit(Number(item.dataset.id))};
 $('sortMode').onchange=e=>{state.sort=e.target.value;save();renderOps()};
 $('clearOps').onclick=()=>{if(confirm('Очистить только тестовые операции?')){state.operations=[];save();resetForm();renderOps()}};
-$('openCalc').onclick=()=>{expr='';$('calcDisplay').value='';openModal('calcModal')};$$('[data-close]').forEach(x=>x.onclick=close);$$('.modal').forEach(x=>x.onclick=e=>{if(e.target===x)close()});
+$('openCalc').onclick=()=>{const current=$('amount').value.trim().replace(',','.');expr=/^\d+(?:\.\d+)?$/.test(current)?current:'';$('calcDisplay').value=expr;openModal('calcModal')};$$('[data-close]').forEach(x=>x.onclick=close);$$('.modal').forEach(x=>x.onclick=e=>{if(e.target===x)close()});
 const calcKeys=['7','8','9','÷','4','5','6','×','1','2','3','−','0','.','C','+'];$('calcGrid').innerHTML=calcKeys.map(k=>`<button class="btn ${['÷','×','−','+'].includes(k)?'secondary':'ghost'}" data-key="${k}">${k}</button>`).join('');let expr='';
 function pushCalc(k){if(k==='C')expr='';else if(k==='Backspace')expr=expr.slice(0,-1);else expr+=({'÷':'/','×':'*','−':'-'}[k]||k);$('calcDisplay').value=expr}
 $('calcGrid').onclick=e=>{const k=e.target.dataset.key;if(k)pushCalc(k)};
