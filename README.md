@@ -1,35 +1,36 @@
-# FamilyPilot PF-08 Public Test
+# FamilyPilot Public Validation
 
-Публичный обезличенный прототип для пользовательской проверки FamilyPilot.
+PF-08 testing now runs one module at a time after the first broad prototype failed comprehension testing.
 
-## Participant Link
+## Module 1 — Operations
 
 `https://maloma.github.io/sandbox/`
 
-## Как проходит тест
+Checks only:
 
-1. Открыть ссылку.
-2. Нажать `Начать тест`.
-3. Пройти прототип без подсказок.
-4. Нажать `Завершить`.
-5. Отметить только выполненные самостоятельно действия.
-6. Нажать `Завершить и отправить`.
-7. Выбрать тот же чат или мессенджер, где была получена ссылка.
+- expense, income and transfer selection;
+- amount, category, description and date;
+- adding a new category inside the operation flow;
+- basic operation history;
+- short inline help;
+- mobile readability without pinch zoom.
 
-Скачивать файлы не нужно. На компьютере без системного меню отправки результат копируется для вставки в чат.
+## Module 2 — Historical Debts
 
-## Приватность
+`https://maloma.github.io/sandbox/debt.html`
 
-В отправляемый результат не входят введённые финансовые суммы, имена, остатки, доходы, расходы, накопления, резерв, суммы долгов, валюты и количество криптоактивов.
+Checks only:
 
-В публичном репозитории нет внутренней документации FamilyPilot.
+- explicit counterparty;
+- adding an existing historical debt;
+- repayment of that debt;
+- handling repayment greater than the tracked balance;
+- distinction between principal and ordinary expense.
 
-## Deployment
+## Evidence Boundary
 
-Workflow: `.github/workflows/pages.yml`.
+The first broad prototype received four real participant responses. All four reported that the overall purpose and required actions were unclear. The broad prototype is therefore retired from participant testing.
 
-GitHub Pages source: `GitHub Actions`.
-
-Initial deployment trigger: 2026-07-16.
+Current validation decision: `CHANGE — TEST ONE MODULE AT A TIME`.
 
 # END OF FILE
