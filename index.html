@@ -8,10 +8,12 @@
 <style>html,body{margin:0;min-height:100%;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#f4f7f6;color:#17332d}.loading{min-height:100vh;display:grid;place-items:center;padding:24px;text-align:center}.box{max-width:440px;background:#fff;border:1px solid #d8e4e1;border-radius:20px;padding:22px}.spinner{width:38px;height:38px;margin:0 auto 14px;border:4px solid #dfeeea;border-top-color:#0f766e;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}button{font:inherit;border:0;border-radius:13px;padding:12px 16px;background:#0f766e;color:#fff;font-weight:750}</style>
 </head>
 <body>
-<div class="loading"><div class="box"><div class="spinner"></div><strong>Открываем модуль 3</strong><p id="status">Загружаем обязательства…</p><button id="retry" hidden>Повторить</button></div></div>
+<div class="loading"><div class="box"><div class="spinner"></div><strong>Открываем модуль 3</strong><p id="status">Загружаем календарь платежей…</p><button id="retry" hidden>Повторить</button></div></div>
 <script>
-const source='https://raw.githubusercontent.com/maloma/sandbox/640bc9f9edcf6a184207ae3cc52767dd720b71ce/m3.html';
-async function load(){const status=document.getElementById('status'),retry=document.getElementById('retry');retry.hidden=true;status.textContent='Загружаем обязательства…';try{const response=await fetch(source,{cache:'no-store'});if(!response.ok)throw new Error('HTTP');const html=await response.text();if(!html.includes('FamilyPilot — M3 Обязательства')||!html.includes('Новое обязательство'))throw new Error('Некорректный файл');document.open();document.write(html);document.close()}catch(error){status.textContent='Не удалось загрузить M3. Нажмите «Повторить».';retry.hidden=false}}
+const commit='5a5afc1a64e41034993f15ece93ad085e478369f';
+const urls=Array.from({length:12},(_,i)=>`https://raw.githubusercontent.com/maloma/sandbox/${commit}/m3-v2.part${String(i).padStart(2,'0')}`);
+async function bytes(url){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error('HTTP');return new Uint8Array(await r.arrayBuffer())}
+async function load(){const status=document.getElementById('status'),retry=document.getElementById('retry');retry.hidden=true;status.textContent='Загружаем календарь платежей…';try{const parts=await Promise.all(urls.map(bytes));const size=parts.reduce((n,p)=>n+p.length,0),all=new Uint8Array(size);let offset=0;for(const part of parts){all.set(part,offset);offset+=part.length}const html=new TextDecoder('utf-8',{fatal:true}).decode(all);if(all.length!==35630||!html.includes('FamilyPilot — M3 Обязательства')||!html.includes('familypilot.m3.v2')||!html.includes('Начиная со следующего платежа')||!html.includes('Перенести один платёж'))throw new Error('INVALID');document.open();document.write(html);document.close()}catch(error){status.textContent='Не удалось загрузить M3. Нажмите «Повторить».';retry.hidden=false}}
 document.getElementById('retry').onclick=load;load();
 </script>
 </body>
