@@ -1,0 +1,13 @@
+FamilyPilot PF-08 M4 correction
+Date: 2026-07-18
+Build: m4-v2
+Reason: Founder reported unclear section names and missing hints.
+Changes:
+- renamed sections to Доступно сейчас, Отложено всего, Неприкосновенный запас;
+- added persistent explanations and examples;
+- added ? contextual help for every concept and field;
+- clarified test tasks and result wording;
+- preserved green/yellow/red avatar status and no-popup rule.
+Entry route: https://maloma.github.io/sandbox/
+Source commit: 8b007b45cc496f87c4ef4f8eaa497e89aecd0d60
+Root route commit: e67824d90e0ed6cec851cdadc5c455b0fc8ceb0c
