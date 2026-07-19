@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta http-equiv="cache-control" content="no-store">
+<title>FamilyPilot — mobile modal fix</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#f5f7fb}
+iframe{display:block;width:100%;height:100%;border:0;background:#f5f7fb}
+</style>
+</head>
+<body>
+<iframe id="app" src="./main-v7.html?mobilefix=1" title="FamilyPilot"></iframe>
+<script>
+(()=>{
+  const frame=document.getElementById('app');
+  frame.addEventListener('load',()=>{
+    const w=frame.contentWindow,d=w.document;
+    if(!d||d.getElementById('fp-mobile-modal-fix')) return;
+
+    const style=d.createElement('style');
+    style.id='fp-mobile-modal-fix';
+    style.textContent=`
+      html.fp-modal-open,body.fp-modal-open{overflow:hidden!important;overscroll-behavior:none!important;touch-action:none!important}
+      body.fp-modal-open{position:fixed!important;left:0!important;right:0!important;width:100%!important}
+      #entryModal.modal{position:fixed!important;inset:0!important;height:var(--fp-vvh,100dvh)!important;align-items:flex-end!important;overflow:hidden!important;overscroll-behavior:none!important;touch-action:none!important}
+      #entryModal .sheet{display:flex!important;flex-direction:column!important;width:min(100%,480px)!important;max-height:calc(var(--fp-vvh,100dvh) - 8px)!important;height:auto!important;overflow-y:auto!important;overscroll-behavior:contain!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;padding-bottom:calc(12px + env(safe-area-inset-bottom))!important;scroll-padding-bottom:110px!important}
+      #entryModal .sheet-head{position:sticky!important;top:-18px!important;z-index:5!important;background:var(--bg)!important;padding-top:18px!important;padding-bottom:10px!important}
+      #entryModal .sheet-actions{position:sticky!important;bottom:calc(-12px - env(safe-area-inset-bottom))!important;z-index:6!important;background:var(--bg)!important;margin-top:14px!important;padding-top:10px!important;padding-bottom:calc(12px + env(safe-area-inset-bottom))!important}
+      #entryModal textarea{min-height:92px!important}
+      @supports(height:100svh){#entryModal.modal{height:var(--fp-vvh,100svh)!important}}
+    `;
+    d.head.appendChild(style);
+
+    let locked=false,scrollY=0;
+    const modal=d.getElementById('entryModal');
+    if(!modal) return;
+
+    const setViewport=()=>{
+      const vv=w.visualViewport;
+      const h=vv?vv.height:w.innerHeight;
+      d.documentElement.style.setProperty('--fp-vvh',`${Math.round(h)}px`);
+      frame.style.height=`${Math.round(h+(vv?vv.offsetTop:0))}px`;
+    };
+    setViewport();
+    w.visualViewport?.addEventListener('resize',setViewport);
+    w.visualViewport?.addEventListener('scroll',setViewport);
+    w.addEventListener('resize',setViewport);
+
+    const lock=()=>{
+      if(locked)return;
+      locked=true;
+      scrollY=w.scrollY||0;
+      d.documentElement.classList.add('fp-modal-open');
+      d.body.classList.add('fp-modal-open');
+      d.body.style.top=`-${scrollY}px`;
+      setViewport();
+      modal.querySelector('.sheet')?.scrollTo({top:0});
+    };
+    const unlock=()=>{
+      if(!locked)return;
+      locked=false;
+      d.documentElement.classList.remove('fp-modal-open');
+      d.body.classList.remove('fp-modal-open');
+      d.body.style.top='';
+      w.scrollTo(0,scrollY);
+      frame.style.height='100%';
+    };
+
+    const observer=new MutationObserver(()=>modal.classList.contains('open')?lock():unlock());
+    observer.observe(modal,{attributes:true,attributeFilter:['class']});
+    if(modal.classList.contains('open'))lock();
+
+    modal.addEventListener('touchmove',e=>{
+      if(!e.target.closest('.sheet')) e.preventDefault();
+    },{passive:false});
+
+    d.addEventListener('focusin',e=>{
+      if(!modal.classList.contains('open'))return;
+      if(!e.target.matches('input,textarea,select'))return;
+      setTimeout(()=>e.target.scrollIntoView({block:'center',behavior:'smooth'}),220);
+    });
+  });
+})();
+</script>
+</body>
+</html>
