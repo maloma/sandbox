@@ -4,49 +4,96 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta http-equiv="cache-control" content="no-store">
-<title>FamilyPilot — mobile modal fix</title>
+<title>FamilyPilot — mobile modal fix 2</title>
 <style>
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#f5f7fb}
 iframe{display:block;width:100%;height:100%;border:0;background:#f5f7fb}
 </style>
 </head>
 <body>
-<iframe id="app" src="./main-v7.html?mobilefix=1" title="FamilyPilot"></iframe>
+<iframe id="app" src="./main-v7.html?mobilefix=2" title="FamilyPilot"></iframe>
 <script>
 (()=>{
   const frame=document.getElementById('app');
   frame.addEventListener('load',()=>{
     const w=frame.contentWindow,d=w.document;
-    if(!d||d.getElementById('fp-mobile-modal-fix')) return;
+    if(!d||d.getElementById('fp-mobile-modal-fix-2')) return;
 
     const style=d.createElement('style');
-    style.id='fp-mobile-modal-fix';
+    style.id='fp-mobile-modal-fix-2';
     style.textContent=`
-      html.fp-modal-open,body.fp-modal-open{overflow:hidden!important;overscroll-behavior:none!important;touch-action:none!important}
-      body.fp-modal-open{position:fixed!important;left:0!important;right:0!important;width:100%!important}
-      #entryModal.modal{position:fixed!important;inset:0!important;height:var(--fp-vvh,100dvh)!important;align-items:flex-end!important;overflow:hidden!important;overscroll-behavior:none!important;touch-action:none!important}
-      #entryModal .sheet{display:flex!important;flex-direction:column!important;width:min(100%,480px)!important;max-height:calc(var(--fp-vvh,100dvh) - 8px)!important;height:auto!important;overflow-y:auto!important;overscroll-behavior:contain!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;padding-bottom:calc(12px + env(safe-area-inset-bottom))!important;scroll-padding-bottom:110px!important}
-      #entryModal .sheet-head{position:sticky!important;top:-18px!important;z-index:5!important;background:var(--bg)!important;padding-top:18px!important;padding-bottom:10px!important}
-      #entryModal .sheet-actions{position:sticky!important;bottom:calc(-12px - env(safe-area-inset-bottom))!important;z-index:6!important;background:var(--bg)!important;margin-top:14px!important;padding-top:10px!important;padding-bottom:calc(12px + env(safe-area-inset-bottom))!important}
-      #entryModal textarea{min-height:92px!important}
-      @supports(height:100svh){#entryModal.modal{height:var(--fp-vvh,100svh)!important}}
+      html.fp-modal-open,body.fp-modal-open{
+        overflow:hidden!important;
+        overscroll-behavior:none!important;
+        touch-action:none!important;
+      }
+      body.fp-modal-open{
+        position:fixed!important;
+        left:0!important;
+        right:0!important;
+        width:100%!important;
+      }
+      #entryModal.modal{
+        position:fixed!important;
+        left:0!important;
+        right:0!important;
+        top:var(--fp-vv-top,0px)!important;
+        bottom:auto!important;
+        height:var(--fp-vv-height,100dvh)!important;
+        align-items:stretch!important;
+        justify-content:flex-end!important;
+        overflow:hidden!important;
+        overscroll-behavior:none!important;
+        touch-action:none!important;
+      }
+      #entryModal .sheet{
+        display:block!important;
+        width:min(100%,480px)!important;
+        height:100%!important;
+        max-height:none!important;
+        margin:0 auto!important;
+        overflow-y:scroll!important;
+        overflow-x:hidden!important;
+        overscroll-behavior-y:contain!important;
+        -webkit-overflow-scrolling:touch!important;
+        touch-action:pan-y!important;
+        padding-bottom:calc(130px + env(safe-area-inset-bottom))!important;
+        scroll-padding-top:90px!important;
+        scroll-padding-bottom:150px!important;
+      }
+      #entryModal .sheet-head{
+        position:sticky!important;
+        top:-18px!important;
+        z-index:8!important;
+        background:var(--bg)!important;
+        padding-top:18px!important;
+        padding-bottom:10px!important;
+      }
+      #entryModal .sheet-actions{
+        position:sticky!important;
+        bottom:calc(-130px - env(safe-area-inset-bottom))!important;
+        z-index:9!important;
+        background:var(--bg)!important;
+        margin-top:16px!important;
+        padding-top:12px!important;
+        padding-bottom:calc(18px + env(safe-area-inset-bottom))!important;
+      }
+      #entryModal textarea{min-height:110px!important}
     `;
     d.head.appendChild(style);
 
     let locked=false,scrollY=0;
     const modal=d.getElementById('entryModal');
-    if(!modal) return;
+    const sheet=modal?.querySelector('.sheet');
+    if(!modal||!sheet) return;
 
     const setViewport=()=>{
       const vv=w.visualViewport;
-      const h=vv?vv.height:w.innerHeight;
-      d.documentElement.style.setProperty('--fp-vvh',`${Math.round(h)}px`);
-      frame.style.height=`${Math.round(h+(vv?vv.offsetTop:0))}px`;
+      const h=Math.round(vv?.height||w.innerHeight);
+      const top=Math.round(vv?.offsetTop||0);
+      d.documentElement.style.setProperty('--fp-vv-height',`${h}px`);
+      d.documentElement.style.setProperty('--fp-vv-top',`${top}px`);
     };
-    setViewport();
-    w.visualViewport?.addEventListener('resize',setViewport);
-    w.visualViewport?.addEventListener('scroll',setViewport);
-    w.addEventListener('resize',setViewport);
 
     const lock=()=>{
       if(locked)return;
@@ -56,7 +103,7 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f5f7fb}
       d.body.classList.add('fp-modal-open');
       d.body.style.top=`-${scrollY}px`;
       setViewport();
-      modal.querySelector('.sheet')?.scrollTo({top:0});
+      sheet.scrollTop=0;
     };
     const unlock=()=>{
       if(!locked)return;
@@ -65,8 +112,12 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f5f7fb}
       d.body.classList.remove('fp-modal-open');
       d.body.style.top='';
       w.scrollTo(0,scrollY);
-      frame.style.height='100%';
     };
+
+    setViewport();
+    w.visualViewport?.addEventListener('resize',setViewport);
+    w.visualViewport?.addEventListener('scroll',setViewport);
+    w.addEventListener('resize',setViewport);
 
     const observer=new MutationObserver(()=>modal.classList.contains('open')?lock():unlock());
     observer.observe(modal,{attributes:true,attributeFilter:['class']});
@@ -76,10 +127,25 @@ iframe{display:block;width:100%;height:100%;border:0;background:#f5f7fb}
       if(!e.target.closest('.sheet')) e.preventDefault();
     },{passive:false});
 
+    let startY=0;
+    sheet.addEventListener('touchstart',e=>{startY=e.touches[0]?.clientY||0},{passive:true});
+    sheet.addEventListener('touchmove',e=>{
+      const y=e.touches[0]?.clientY||0;
+      const movingDown=y>startY;
+      const atTop=sheet.scrollTop<=0;
+      const atBottom=Math.ceil(sheet.scrollTop+sheet.clientHeight)>=sheet.scrollHeight;
+      if((atTop&&movingDown)||(atBottom&&!movingDown)) e.preventDefault();
+    },{passive:false});
+
     d.addEventListener('focusin',e=>{
       if(!modal.classList.contains('open'))return;
       if(!e.target.matches('input,textarea,select'))return;
-      setTimeout(()=>e.target.scrollIntoView({block:'center',behavior:'smooth'}),220);
+      setTimeout(()=>{
+        setViewport();
+        const rect=e.target.getBoundingClientRect();
+        const visibleBottom=(w.visualViewport?.height||w.innerHeight)-110;
+        if(rect.bottom>visibleBottom) sheet.scrollBy({top:rect.bottom-visibleBottom+24,behavior:'smooth'});
+      },320);
     });
   });
 })();
