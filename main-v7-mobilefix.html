@@ -11,7 +11,7 @@ iframe{position:fixed;left:0;top:var(--vv-top,0px);display:block;width:100%;heig
 </style>
 </head>
 <body>
-<iframe id="app" src="./main-v7.html?mobilefix=4" title="FamilyPilot"></iframe>
+<iframe id="app" src="./main-v7.html?mobilefix=5" title="FamilyPilot"></iframe>
 <script>
 (()=>{
   const frame=document.getElementById('app');
@@ -29,10 +29,10 @@ iframe{position:fixed;left:0;top:var(--vv-top,0px);display:block;width:100%;heig
 
   frame.addEventListener('load',()=>{
     const w=frame.contentWindow,d=w.document;
-    if(!d||d.getElementById('fp-mobile-modal-fix4'))return;
+    if(!d||d.getElementById('fp-mobile-modal-fix5'))return;
 
     const style=d.createElement('style');
-    style.id='fp-mobile-modal-fix4';
+    style.id='fp-mobile-modal-fix5';
     style.textContent=`
       html.fp-modal-open,body.fp-modal-open{overflow:hidden!important;overscroll-behavior:none!important}
       body.fp-modal-open{position:fixed!important;inset:0!important;width:100%!important;height:100%!important}
@@ -88,10 +88,10 @@ iframe{position:fixed;left:0;top:var(--vv-top,0px);display:block;width:100%;heig
     if(amount&&save&&error){
       amount.setAttribute('inputmode','decimal');
       amount.setAttribute('autocomplete','off');
-      amount.setAttribute('maxlength','15');
+      amount.setAttribute('maxlength','9');
       const hint=d.createElement('div');
       hint.className='fp-amount-hint';
-      hint.textContent='Максимум 999 999 999 999,99 €';
+      hint.textContent='Максимум 999 999,99 € за одну операцию';
       amount.insertAdjacentElement('afterend',hint);
 
       const normalize=value=>{
@@ -101,13 +101,14 @@ iframe{position:fixed;left:0;top:var(--vv-top,0px);display:block;width:100%;heig
           text=text.slice(0,comma+1)+text.slice(comma+1).replace(/,/g,'');
         }
         let [whole='',fraction='']=text.split(',');
-        whole=whole.slice(0,12);
+        whole=whole.slice(0,6);
         fraction=fraction.slice(0,2);
         return comma===-1?whole:whole+','+fraction;
       };
       const validate=()=>{
         const value=amount.value.trim();
-        const valid=/^(?:0|[1-9]\d{0,11})(?:[.,]\d{1,2})?$/.test(value)&&Number(value.replace(',','.'))>0&&Number(value.replace(',','.'))<=999999999999.99;
+        const numeric=Number(value.replace(',','.'));
+        const valid=/^(?:0|[1-9]\d{0,5})(?:[.,]\d{1,2})?$/.test(value)&&numeric>0&&numeric<=999999.99;
         amount.classList.toggle('fp-amount-invalid',!valid&&value.length>0);
         return valid;
       };
@@ -122,7 +123,7 @@ iframe{position:fixed;left:0;top:var(--vv-top,0px);display:block;width:100%;heig
         if(validate())return;
         event.preventDefault();
         event.stopImmediatePropagation();
-        error.textContent='Сумма должна быть от 0,01 € до 999 999 999 999,99 € и содержать не более двух знаков после запятой.';
+        error.textContent='Сумма операции должна быть от 0,01 € до 999 999,99 € и содержать не более двух знаков после запятой.';
         amount.focus();
       },true);
     }
