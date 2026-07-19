@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta http-equiv="cache-control" content="no-store">
-<title>FamilyPilot — iOS form fix</title>
+<title>FamilyPilot — navigation and period fix</title>
 <style>
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#f5f7fb}
 iframe{position:fixed;left:0;top:var(--vv-top,0px);display:block;width:100%;height:var(--vv-height,100dvh);border:0;background:#f5f7fb}
@@ -14,120 +14,171 @@ iframe{position:fixed;left:0;top:var(--vv-top,0px);display:block;width:100%;heig
 <iframe id="app" src="./main-v7.html?mobilefix=5" title="FamilyPilot"></iframe>
 <script>
 (()=>{
-  const frame=document.getElementById('app');
-  const updateOuterViewport=()=>{
-    const vv=window.visualViewport;
-    const height=Math.round(vv?vv.height:window.innerHeight);
-    const top=Math.round(vv?vv.offsetTop:0);
-    document.documentElement.style.setProperty('--vv-height',height+'px');
-    document.documentElement.style.setProperty('--vv-top',top+'px');
-  };
-  updateOuterViewport();
-  visualViewport?.addEventListener('resize',updateOuterViewport);
-  visualViewport?.addEventListener('scroll',updateOuterViewport);
-  window.addEventListener('resize',updateOuterViewport);
+const frame=document.getElementById('app');
+const updateOuterViewport=()=>{
+ const vv=window.visualViewport;
+ document.documentElement.style.setProperty('--vv-height',Math.round(vv?vv.height:innerHeight)+'px');
+ document.documentElement.style.setProperty('--vv-top',Math.round(vv?vv.offsetTop:0)+'px');
+};
+updateOuterViewport();
+visualViewport?.addEventListener('resize',updateOuterViewport);
+visualViewport?.addEventListener('scroll',updateOuterViewport);
+addEventListener('resize',updateOuterViewport);
 
-  frame.addEventListener('load',()=>{
-    const w=frame.contentWindow,d=w.document;
-    if(!d||d.getElementById('fp-mobile-modal-fix5'))return;
+frame.addEventListener('load',()=>{
+ const w=frame.contentWindow,d=w.document;
+ if(!d||d.getElementById('fp-enhancements-v5'))return;
+ const $=id=>d.getElementById(id);
+ const APP_KEY='familypilot.main.v7',PERIOD_KEY='familypilot.period.selection.v1';
+ const money=v=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Math.abs(v))+' €';
+ const signed=v=>(v>0?'+':v<0?'−':'')+money(v);
+ const esc=v=>String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+ const style=d.createElement('style');
+ style.id='fp-enhancements-v5';
+ style.textContent=`
+ html.fp-modal-open,body.fp-modal-open{overflow:hidden!important;overscroll-behavior:none!important}
+ body.fp-modal-open{position:fixed!important;inset:0!important;width:100%!important;height:100%!important}
+ #entryModal.modal{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;display:none!important;align-items:stretch!important;overflow:hidden!important;background:rgba(4,18,28,.5)!important}
+ #entryModal.modal.open{display:flex!important}
+ #entryModal .sheet{position:relative!important;display:block!important;width:min(100%,480px)!important;height:100%!important;max-height:none!important;margin:0 auto!important;border-radius:0!important;overflow-y:auto!important;overscroll-behavior:contain!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;padding:18px 18px 112px!important;scroll-padding-top:90px!important;scroll-padding-bottom:150px!important;background:var(--bg)!important}
+ #entryModal .sheet-head{position:sticky!important;top:-18px!important;z-index:10!important;background:var(--bg)!important;padding:18px 0 12px!important;margin-top:-18px!important}
+ #entryModal .sheet-actions{position:fixed!important;left:50%!important;transform:translateX(-50%)!important;bottom:0!important;z-index:30!important;width:min(100%,480px)!important;display:grid!important;grid-template-columns:1fr 1.5fr!important;gap:9px!important;margin:0!important;padding:10px 18px calc(10px + env(safe-area-inset-bottom))!important;background:var(--bg)!important;border-top:1px solid var(--line)!important}
+ #entryModal textarea{min-height:120px!important}
+ #amountInput.fp-amount-invalid{border-color:var(--red)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--red) 14%,transparent)!important}
+ .fp-amount-hint{font-size:11px;color:var(--muted);margin-top:6px}
+ .balance>#periodSelector{margin:10px 0 0!important;border:1px solid var(--line)!important;box-shadow:none!important;background:var(--card2)!important;border-radius:15px!important}
+ .fp-period-nav{display:grid;grid-template-columns:42px 1fr 42px;align-items:center;gap:5px;margin:7px 0 14px}
+ .fp-period-nav button{height:38px;border:1px solid var(--line);border-radius:12px;background:var(--card2);color:var(--ink);font-weight:900}
+ .fp-period-label{width:100%;font-size:13px!important;color:var(--ink)!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .fp-period-nav button:disabled{opacity:.28}
+ .fp-back{width:38px;height:38px;border:1px solid var(--line);border-radius:13px;background:var(--card);color:var(--ink);font-size:25px;line-height:1;box-shadow:var(--shadow);margin-right:8px}
+ .page-title.fp-has-back{justify-content:flex-start!important}
+ .fp-overlay{display:none;position:fixed;inset:0;z-index:100;background:rgba(4,18,28,.55);align-items:flex-end;justify-content:center}
+ .fp-overlay.open{display:flex}
+ .fp-panel{width:min(100%,480px);background:var(--bg);border-radius:24px 24px 0 0;padding:18px 18px calc(20px + env(safe-area-inset-bottom))}
+ .fp-panel-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+ .fp-panel h2{margin:0;font-size:21px}.fp-panel p{color:var(--muted);line-height:1.45}
+ .fp-picker-input{width:100%;min-height:52px;border:1px solid var(--line);border-radius:15px;background:var(--card);color:var(--ink);padding:12px;font:inherit;font-size:17px}
+ .fp-panel-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+ .fp-panel-actions button{min-height:48px;border:0;border-radius:15px;font-weight:900}
+ .fp-current{background:var(--card);color:var(--ink);border:1px solid var(--line)!important}.fp-apply{background:var(--green);color:#fff}
+ `;
+ d.head.appendChild(style);
 
-    const style=d.createElement('style');
-    style.id='fp-mobile-modal-fix5';
-    style.textContent=`
-      html.fp-modal-open,body.fp-modal-open{overflow:hidden!important;overscroll-behavior:none!important}
-      body.fp-modal-open{position:fixed!important;inset:0!important;width:100%!important;height:100%!important}
-      #entryModal.modal{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;display:none!important;align-items:stretch!important;overflow:hidden!important;overscroll-behavior:none!important;background:rgba(4,18,28,.5)!important}
-      #entryModal.modal.open{display:flex!important}
-      #entryModal .sheet{position:relative!important;display:block!important;width:min(100%,480px)!important;height:100%!important;max-height:none!important;margin:0 auto!important;border-radius:0!important;overflow-y:auto!important;overscroll-behavior:contain!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;padding:18px 18px 112px!important;scroll-padding-top:90px!important;scroll-padding-bottom:150px!important;background:var(--bg)!important}
-      #entryModal .sheet-head{position:sticky!important;top:-18px!important;z-index:10!important;background:var(--bg)!important;padding:18px 0 12px!important;margin-top:-18px!important}
-      #entryModal .sheet-actions{position:fixed!important;left:50%!important;transform:translateX(-50%)!important;bottom:0!important;z-index:30!important;width:min(100%,480px)!important;display:grid!important;grid-template-columns:1fr 1.5fr!important;gap:9px!important;margin:0!important;padding:10px 18px calc(10px + env(safe-area-inset-bottom))!important;background:linear-gradient(to top,var(--bg) 80%,color-mix(in srgb,var(--bg) 92%,transparent))!important;border-top:1px solid var(--line)!important}
-      #entryModal textarea{min-height:120px!important}
-      #entryModal .field:last-of-type{margin-bottom:18px!important}
-      #amountInput.fp-amount-invalid{border-color:var(--red)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--red) 14%,transparent)!important}
-      .fp-amount-hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.35}
-    `;
-    d.head.appendChild(style);
+ const modal=$('entryModal');
+ let locked=false,scrollY=0;
+ const lock=()=>{if(locked)return;locked=true;scrollY=w.scrollY||0;d.documentElement.classList.add('fp-modal-open');d.body.classList.add('fp-modal-open');d.body.style.top=`-${scrollY}px`;modal?.querySelector('.sheet')?.scrollTo(0,0)};
+ const unlock=()=>{if(!locked)return;locked=false;d.documentElement.classList.remove('fp-modal-open');d.body.classList.remove('fp-modal-open');d.body.style.top='';w.scrollTo(0,scrollY)};
+ if(modal)new MutationObserver(()=>modal.classList.contains('open')?lock():unlock()).observe(modal,{attributes:true,attributeFilter:['class']});
+ d.addEventListener('focusin',e=>{if(!modal?.classList.contains('open')||!e.target.matches('input,textarea,select'))return;setTimeout(()=>{const sheet=modal.querySelector('.sheet'),r=e.target.getBoundingClientRect();if(!sheet)return;const safe=Math.max(110,Math.round(w.innerHeight*.22));if(r.bottom>w.innerHeight-safe)sheet.scrollBy({top:r.bottom-(w.innerHeight-safe)+24,behavior:'smooth'});else if(r.top<80)sheet.scrollBy({top:r.top-100,behavior:'smooth'})},250)});
 
-    const modal=d.getElementById('entryModal');
-    if(!modal)return;
-    let locked=false,scrollY=0;
-    const lock=()=>{
-      if(locked)return;
-      locked=true;
-      scrollY=w.scrollY||0;
-      d.documentElement.classList.add('fp-modal-open');
-      d.body.classList.add('fp-modal-open');
-      d.body.style.top=`-${scrollY}px`;
-      modal.querySelector('.sheet')?.scrollTo(0,0);
-    };
-    const unlock=()=>{
-      if(!locked)return;
-      locked=false;
-      d.documentElement.classList.remove('fp-modal-open');
-      d.body.classList.remove('fp-modal-open');
-      d.body.style.top='';
-      w.scrollTo(0,scrollY);
-    };
-    new MutationObserver(()=>modal.classList.contains('open')?lock():unlock()).observe(modal,{attributes:true,attributeFilter:['class']});
+ const amount=$('amountInput'),error=$('entryError'),save=$('saveOperationBtn');
+ if(amount&&error&&save){
+  amount.inputMode='decimal';amount.autocomplete='off';amount.maxLength=9;
+  const hint=d.createElement('div');hint.className='fp-amount-hint';hint.textContent='Максимум одной операции: 999 999,99 €';amount.after(hint);
+  const normalize=value=>{let t=String(value??'').replace(/\s/g,'').replace('.',',').replace(/[^0-9,]/g,'');const c=t.indexOf(',');if(c!==-1)t=t.slice(0,c+1)+t.slice(c+1).replace(/,/g,'');let [a='',b='']=t.split(',');a=a.slice(0,6);b=b.slice(0,2);return c===-1?a:a+','+b};
+  const valid=()=>{const v=amount.value.trim(),ok=/^(?:0|[1-9]\d{0,5})(?:[.,]\d{1,2})?$/.test(v)&&Number(v.replace(',','.'))>0&&Number(v.replace(',','.'))<=999999.99;amount.classList.toggle('fp-amount-invalid',!ok&&v.length>0);return ok};
+  amount.addEventListener('input',()=>{amount.value=normalize(amount.value);if(error.textContent.includes('Сумма'))error.textContent='';valid()});
+  save.addEventListener('click',e=>{if(valid())return;e.preventDefault();e.stopImmediatePropagation();error.textContent='Сумма должна быть от 0,01 € до 999 999,99 €.';amount.focus()},true);
+ }
 
-    d.addEventListener('focusin',e=>{
-      if(!modal.classList.contains('open')||!e.target.matches('input,textarea,select'))return;
-      setTimeout(()=>{
-        const sheet=modal.querySelector('.sheet');
-        if(!sheet)return;
-        const rect=e.target.getBoundingClientRect();
-        const safeBottom=Math.max(110,Math.round(w.innerHeight*.22));
-        if(rect.bottom>w.innerHeight-safeBottom){sheet.scrollBy({top:rect.bottom-(w.innerHeight-safeBottom)+24,behavior:'smooth'})}
-        else if(rect.top<80){sheet.scrollBy({top:rect.top-100,behavior:'smooth'})}
-      },250);
-    });
+ const readApp=()=>{try{return JSON.parse(w.localStorage.getItem(APP_KEY)||'{}')}catch{return {transactions:[]}}};
+ const readPeriod=()=>{try{const p=JSON.parse(w.localStorage.getItem(PERIOD_KEY)||'{}');return {range:['day','week','month','year','all'].includes(p.range)?p.range:'month',anchor:Number(p.anchor)||Date.now()}}catch{return {range:'month',anchor:Date.now()}}};
+ let period=readPeriod();
+ const savePeriod=()=>w.localStorage.setItem(PERIOD_KEY,JSON.stringify(period));
+ const bounds=(range,anchor)=>{const a=new Date(anchor),y=a.getFullYear(),m=a.getMonth(),date=a.getDate();if(range==='day'){const s=new Date(y,m,date).getTime();return [s,new Date(y,m,date+1).getTime()]}if(range==='week'){const wd=(a.getDay()+6)%7,s=new Date(y,m,date-wd);return [s.getTime(),new Date(s.getFullYear(),s.getMonth(),s.getDate()+7).getTime()]}if(range==='month')return [new Date(y,m,1).getTime(),new Date(y,m+1,1).getTime()];if(range==='year')return [new Date(y,0,1).getTime(),new Date(y+1,0,1).getTime()];return [0,Infinity]};
+ const currentStart=range=>bounds(range,Date.now())[0];
+ const txForPeriod=()=>{const [s,e]=bounds(period.range,period.anchor);return (readApp().transactions||[]).filter(t=>Number(t.date)>=s&&Number(t.date)<e)};
+ const totals=list=>list.reduce((a,t)=>{a[t.kind]=(a[t.kind]||0)+Number(t.amount||0);return a},{income:0,expense:0});
+ const categorySummary=list=>{const x=list.filter(t=>t.kind==='expense'),total=x.reduce((s,t)=>s+Number(t.amount||0),0),map={};x.forEach(t=>map[t.category]=(map[t.category]||0)+Number(t.amount||0));return Object.entries(map).map(([name,value])=>({name,value,percent:total?value/total*100:0})).sort((a,b)=>b.value-a.value)};
+ const catsHtml=(list,limit=99)=>{const items=categorySummary(list).slice(0,limit);return items.length?items.map(x=>`<div class="cat"><div><div class="cat-row"><b>${esc(x.name)}</b><span>${Math.round(x.percent)}%</span></div><div class="bar"><i style="width:${Math.max(4,x.percent)}%"></i></div></div><b>${money(x.value)}</b></div>`).join(''):'<div class="empty">За выбранный период расходов нет.</div>'};
+ const monthNames=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+ const label=()=>{const [s,e]=bounds(period.range,period.anchor),a=new Date(s);if(period.range==='day')return new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric'}).format(a);if(period.range==='week'){const b=new Date(e-1);if(a.getMonth()===b.getMonth())return `${a.getDate()}–${b.getDate()} ${new Intl.DateTimeFormat('ru-RU',{month:'long',year:'numeric'}).format(b)}`;return `${new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short'}).format(a)} — ${new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',year:'numeric'}).format(b)}`}if(period.range==='month')return `${monthNames[a.getMonth()]} ${a.getFullYear()}`;if(period.range==='year')return `${a.getFullYear()} год`;return 'Всё доступное время'};
+ const shift=dir=>{const a=new Date(period.anchor);if(period.range==='day')a.setDate(a.getDate()+dir);if(period.range==='week')a.setDate(a.getDate()+7*dir);if(period.range==='month')a.setMonth(a.getMonth()+dir);if(period.range==='year')a.setFullYear(a.getFullYear()+dir);period.anchor=a.getTime();if(bounds(period.range,period.anchor)[0]>currentStart(period.range))period.anchor=Date.now();savePeriod();renderPeriod()};
 
-    const amount=d.getElementById('amountInput');
-    const error=d.getElementById('entryError');
-    const save=d.getElementById('saveOperationBtn');
-    if(amount&&save&&error){
-      amount.setAttribute('inputmode','decimal');
-      amount.setAttribute('autocomplete','off');
-      amount.setAttribute('maxlength','9');
-      const hint=d.createElement('div');
-      hint.className='fp-amount-hint';
-      hint.textContent='Максимум 999 999,99 € за одну операцию';
-      amount.insertAdjacentElement('afterend',hint);
+ const periodSelector=$('periodSelector'),balance=d.querySelector('.balance'),balanceHead=balance?.querySelector('.balance-head');
+ if(periodSelector&&balance&&balanceHead){periodSelector.classList.remove('card');balance.insertBefore(periodSelector,balanceHead.nextSibling)}
+ const navHtml='<div class="fp-period-nav"><button data-fp-prev aria-label="Предыдущий период">‹</button><button class="fp-period-label" data-fp-pick></button><button data-fp-next aria-label="Следующий период">›</button></div>';
+ periodSelector?.insertAdjacentHTML('afterend',navHtml);
+ const analytics=$('analyticsScreen');
+ if(analytics){
+  const title=analytics.querySelector('.page-title');if(title){title.classList.add('fp-has-back');title.insertAdjacentHTML('afterbegin','<button class="fp-back" data-fp-back aria-label="Назад">‹</button>')}
+  const first=analytics.querySelector('.card');first?.insertAdjacentHTML('beforebegin',`<section class="card section" id="fpAnalyticsPeriod"><div class="section-head"><h2>Период</h2></div>${navHtml}</section>`);
+ }
+ const operations=$('operationsScreen');
+ if(operations){const title=operations.querySelector('.page-title');if(title){title.classList.add('fp-has-back');title.insertAdjacentHTML('afterbegin','<button class="fp-back" data-fp-back aria-label="Назад">‹</button>')}}
 
-      const normalize=value=>{
-        let text=String(value??'').replace(/\s/g,'').replace('.',',').replace(/[^0-9,]/g,'');
-        const comma=text.indexOf(',');
-        if(comma!==-1){
-          text=text.slice(0,comma+1)+text.slice(comma+1).replace(/,/g,'');
-        }
-        let [whole='',fraction='']=text.split(',');
-        whole=whole.slice(0,6);
-        fraction=fraction.slice(0,2);
-        return comma===-1?whole:whole+','+fraction;
-      };
-      const validate=()=>{
-        const value=amount.value.trim();
-        const numeric=Number(value.replace(',','.'));
-        const valid=/^(?:0|[1-9]\d{0,5})(?:[.,]\d{1,2})?$/.test(value)&&numeric>0&&numeric<=999999.99;
-        amount.classList.toggle('fp-amount-invalid',!valid&&value.length>0);
-        return valid;
-      };
-      amount.addEventListener('input',()=>{
-        const normalized=normalize(amount.value);
-        if(amount.value!==normalized)amount.value=normalized;
-        if(error.textContent.includes('Сумма'))error.textContent='';
-        validate();
-      });
-      amount.addEventListener('paste',()=>setTimeout(()=>{amount.value=normalize(amount.value);validate()},0));
-      save.addEventListener('click',event=>{
-        if(validate())return;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        error.textContent='Сумма операции должна быть от 0,01 € до 999 999,99 € и содержать не более двух знаков после запятой.';
-        amount.focus();
-      },true);
-    }
-  });
+ d.body.insertAdjacentHTML('beforeend',`
+ <div id="fpPeriodOverlay" class="fp-overlay"><div class="fp-panel">
+  <div class="fp-panel-head"><h2 id="fpPickerTitle">Выберите период</h2><button class="close" data-fp-close>Закрыть</button></div>
+  <p id="fpPickerHelp"></p><input id="fpPickerInput" class="fp-picker-input">
+  <div class="fp-panel-actions"><button id="fpCurrentPeriod" class="fp-current">Текущий период</button><button id="fpApplyPeriod" class="fp-apply">Применить</button></div>
+ </div></div>
+ <div id="fpInfoOverlay" class="fp-overlay"><div class="fp-panel">
+  <div class="fp-panel-head"><h2>Что такое капитал</h2><button class="close" data-fp-close>Закрыть</button></div>
+  <p>Капитал — текущая сумма денег семьи с учётом всех сохранённых приходов и расходов. Он считается за всю историю и не меняется при переключении периода финансового баланса.</p>
+ </div></div>`);
+
+ const openPicker=()=>{
+  if(period.range==='all')return;
+  const input=$('fpPickerInput'),a=new Date(period.anchor),pad=n=>String(n).padStart(2,'0');
+  if(period.range==='month'){input.type='month';input.value=`${a.getFullYear()}-${pad(a.getMonth()+1)}`;$('fpPickerHelp').textContent='Выберите месяц и год.'}
+  else if(period.range==='year'){input.type='number';input.min='1900';input.max=String(new Date().getFullYear());input.value=String(a.getFullYear());$('fpPickerHelp').textContent='Введите год.'}
+  else{input.type='date';input.max=`${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`;input.value=`${a.getFullYear()}-${pad(a.getMonth()+1)}-${pad(a.getDate())}`;$('fpPickerHelp').textContent=period.range==='week'?'Выберите любую дату нужной недели.':'Выберите дату.'}
+  $('fpPickerTitle').textContent={day:'Выберите день',week:'Выберите неделю',month:'Выберите месяц',year:'Выберите год'}[period.range];
+  $('fpPeriodOverlay').classList.add('open')
+ };
+ const applyPicker=()=>{const input=$('fpPickerInput');let a;if(period.range==='month'){const [y,m]=input.value.split('-').map(Number);a=new Date(y,m-1,1)}else if(period.range==='year')a=new Date(Number(input.value),0,1);else a=new Date(input.value+'T12:00:00');if(!Number.isFinite(a.getTime()))return;period.anchor=Math.min(a.getTime(),Date.now());savePeriod();$('fpPeriodOverlay').classList.remove('open');renderPeriod()};
+
+ let applying=false;
+ const renderPeriod=()=>{
+  applying=true;
+  const list=txForPeriod(),t=totals(list),diff=t.income-t.expense;
+  $('expenseTop')&&($('expenseTop').textContent=money(t.expense));$('incomeTop')&&($('incomeTop').textContent=money(t.income));
+  $('expenseMetric')&&($('expenseMetric').textContent=money(t.expense));$('incomeMetric')&&($('incomeMetric').textContent=money(t.income));
+  if($('diffMetric')){$('diffMetric').textContent=signed(diff);$('diffMetric').classList.toggle('positive',diff>=0);$('diffMetric').classList.toggle('negative',diff<0)}
+  const total=t.income+t.expense,pct=total?t.income/total*100:50;
+  if($('balanceMarker'))$('balanceMarker').style.left=pct+'%';
+  if($('resultLabel')){const el=$('resultLabel');el.style.left=pct+'%';el.textContent=signed(diff);el.className='result-label '+(pct<8?'left':pct>92?'right':'center')}
+  if($('topCategories'))$('topCategories').innerHTML=catsHtml(list,3);
+  if($('analyticsIncome'))$('analyticsIncome').textContent=money(t.income);
+  if($('analyticsExpense'))$('analyticsExpense').textContent=money(t.expense);
+  if($('analyticsDiff')){$('analyticsDiff').textContent=signed(diff);$('analyticsDiff').classList.toggle('positive',diff>=0);$('analyticsDiff').classList.toggle('negative',diff<0)}
+  if($('analyticsCategories'))$('analyticsCategories').innerHTML=catsHtml(list);
+  d.querySelectorAll('[data-range]').forEach(b=>b.classList.toggle('active',b.dataset.range===period.range));
+  d.querySelectorAll('[data-fp-pick]').forEach(b=>b.textContent=label());
+  d.querySelectorAll('[data-fp-prev]').forEach(b=>b.disabled=period.range==='all');
+  const atCurrent=period.range==='all'||bounds(period.range,period.anchor)[0]>=currentStart(period.range);
+  d.querySelectorAll('[data-fp-next]').forEach(b=>b.disabled=atCurrent);
+  d.querySelectorAll('.fp-period-nav').forEach(n=>n.style.gridTemplateColumns=period.range==='all'?'1fr':'42px 1fr 42px');
+  d.querySelectorAll('[data-fp-prev],[data-fp-next]').forEach(b=>b.style.display=period.range==='all'?'none':'');
+  applying=false;
+ };
+
+ const nativeAll=d.querySelector('[data-range="all"]');nativeAll?.click();
+ d.addEventListener('click',e=>{
+  const range=e.target.closest('[data-range]');
+  if(range){e.preventDefault();e.stopImmediatePropagation();period.range=range.dataset.range;period.anchor=Math.min(period.anchor||Date.now(),Date.now());savePeriod();renderPeriod();if(period.range!=='all')openPicker();return}
+  if(e.target.closest('[data-fp-prev]')){shift(-1);return}
+  if(e.target.closest('[data-fp-next]')){shift(1);return}
+  if(e.target.closest('[data-fp-pick]')){openPicker();return}
+  if(e.target.closest('#fpApplyPeriod')){applyPicker();return}
+  if(e.target.closest('#fpCurrentPeriod')){period.anchor=Date.now();savePeriod();$('fpPeriodOverlay').classList.remove('open');renderPeriod();return}
+  if(e.target.closest('[data-fp-close]')){e.target.closest('.fp-overlay')?.classList.remove('open');return}
+  if(e.target.closest('.capital .info')){$('fpInfoOverlay').classList.add('open');return}
+  if(e.target.closest('[data-fp-back]')){d.querySelector('[data-screen="home"]')?.click();setTimeout(renderPeriod,0);return}
+  if(e.target.closest('#analyticsBtn'))setTimeout(renderPeriod,0);
+ },true);
+ $('fpPeriodOverlay')?.addEventListener('click',e=>{if(e.target===$('fpPeriodOverlay'))$('fpPeriodOverlay').classList.remove('open')});
+ $('fpInfoOverlay')?.addEventListener('click',e=>{if(e.target===$('fpInfoOverlay'))$('fpInfoOverlay').classList.remove('open')});
+
+ let startX=0,startY=0,edge=false;
+ d.addEventListener('touchstart',e=>{const t=e.touches[0];startX=t.clientX;startY=t.clientY;edge=startX<24},{passive:true});
+ d.addEventListener('touchend',e=>{if(!edge)return;const t=e.changedTouches[0];if(t.clientX-startX>70&&Math.abs(t.clientY-startY)<55){const active=d.querySelector('.screen.active');if(active&&active.id!=='homeScreen')d.querySelector('[data-screen="home"]')?.click()}edge=false},{passive:true});
+
+ const cap=$('capitalValue');if(cap)new MutationObserver(()=>{if(!applying)setTimeout(renderPeriod,0)}).observe(cap,{subtree:true,childList:true,characterData:true});
+ renderPeriod();
+});
 })();
 </script>
 </body>
