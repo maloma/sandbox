@@ -11,7 +11,7 @@ iframe{position:fixed;left:0;top:var(--vv-top,0px);display:block;width:100%;heig
 </style>
 </head>
 <body>
-<iframe id="app" src="./main-v7.html?mobilefix=3" title="FamilyPilot"></iframe>
+<iframe id="app" src="./main-v7.html?mobilefix=4" title="FamilyPilot"></iframe>
 <script>
 (()=>{
   const frame=document.getElementById('app');
@@ -29,10 +29,10 @@ iframe{position:fixed;left:0;top:var(--vv-top,0px);display:block;width:100%;heig
 
   frame.addEventListener('load',()=>{
     const w=frame.contentWindow,d=w.document;
-    if(!d||d.getElementById('fp-mobile-modal-fix3'))return;
+    if(!d||d.getElementById('fp-mobile-modal-fix4'))return;
 
     const style=d.createElement('style');
-    style.id='fp-mobile-modal-fix3';
+    style.id='fp-mobile-modal-fix4';
     style.textContent=`
       html.fp-modal-open,body.fp-modal-open{overflow:hidden!important;overscroll-behavior:none!important}
       body.fp-modal-open{position:fixed!important;inset:0!important;width:100%!important;height:100%!important}
@@ -43,6 +43,8 @@ iframe{position:fixed;left:0;top:var(--vv-top,0px);display:block;width:100%;heig
       #entryModal .sheet-actions{position:fixed!important;left:50%!important;transform:translateX(-50%)!important;bottom:0!important;z-index:30!important;width:min(100%,480px)!important;display:grid!important;grid-template-columns:1fr 1.5fr!important;gap:9px!important;margin:0!important;padding:10px 18px calc(10px + env(safe-area-inset-bottom))!important;background:linear-gradient(to top,var(--bg) 80%,color-mix(in srgb,var(--bg) 92%,transparent))!important;border-top:1px solid var(--line)!important}
       #entryModal textarea{min-height:120px!important}
       #entryModal .field:last-of-type{margin-bottom:18px!important}
+      #amountInput.fp-amount-invalid{border-color:var(--red)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--red) 14%,transparent)!important}
+      .fp-amount-hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.35}
     `;
     d.head.appendChild(style);
 
@@ -79,6 +81,51 @@ iframe{position:fixed;left:0;top:var(--vv-top,0px);display:block;width:100%;heig
         else if(rect.top<80){sheet.scrollBy({top:rect.top-100,behavior:'smooth'})}
       },250);
     });
+
+    const amount=d.getElementById('amountInput');
+    const error=d.getElementById('entryError');
+    const save=d.getElementById('saveOperationBtn');
+    if(amount&&save&&error){
+      amount.setAttribute('inputmode','decimal');
+      amount.setAttribute('autocomplete','off');
+      amount.setAttribute('maxlength','15');
+      const hint=d.createElement('div');
+      hint.className='fp-amount-hint';
+      hint.textContent='Максимум 999 999 999 999,99 €';
+      amount.insertAdjacentElement('afterend',hint);
+
+      const normalize=value=>{
+        let text=String(value??'').replace(/\s/g,'').replace('.',',').replace(/[^0-9,]/g,'');
+        const comma=text.indexOf(',');
+        if(comma!==-1){
+          text=text.slice(0,comma+1)+text.slice(comma+1).replace(/,/g,'');
+        }
+        let [whole='',fraction='']=text.split(',');
+        whole=whole.slice(0,12);
+        fraction=fraction.slice(0,2);
+        return comma===-1?whole:whole+','+fraction;
+      };
+      const validate=()=>{
+        const value=amount.value.trim();
+        const valid=/^(?:0|[1-9]\d{0,11})(?:[.,]\d{1,2})?$/.test(value)&&Number(value.replace(',','.'))>0&&Number(value.replace(',','.'))<=999999999999.99;
+        amount.classList.toggle('fp-amount-invalid',!valid&&value.length>0);
+        return valid;
+      };
+      amount.addEventListener('input',()=>{
+        const normalized=normalize(amount.value);
+        if(amount.value!==normalized)amount.value=normalized;
+        if(error.textContent.includes('Сумма'))error.textContent='';
+        validate();
+      });
+      amount.addEventListener('paste',()=>setTimeout(()=>{amount.value=normalize(amount.value);validate()},0));
+      save.addEventListener('click',event=>{
+        if(validate())return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        error.textContent='Сумма должна быть от 0,01 € до 999 999 999 999,99 € и содержать не более двух знаков после запятой.';
+        amount.focus();
+      },true);
+    }
   });
 })();
 </script>
