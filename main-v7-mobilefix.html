@@ -1,41 +1,571 @@
 <!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta http-equiv="cache-control" content="no-store"><title>FamilyPilot</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#f5f7fb}iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#f5f7fb}</style></head>
-<body><iframe id="app" title="FamilyPilot"></iframe><script>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta http-equiv="cache-control" content="no-store">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>FamilyPilot</title>
+  <style>
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#f5f7fb}
+    iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#f5f7fb}
+  </style>
+</head>
+<body>
+<iframe id="app" title="FamilyPilot"></iframe>
+<script>
 (()=>{
-const frame=document.getElementById('app');
-function boot(){
- const w=frame.contentWindow,d=w&&w.document;
- if(!d||d.readyState==='loading'||d.getElementById('fp-v6'))return;
- const $=id=>d.getElementById(id),APP='familypilot.main.v7',PKEY='familypilot.period.selection.v2';
- const css=d.createElement('style');css.id='fp-v6';css.textContent=`
- html.fp-lock,body.fp-lock{overflow:hidden!important;overscroll-behavior:none!important}body.fp-lock{position:fixed!important;inset:0!important;width:100%!important;height:100%!important}
- #entryModal.modal{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;display:none!important;align-items:stretch!important;overflow:hidden!important}#entryModal.modal.open{display:flex!important}
- #entryModal .sheet{width:min(100%,480px)!important;height:100%!important;max-height:none!important;margin:0 auto!important;border-radius:0!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;padding:18px 18px 112px!important;background:var(--bg)!important}
- #entryModal .sheet-head{position:sticky!important;top:-18px!important;z-index:10!important;background:var(--bg)!important;padding:18px 0 12px!important;margin-top:-18px!important}
- #entryModal .sheet-actions{position:fixed!important;left:50%!important;transform:translateX(-50%)!important;bottom:0!important;z-index:30!important;width:min(100%,480px)!important;margin:0!important;padding:10px 18px calc(10px + env(safe-area-inset-bottom))!important;background:var(--bg)!important;border-top:1px solid var(--line)!important}
- #entryModal textarea{min-height:120px!important}.fp-hint{font-size:11px;color:var(--muted);margin-top:6px}.fp-invalid{border-color:var(--red)!important}
- .balance>#periodSelector{margin:10px 0 0!important;border:1px solid var(--line)!important;box-shadow:none!important;background:var(--card2)!important;border-radius:15px!important}
- .fp-period-nav{display:grid;grid-template-columns:42px 1fr 42px;gap:6px;align-items:center;margin:7px 0 14px}.fp-period-nav button{height:38px;border:1px solid var(--line);border-radius:12px;background:var(--card2);color:var(--ink);font-weight:900}.fp-period-label{font-size:13px!important}.fp-period-nav button:disabled{opacity:.3}
- .fp-back{width:38px;height:38px;border:1px solid var(--line);border-radius:13px;background:var(--card);color:var(--ink);font-size:24px;margin-right:8px}.page-title.fp-back-title{justify-content:flex-start!important}
- .fp-overlay{display:none;position:fixed;inset:0;z-index:100;background:rgba(4,18,28,.55);align-items:flex-end;justify-content:center}.fp-overlay.open{display:flex}.fp-panel{width:min(100%,480px);background:var(--bg);border-radius:24px 24px 0 0;padding:18px 18px calc(20px + env(safe-area-inset-bottom))}.fp-panel-head{display:flex;justify-content:space-between;align-items:center}.fp-panel h2{margin:0}.fp-input{width:100%;min-height:52px;border:1px solid var(--line);border-radius:15px;background:var(--card);color:var(--ink);padding:12px;font:inherit;font-size:17px;margin-top:12px}.fp-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}.fp-actions button{min-height:48px;border:0;border-radius:15px;font-weight:900}.fp-primary{background:var(--green);color:#fff}
- `;d.head.appendChild(css);
- const modal=$('entryModal');let sy=0;
- if(modal){new MutationObserver(()=>{if(modal.classList.contains('open')){sy=w.scrollY||0;d.documentElement.classList.add('fp-lock');d.body.classList.add('fp-lock');d.body.style.top=`-${sy}px`}else{d.documentElement.classList.remove('fp-lock');d.body.classList.remove('fp-lock');d.body.style.top='';w.scrollTo(0,sy)}}).observe(modal,{attributes:true,attributeFilter:['class']});}
- const amount=$('amountInput'),err=$('entryError'),save=$('saveOperationBtn');if(amount&&save&&err){amount.maxLength=9;amount.inputMode='decimal';const h=d.createElement('div');h.className='fp-hint';h.textContent='Максимум одной операции: 999 999,99 €';amount.after(h);const norm=v=>{let t=String(v||'').replace(/\s/g,'').replace('.',',').replace(/[^0-9,]/g,'');const c=t.indexOf(',');if(c>=0)t=t.slice(0,c+1)+t.slice(c+1).replace(/,/g,'');let [a='',b='']=t.split(',');a=a.slice(0,6);b=b.slice(0,2);return c<0?a:a+','+b};const valid=()=>{const v=amount.value.trim(),ok=/^(?:0|[1-9]\d{0,5})(?:[.,]\d{1,2})?$/.test(v)&&Number(v.replace(',','.'))>0&&Number(v.replace(',','.'))<=999999.99;amount.classList.toggle('fp-invalid',!ok&&v.length>0);return ok};amount.addEventListener('input',()=>{amount.value=norm(amount.value);valid()});save.addEventListener('click',e=>{if(valid())return;e.preventDefault();e.stopImmediatePropagation();err.textContent='Сумма должна быть от 0,01 € до 999 999,99 €.';amount.focus()},true)}
- const read=()=>{try{return JSON.parse(w.localStorage.getItem(APP)||'{}')}catch{return {transactions:[]}}};let p;try{p=JSON.parse(w.localStorage.getItem(PKEY)||'{}')}catch{};p={range:['day','week','month','year','all'].includes(p?.range)?p.range:'month',anchor:Number(p?.anchor)||Date.now()};const saveP=()=>w.localStorage.setItem(PKEY,JSON.stringify(p));
- const bounds=(r,a)=>{const x=new Date(a),y=x.getFullYear(),m=x.getMonth(),dt=x.getDate();if(r==='day')return [new Date(y,m,dt).getTime(),new Date(y,m,dt+1).getTime()];if(r==='week'){const q=(x.getDay()+6)%7,s=new Date(y,m,dt-q);return [s.getTime(),new Date(s.getFullYear(),s.getMonth(),s.getDate()+7).getTime()]};if(r==='month')return [new Date(y,m,1).getTime(),new Date(y,m+1,1).getTime()];if(r==='year')return [new Date(y,0,1).getTime(),new Date(y+1,0,1).getTime()];return [0,Infinity]};
- const label=()=>{const [s,e]=bounds(p.range,p.anchor),a=new Date(s);if(p.range==='day')return new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric'}).format(a);if(p.range==='week'){const b=new Date(e-1);return `${new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short'}).format(a)} — ${new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',year:'numeric'}).format(b)}`};if(p.range==='month')return new Intl.DateTimeFormat('ru-RU',{month:'long',year:'numeric'}).format(a);if(p.range==='year')return a.getFullYear()+' год';return 'Всё время'};
- const tx=()=>{const [s,e]=bounds(p.range,p.anchor);return (read().transactions||[]).filter(t=>t.date>=s&&t.date<e)};const totals=l=>l.reduce((a,t)=>(a[t.kind]=(a[t.kind]||0)+Number(t.amount||0),a),{income:0,expense:0});const money=v=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Math.abs(v))+' €';const signed=v=>(v>0?'+':v<0?'−':'')+money(v);
- const render=()=>{const t=totals(tx()),diff=t.income-t.expense,total=t.income+t.expense,pct=total?t.income/total*100:50;[['expenseTop',t.expense],['expenseMetric',t.expense],['incomeTop',t.income],['incomeMetric',t.income],['analyticsIncome',t.income],['analyticsExpense',t.expense]].forEach(([id,v])=>{if($(id))$(id).textContent=money(v)});['diffMetric','analyticsDiff'].forEach(id=>{if($(id))$(id).textContent=signed(diff)});if($('balanceMarker'))$('balanceMarker').style.left=pct+'%';if($('resultLabel')){$('resultLabel').style.left=pct+'%';$('resultLabel').textContent=signed(diff)};d.querySelectorAll('[data-range]').forEach(b=>b.classList.toggle('active',b.dataset.range===p.range));d.querySelectorAll('[data-fp-label]').forEach(b=>b.textContent=label());d.querySelectorAll('[data-fp-next]').forEach(b=>b.disabled=p.range==='all'||bounds(p.range,p.anchor)[0]>=bounds(p.range,Date.now())[0]);d.querySelectorAll('[data-fp-prev]').forEach(b=>b.disabled=p.range==='all')};
- const selector=$('periodSelector'),balance=d.querySelector('.balance'),head=balance?.querySelector('.balance-head');if(selector&&balance&&head){selector.classList.remove('card');balance.insertBefore(selector,head.nextSibling)}const nav='<div class="fp-period-nav"><button data-fp-prev>‹</button><button class="fp-period-label" data-fp-label></button><button data-fp-next>›</button></div>';selector?.insertAdjacentHTML('afterend',nav);
- ['operationsScreen','analyticsScreen'].forEach(id=>{const title=$(id)?.querySelector('.page-title');if(title){title.classList.add('fp-back-title');title.insertAdjacentHTML('afterbegin','<button class="fp-back" data-fp-back>‹</button>')}});$('analyticsScreen')?.querySelector('.card')?.insertAdjacentHTML('beforebegin',`<section class="card section"><h2 style="font-size:15px;margin:0">Период</h2>${nav}</section>`);
- d.body.insertAdjacentHTML('beforeend','<div id="fpPicker" class="fp-overlay"><div class="fp-panel"><div class="fp-panel-head"><h2>Выберите период</h2><button class="close" data-fp-close>Закрыть</button></div><input id="fpPickInput" class="fp-input"><div class="fp-actions"><button data-fp-current>Текущий</button><button class="fp-primary" data-fp-apply>Применить</button></div></div></div><div id="fpInfo" class="fp-overlay"><div class="fp-panel"><div class="fp-panel-head"><h2>Что такое капитал</h2><button class="close" data-fp-close>Закрыть</button></div><p>Капитал — текущая сумма денег семьи с учётом всех сохранённых приходов и расходов. Он считается за всё время.</p></div></div>');
- const openPicker=()=>{if(p.range==='all')return;const i=$('fpPickInput'),a=new Date(p.anchor),pad=n=>String(n).padStart(2,'0');if(p.range==='month'){i.type='month';i.value=`${a.getFullYear()}-${pad(a.getMonth()+1)}`}else if(p.range==='year'){i.type='number';i.value=a.getFullYear();i.max=new Date().getFullYear()}else{i.type='date';i.value=`${a.getFullYear()}-${pad(a.getMonth()+1)}-${pad(a.getDate())}`};$('fpPicker').classList.add('open')};
- const shift=n=>{const a=new Date(p.anchor);if(p.range==='day')a.setDate(a.getDate()+n);if(p.range==='week')a.setDate(a.getDate()+7*n);if(p.range==='month')a.setMonth(a.getMonth()+n);if(p.range==='year')a.setFullYear(a.getFullYear()+n);p.anchor=Math.min(a.getTime(),Date.now());saveP();render()};
- d.addEventListener('click',e=>{const r=e.target.closest('[data-range]');if(r){e.preventDefault();e.stopImmediatePropagation();p.range=r.dataset.range;p.anchor=Date.now();saveP();render();openPicker();return}if(e.target.closest('[data-fp-prev]'))return shift(-1);if(e.target.closest('[data-fp-next]'))return shift(1);if(e.target.closest('[data-fp-label]'))return openPicker();if(e.target.closest('[data-fp-close]'))return e.target.closest('.fp-overlay')?.classList.remove('open');if(e.target.closest('[data-fp-current]')){p.anchor=Date.now();saveP();$('fpPicker').classList.remove('open');return render()}if(e.target.closest('[data-fp-apply]')){const i=$('fpPickInput');let a;if(p.range==='month'){const [y,m]=i.value.split('-').map(Number);a=new Date(y,m-1,1)}else if(p.range==='year')a=new Date(Number(i.value),0,1);else a=new Date(i.value+'T12:00:00');if(Number.isFinite(a.getTime())){p.anchor=Math.min(a.getTime(),Date.now());saveP();$('fpPicker').classList.remove('open');render()}return}if(e.target.closest('.capital .info'))return $('fpInfo').classList.add('open');if(e.target.closest('[data-fp-back]'))return d.querySelector('[data-screen="home"]')?.click()},true);
- let sx=0,syy=0,edge=false;d.addEventListener('touchstart',e=>{const t=e.touches[0];sx=t.clientX;syy=t.clientY;edge=sx<24},{passive:true});d.addEventListener('touchend',e=>{const t=e.changedTouches[0];if(edge&&t.clientX-sx>70&&Math.abs(t.clientY-syy)<55)d.querySelector('[data-screen="home"]')?.click();edge=false},{passive:true});
- render();
-}
-frame.addEventListener('load',boot);frame.src='./main-v7.html?mobilefix=6&t='+Date.now();setTimeout(boot,300);setTimeout(boot,1000);
+  'use strict';
+  const frame=document.getElementById('app');
+  const ENHANCEMENT_ID='fp-v7-updates';
+
+  function boot(){
+    const w=frame.contentWindow;
+    const d=w&&w.document;
+    if(!d||d.readyState==='loading'||d.getElementById(ENHANCEMENT_ID))return;
+
+    const $=id=>d.getElementById(id);
+    const APP_KEY='familypilot.main.v7';
+    const PERIOD_KEY='familypilot.period.selection.v3';
+    const periodTypes=['day','week','month','year','all'];
+
+    const css=d.createElement('style');
+    css.id=ENHANCEMENT_ID;
+    css.textContent=`
+      html.fp-lock,body.fp-lock{overflow:hidden!important;overscroll-behavior:none!important}
+      body.fp-lock{position:fixed!important;inset:0!important;width:100%!important;height:100%!important}
+      #entryModal.modal{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;display:none!important;align-items:stretch!important;overflow:hidden!important}
+      #entryModal.modal.open{display:flex!important}
+      #entryModal .sheet{width:min(100%,480px)!important;height:100%!important;max-height:none!important;margin:0 auto!important;border-radius:0!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;padding:18px 18px 112px!important;background:var(--bg)!important}
+      #entryModal .sheet-head{position:sticky!important;top:-18px!important;z-index:10!important;background:var(--bg)!important;padding:18px 0 12px!important;margin-top:-18px!important}
+      #entryModal .sheet-actions{position:fixed!important;left:50%!important;transform:translateX(-50%)!important;bottom:0!important;z-index:30!important;width:min(100%,480px)!important;margin:0!important;padding:10px 18px calc(10px + env(safe-area-inset-bottom))!important;background:var(--bg)!important;border-top:1px solid var(--line)!important}
+      #entryModal textarea{min-height:120px!important}
+      .fp-hint{font-size:11px;color:var(--muted);margin-top:6px}
+      .fp-invalid{border-color:var(--red)!important}
+      .balance>#periodSelector{margin:10px 0 0!important;border:1px solid var(--line)!important;box-shadow:none!important;background:var(--card2)!important;border-radius:15px!important}
+      .fp-range{display:grid;grid-template-columns:repeat(5,1fr);gap:2px;padding:3px;margin-top:10px;border:1px solid var(--line);border-radius:15px;background:var(--card2)}
+      .fp-range button{height:34px;border:0;border-radius:12px;background:transparent;color:var(--muted);font-size:12px;font-weight:800;padding:0 2px}
+      .fp-range button.active{background:var(--card);color:var(--green);box-shadow:0 2px 8px rgba(35,54,86,.1)}
+      .fp-period-nav{display:grid;grid-template-columns:42px 1fr 42px;gap:6px;align-items:center;margin:7px 0 14px}
+      .fp-period-nav button{height:38px;border:1px solid var(--line);border-radius:12px;background:var(--card2);color:var(--ink);font-weight:900}
+      .fp-period-label{font-size:13px!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 8px!important}
+      .fp-period-nav button:disabled{opacity:.3}
+      .fp-back{width:38px;height:38px;border:1px solid var(--line);border-radius:13px;background:var(--card);color:var(--ink);font-size:24px;margin-right:8px}
+      .page-title.fp-back-title{justify-content:flex-start!important}
+      .fp-overlay{display:none;position:fixed;inset:0;z-index:100;background:rgba(4,18,28,.55);align-items:flex-end;justify-content:center}
+      .fp-overlay.open{display:flex}
+      .fp-panel{width:min(100%,480px);max-height:88dvh;overflow:auto;background:var(--bg);border-radius:24px 24px 0 0;padding:18px 18px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -12px 40px rgba(0,0,0,.2)}
+      .fp-panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+      .fp-panel h2{margin:0;font-size:21px}
+      .fp-input{width:100%;min-height:52px;border:1px solid var(--line);border-radius:15px;background:var(--card);color:var(--ink);padding:12px;font:inherit;font-size:17px;margin-top:12px}
+      .fp-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+      .fp-actions button{min-height:48px;border:0;border-radius:15px;font-weight:900}
+      .fp-primary{background:var(--green);color:#fff}
+      .fp-info-intro{color:var(--muted);line-height:1.45;margin:14px 0 10px}
+      .fp-breakdown{border:1px solid var(--line);border-radius:16px;background:var(--card);overflow:hidden}
+      .fp-breakdown-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:11px 13px;border-top:1px solid var(--line);font-size:14px}
+      .fp-breakdown-row:first-child{border-top:0}
+      .fp-breakdown-row strong{white-space:nowrap}
+      .fp-breakdown-row.total{font-size:16px;background:var(--card2)}
+      .fp-future-note{font-size:13px;color:var(--muted);line-height:1.45;margin:12px 2px 0}
+      .fp-balance-link{cursor:pointer;border-radius:12px;transition:background .15s,transform .15s}
+      .fp-balance-link:active{background:var(--card2);transform:scale(.98)}
+      .edge-label.fp-balance-link{padding:5px 7px;margin:-5px -7px}
+      .metric.fp-balance-link{padding-top:10px!important}
+      #resultLabel.fp-balance-link{padding:3px 6px}
+      #fpOpsPeriod{padding:10px 13px;margin-bottom:9px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+      #fpOpsPeriod span{font-size:12px;color:var(--muted);font-weight:800}
+      #fpOpsPeriod strong{font-size:13px;text-align:right}
+      #fpAnalyticsPeriod{padding-bottom:4px}
+      #fpAnalyticsPeriod h2{font-size:15px;margin:0}
+    `;
+    d.head.appendChild(css);
+
+    const readState=()=>{
+      try{
+        const value=JSON.parse(w.localStorage.getItem(APP_KEY)||'{}');
+        return value&&Array.isArray(value.transactions)?value:{transactions:[],baseCapital:0};
+      }catch{
+        return {transactions:[],baseCapital:0};
+      }
+    };
+
+    const normalizePeriod=value=>({
+      range:periodTypes.includes(value&&value.range)?value.range:'month',
+      anchor:Number(value&&value.anchor)||Date.now()
+    });
+
+    let savedPeriods={};
+    try{savedPeriods=JSON.parse(w.localStorage.getItem(PERIOD_KEY)||'{}')||{}}catch{}
+    const periods={
+      home:normalizePeriod(savedPeriods.home),
+      analytics:normalizePeriod(savedPeriods.analytics)
+    };
+    const savePeriods=()=>w.localStorage.setItem(PERIOD_KEY,JSON.stringify(periods));
+
+    const bounds=(range,anchor)=>{
+      const x=new Date(anchor),year=x.getFullYear(),month=x.getMonth(),date=x.getDate();
+      if(range==='day')return [new Date(year,month,date).getTime(),new Date(year,month,date+1).getTime()];
+      if(range==='week'){
+        const offset=(x.getDay()+6)%7;
+        const start=new Date(year,month,date-offset);
+        return [start.getTime(),new Date(start.getFullYear(),start.getMonth(),start.getDate()+7).getTime()];
+      }
+      if(range==='month')return [new Date(year,month,1).getTime(),new Date(year,month+1,1).getTime()];
+      if(range==='year')return [new Date(year,0,1).getTime(),new Date(year+1,0,1).getTime()];
+      return [0,Infinity];
+    };
+
+    const periodLabel=period=>{
+      const [start,end]=bounds(period.range,period.anchor);
+      const a=new Date(start);
+      if(period.range==='day')return new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric'}).format(a);
+      if(period.range==='week'){
+        const b=new Date(end-1);
+        return `${new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short'}).format(a)} — ${new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',year:'numeric'}).format(b)}`;
+      }
+      if(period.range==='month')return new Intl.DateTimeFormat('ru-RU',{month:'long',year:'numeric'}).format(a);
+      if(period.range==='year')return `${a.getFullYear()} год`;
+      return 'Всё время';
+    };
+
+    const transactionsFor=period=>{
+      const [start,end]=bounds(period.range,period.anchor);
+      return readState().transactions.filter(t=>Number(t.date)>=start&&Number(t.date)<end);
+    };
+    const totals=list=>list.reduce((acc,t)=>{
+      if(t.kind==='income'||t.kind==='expense')acc[t.kind]+=Number(t.amount)||0;
+      return acc;
+    },{income:0,expense:0});
+    const money=value=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Math.abs(Number(value)||0))+' €';
+    const signed=value=>(value>0?'+':value<0?'−':'')+money(value);
+    const escapeHtml=value=>String(value).replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+
+    const categoryHtml=list=>{
+      const expenses=list.filter(t=>t.kind==='expense');
+      const total=expenses.reduce((sum,t)=>sum+(Number(t.amount)||0),0);
+      const map={};
+      expenses.forEach(t=>map[t.category]=(map[t.category]||0)+(Number(t.amount)||0));
+      const items=Object.entries(map).map(([name,value])=>({name,value,percent:total?value/total*100:0})).sort((a,b)=>b.value-a.value);
+      if(!items.length)return '<div class="empty">За выбранный период расходов нет.</div>';
+      return items.map(item=>`<div class="cat"><div><div class="cat-row"><b>${escapeHtml(item.name)}</b><span>${Math.round(item.percent)}%</span></div><div class="bar"><i style="width:${Math.max(4,item.percent)}%"></i></div></div><b>${money(item.value)}</b></div>`).join('');
+    };
+
+    const operationHtml=t=>`<div class="operation" data-operation-id="${escapeHtml(t.id)}"><div class="op-icon ${t.kind}">${t.kind==='income'?'＋':'−'}</div><div><div class="op-title">${escapeHtml(t.category)}${t.receipt?'<span class="receipt-dot" title="Есть чек"></span>':''}</div><div class="op-meta">${new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date(t.date))}${t.note?' · '+escapeHtml(t.note):''}</div></div><div class="op-value ${t.kind==='income'?'positive':'negative'}">${t.kind==='income'?'+':'−'}${money(t.amount)}</div></div>`;
+
+    const originalSelector=$('periodSelector');
+    const balance=d.querySelector('.balance');
+    const balanceHead=balance&&balance.querySelector('.balance-head');
+    if(originalSelector&&balance&&balanceHead){
+      originalSelector.classList.remove('card');
+      originalSelector.querySelectorAll('[data-range]').forEach(button=>{
+        button.dataset.fpRange=button.dataset.range;
+        button.dataset.fpContext='home';
+        button.removeAttribute('data-range');
+      });
+      balance.insertBefore(originalSelector,balanceHead.nextSibling);
+    }
+
+    const navMarkup=context=>`<div class="fp-period-nav" data-fp-nav="${context}"><button type="button" data-fp-prev data-fp-context="${context}" aria-label="Предыдущий период">‹</button><button type="button" class="fp-period-label" data-fp-label data-fp-context="${context}"></button><button type="button" data-fp-next data-fp-context="${context}" aria-label="Следующий период">›</button></div>`;
+    if(originalSelector&&!d.querySelector('[data-fp-nav="home"]'))originalSelector.insertAdjacentHTML('afterend',navMarkup('home'));
+
+    const analyticsScreen=$('analyticsScreen');
+    if(analyticsScreen&&!$('fpAnalyticsPeriod')){
+      const rangeButtons=[['day','День'],['week','Неделя'],['month','Месяц'],['year','Год'],['all','Всё время']]
+        .map(([range,text])=>`<button type="button" data-fp-range="${range}" data-fp-context="analytics">${text}</button>`).join('');
+      analyticsScreen.querySelector('.card')?.insertAdjacentHTML('beforebegin',`<section id="fpAnalyticsPeriod" class="card section"><h2>Период аналитики</h2><div class="fp-range">${rangeButtons}</div>${navMarkup('analytics')}</section>`);
+    }
+
+    const operationsScreen=$('operationsScreen');
+    if(operationsScreen&&!$('fpOpsPeriod'))operationsScreen.querySelector('.filters')?.insertAdjacentHTML('beforebegin','<section id="fpOpsPeriod" class="card"><span>Период списка</span><strong id="fpOpsPeriodLabel">Всё время</strong></section>');
+
+    ['operationsScreen','analyticsScreen'].forEach(id=>{
+      const title=$(id)?.querySelector('.page-title');
+      if(title&&!title.querySelector('[data-fp-back]')){
+        title.classList.add('fp-back-title');
+        title.insertAdjacentHTML('afterbegin','<button type="button" class="fp-back" data-fp-back aria-label="Назад">‹</button>');
+      }
+    });
+
+    const markBalanceLink=(element,filter)=>{
+      if(!element)return;
+      element.classList.add('fp-balance-link');
+      element.dataset.fpOpenOps=filter;
+      element.setAttribute('role','button');
+      element.setAttribute('tabindex','0');
+    };
+    markBalanceLink($('expenseTop')?.closest('.edge-label'),'expense');
+    markBalanceLink($('incomeTop')?.closest('.edge-label'),'income');
+    markBalanceLink($('expenseMetric')?.closest('.metric'),'expense');
+    markBalanceLink($('diffMetric')?.closest('.metric'),'all');
+    markBalanceLink($('incomeMetric')?.closest('.metric'),'income');
+    markBalanceLink($('resultLabel'),'all');
+
+    d.body.insertAdjacentHTML('beforeend',`
+      <div id="fpPicker" class="fp-overlay" aria-hidden="true">
+        <div class="fp-panel" role="dialog" aria-modal="true" aria-labelledby="fpPickerTitle">
+          <div class="fp-panel-head"><h2 id="fpPickerTitle">Выберите период</h2><button class="close" type="button" data-fp-close>Закрыть</button></div>
+          <input id="fpPickInput" class="fp-input">
+          <div class="fp-actions"><button type="button" data-fp-current>Текущий</button><button type="button" class="fp-primary" data-fp-apply>Применить</button></div>
+        </div>
+      </div>
+      <div id="fpInfo" class="fp-overlay" aria-hidden="true">
+        <div class="fp-panel" role="dialog" aria-modal="true" aria-labelledby="fpInfoTitle">
+          <div class="fp-panel-head"><h2 id="fpInfoTitle">Из чего состоит капитал</h2><button class="close" type="button" data-fp-close>Закрыть</button></div>
+          <div id="fpInfoContent"></div>
+        </div>
+      </div>
+    `);
+
+    let pickerContext='home';
+    let operationsView={filter:'all',context:'all'};
+    let programmaticNavigation=false;
+
+    const setOverlayOpen=(overlay,open)=>{
+      if(!overlay)return;
+      overlay.classList.toggle('open',open);
+      overlay.setAttribute('aria-hidden',open?'false':'true');
+    };
+
+    const renderCapitalInfo=()=>{
+      const state=readState();
+      const allTotals=totals(state.transactions);
+      const base=Number(state.baseCapital)||0;
+      const capital=base+allTotals.income-allTotals.expense;
+      const content=$('fpInfoContent');
+      if(!content)return;
+      content.innerHTML=`
+        <p class="fp-info-intro">Сейчас сумма капитала рассчитывается за всё время из следующих частей:</p>
+        <div class="fp-breakdown">
+          <div class="fp-breakdown-row"><span>Начальный капитал</span><strong>${money(base)}</strong></div>
+          <div class="fp-breakdown-row"><span>Все сохранённые приходы</span><strong class="positive">+${money(allTotals.income)}</strong></div>
+          <div class="fp-breakdown-row"><span>Все сохранённые расходы</span><strong class="negative">−${money(allTotals.expense)}</strong></div>
+          <div class="fp-breakdown-row total"><span><b>Текущий капитал</b></span><strong>${money(capital)}</strong></div>
+        </div>
+        <p class="fp-future-note">Отдельные счета, наличные, накопления, кредиты, акции, недвижимость и другое имущество пока не выделены как самостоятельные составляющие. Они будут добавляться в следующих релизах.</p>`;
+    };
+
+    const renderPeriodControls=context=>{
+      const period=periods[context];
+      d.querySelectorAll(`[data-fp-range][data-fp-context="${context}"]`).forEach(button=>button.classList.toggle('active',button.dataset.fpRange===period.range));
+      d.querySelectorAll(`[data-fp-label][data-fp-context="${context}"]`).forEach(button=>button.textContent=periodLabel(period));
+      const currentStart=bounds(period.range,Date.now())[0];
+      const selectedStart=bounds(period.range,period.anchor)[0];
+      d.querySelectorAll(`[data-fp-next][data-fp-context="${context}"]`).forEach(button=>button.disabled=period.range==='all'||selectedStart>=currentStart);
+      d.querySelectorAll(`[data-fp-prev][data-fp-context="${context}"]`).forEach(button=>button.disabled=period.range==='all');
+    };
+
+    const renderHome=()=>{
+      const periodTotals=totals(transactionsFor(periods.home));
+      const diff=periodTotals.income-periodTotals.expense;
+      const combined=periodTotals.income+periodTotals.expense;
+      const pct=combined?periodTotals.income/combined*100:50;
+      [['expenseTop',periodTotals.expense],['expenseMetric',periodTotals.expense],['incomeTop',periodTotals.income],['incomeMetric',periodTotals.income]].forEach(([id,value])=>{if($(id))$(id).textContent=money(value)});
+      if($('diffMetric'))$('diffMetric').textContent=signed(diff);
+      if($('balanceMarker'))$('balanceMarker').style.left=`${pct}%`;
+      if($('resultLabel')){
+        $('resultLabel').style.left=`${pct}%`;
+        $('resultLabel').textContent=signed(diff);
+        $('resultLabel').className=`result-label fp-balance-link ${pct<8?'left':pct>92?'right':'center'}`;
+        $('resultLabel').dataset.fpOpenOps='all';
+      }
+      const top=$('topCategories');
+      if(top){
+        const list=transactionsFor(periods.home);
+        const expenses=list.filter(t=>t.kind==='expense');
+        const total=expenses.reduce((sum,t)=>sum+(Number(t.amount)||0),0);
+        const map={};
+        expenses.forEach(t=>map[t.category]=(map[t.category]||0)+(Number(t.amount)||0));
+        const items=Object.entries(map).map(([name,value])=>({name,value,percent:total?value/total*100:0})).sort((a,b)=>b.value-a.value).slice(0,3);
+        top.innerHTML=items.length?items.map(item=>`<div class="cat"><div><div class="cat-row"><b>${escapeHtml(item.name)}</b><span>${Math.round(item.percent)}%</span></div><div class="bar"><i style="width:${Math.max(4,item.percent)}%"></i></div></div><b>${money(item.value)}</b></div>`).join(''):'<div class="empty">За выбранный период расходов нет.</div>';
+      }
+      renderPeriodControls('home');
+    };
+
+    const renderAnalytics=()=>{
+      const list=transactionsFor(periods.analytics);
+      const result=totals(list);
+      const diff=result.income-result.expense;
+      if($('analyticsIncome'))$('analyticsIncome').textContent=money(result.income);
+      if($('analyticsExpense'))$('analyticsExpense').textContent=money(result.expense);
+      if($('analyticsDiff')){
+        $('analyticsDiff').textContent=signed(diff);
+        $('analyticsDiff').classList.toggle('positive',diff>=0);
+        $('analyticsDiff').classList.toggle('negative',diff<0);
+      }
+      if($('analyticsCategories'))$('analyticsCategories').innerHTML=categoryHtml(list);
+      renderPeriodControls('analytics');
+    };
+
+    const renderOperationsView=()=>{
+      const state=readState();
+      const period=operationsView.context==='all'?{range:'all',anchor:Date.now()}:periods[operationsView.context];
+      const [start,end]=bounds(period.range,period.anchor);
+      const list=[...state.transactions]
+        .filter(t=>Number(t.date)>=start&&Number(t.date)<end)
+        .filter(t=>operationsView.filter==='all'||t.kind===operationsView.filter)
+        .sort((a,b)=>Number(b.date)-Number(a.date));
+      if($('operationsList'))$('operationsList').innerHTML=list.length?list.map(operationHtml).join(''):'<div class="empty">Подходящих операций нет.</div>';
+      const result=totals(list);
+      if($('opsIncome'))$('opsIncome').textContent=money(result.income);
+      if($('opsExpense'))$('opsExpense').textContent=money(result.expense);
+      if($('opsDiff')){
+        const diff=result.income-result.expense;
+        $('opsDiff').textContent=signed(diff);
+        $('opsDiff').classList.toggle('positive',diff>=0);
+        $('opsDiff').classList.toggle('negative',diff<0);
+      }
+      d.querySelectorAll('[data-op-filter]').forEach(button=>button.classList.toggle('active',button.dataset.opFilter===operationsView.filter));
+      if($('fpOpsPeriodLabel'))$('fpOpsPeriodLabel').textContent=periodLabel(period);
+    };
+
+    const renderAll=()=>{
+      renderHome();
+      renderAnalytics();
+      renderOperationsView();
+      renderCapitalInfo();
+    };
+
+    const openPicker=context=>{
+      const period=periods[context];
+      if(period.range==='all')return;
+      pickerContext=context;
+      const input=$('fpPickInput');
+      const anchor=new Date(period.anchor);
+      const pad=n=>String(n).padStart(2,'0');
+      if(period.range==='month'){
+        input.type='month';
+        input.value=`${anchor.getFullYear()}-${pad(anchor.getMonth()+1)}`;
+        input.removeAttribute('max');
+      }else if(period.range==='year'){
+        input.type='number';
+        input.value=anchor.getFullYear();
+        input.min='1900';
+        input.max=String(new Date().getFullYear());
+      }else{
+        input.type='date';
+        input.value=`${anchor.getFullYear()}-${pad(anchor.getMonth()+1)}-${pad(anchor.getDate())}`;
+        input.max=`${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`;
+      }
+      $('fpPickerTitle').textContent=context==='analytics'?'Период аналитики':'Период на главной';
+      setOverlayOpen($('fpPicker'),true);
+    };
+
+    const shiftPeriod=(context,direction)=>{
+      const period=periods[context];
+      const anchor=new Date(period.anchor);
+      if(period.range==='day')anchor.setDate(anchor.getDate()+direction);
+      if(period.range==='week')anchor.setDate(anchor.getDate()+7*direction);
+      if(period.range==='month')anchor.setMonth(anchor.getMonth()+direction);
+      if(period.range==='year')anchor.setFullYear(anchor.getFullYear()+direction);
+      period.anchor=Math.min(anchor.getTime(),Date.now());
+      savePeriods();
+      renderAll();
+    };
+
+    const openOperations=(filter,context='home')=>{
+      operationsView={filter,context};
+      programmaticNavigation=true;
+      d.querySelector('[data-screen="operations"]')?.click();
+      programmaticNavigation=false;
+      setTimeout(renderOperationsView,0);
+    };
+
+    const modal=$('entryModal');
+    let scrollY=0;
+    if(modal){
+      new MutationObserver(()=>{
+        if(modal.classList.contains('open')){
+          scrollY=w.scrollY||0;
+          d.documentElement.classList.add('fp-lock');
+          d.body.classList.add('fp-lock');
+          d.body.style.top=`-${scrollY}px`;
+        }else{
+          d.documentElement.classList.remove('fp-lock');
+          d.body.classList.remove('fp-lock');
+          d.body.style.top='';
+          w.scrollTo(0,scrollY);
+          setTimeout(renderAll,0);
+        }
+      }).observe(modal,{attributes:true,attributeFilter:['class']});
+    }
+
+    const amount=$('amountInput');
+    const error=$('entryError');
+    const saveButton=$('saveOperationBtn');
+    if(amount&&saveButton&&error){
+      amount.maxLength=9;
+      amount.inputMode='decimal';
+      if(!amount.nextElementSibling?.classList.contains('fp-hint')){
+        const hint=d.createElement('div');
+        hint.className='fp-hint';
+        hint.textContent='Максимум одной операции: 999 999,99 €';
+        amount.after(hint);
+      }
+      const normalize=value=>{
+        let text=String(value||'').replace(/\s/g,'').replace('.',',').replace(/[^0-9,]/g,'');
+        const comma=text.indexOf(',');
+        if(comma>=0)text=text.slice(0,comma+1)+text.slice(comma+1).replace(/,/g,'');
+        let [whole='',fraction='']=text.split(',');
+        whole=whole.slice(0,6);
+        fraction=fraction.slice(0,2);
+        return comma<0?whole:`${whole},${fraction}`;
+      };
+      const valid=()=>{
+        const value=amount.value.trim();
+        const okay=/^(?:0|[1-9]\d{0,5})(?:[.,]\d{1,2})?$/.test(value)&&Number(value.replace(',','.'))>0&&Number(value.replace(',','.'))<=999999.99;
+        amount.classList.toggle('fp-invalid',!okay&&value.length>0);
+        return okay;
+      };
+      amount.addEventListener('input',()=>{amount.value=normalize(amount.value);valid()});
+      saveButton.addEventListener('click',event=>{
+        if(valid()){
+          setTimeout(renderAll,30);
+          return;
+        }
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        error.textContent='Сумма должна быть от 0,01 € до 999 999,99 €.';
+        amount.focus();
+      },true);
+    }
+
+    d.addEventListener('click',event=>{
+      const target=event.target;
+      const overlay=target.closest?.('.fp-overlay');
+      if(overlay&&target===overlay){
+        setOverlayOpen(overlay,false);
+        return;
+      }
+
+      const balanceLink=target.closest?.('[data-fp-open-ops]');
+      if(balanceLink){
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        openOperations(balanceLink.dataset.fpOpenOps,'home');
+        return;
+      }
+
+      const rangeButton=target.closest?.('[data-fp-range]');
+      if(rangeButton){
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const context=rangeButton.dataset.fpContext;
+        periods[context].range=rangeButton.dataset.fpRange;
+        periods[context].anchor=Date.now();
+        savePeriods();
+        renderAll();
+        if(periods[context].range!=='all')openPicker(context);
+        return;
+      }
+
+      const previous=target.closest?.('[data-fp-prev]');
+      if(previous){
+        event.preventDefault();
+        shiftPeriod(previous.dataset.fpContext,-1);
+        return;
+      }
+
+      const next=target.closest?.('[data-fp-next]');
+      if(next){
+        event.preventDefault();
+        shiftPeriod(next.dataset.fpContext,1);
+        return;
+      }
+
+      const label=target.closest?.('[data-fp-label]');
+      if(label){
+        event.preventDefault();
+        openPicker(label.dataset.fpContext);
+        return;
+      }
+
+      if(target.closest?.('[data-fp-close]')){
+        setOverlayOpen(target.closest('.fp-overlay'),false);
+        return;
+      }
+
+      if(target.closest?.('[data-fp-current]')){
+        periods[pickerContext].anchor=Date.now();
+        savePeriods();
+        setOverlayOpen($('fpPicker'),false);
+        renderAll();
+        return;
+      }
+
+      if(target.closest?.('[data-fp-apply]')){
+        const period=periods[pickerContext];
+        const input=$('fpPickInput');
+        let anchor;
+        if(period.range==='month'){
+          const [year,month]=input.value.split('-').map(Number);
+          anchor=new Date(year,month-1,1);
+        }else if(period.range==='year'){
+          anchor=new Date(Number(input.value),0,1);
+        }else{
+          anchor=new Date(`${input.value}T12:00:00`);
+        }
+        if(Number.isFinite(anchor.getTime())){
+          period.anchor=Math.min(anchor.getTime(),Date.now());
+          savePeriods();
+          setOverlayOpen($('fpPicker'),false);
+          renderAll();
+        }
+        return;
+      }
+
+      if(target.closest?.('.capital .info')){
+        event.preventDefault();
+        renderCapitalInfo();
+        setOverlayOpen($('fpInfo'),true);
+        return;
+      }
+
+      const filterButton=target.closest?.('[data-op-filter]');
+      if(filterButton){
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        operationsView.filter=filterButton.dataset.opFilter;
+        renderOperationsView();
+        return;
+      }
+
+      const screenButton=target.closest?.('[data-screen]');
+      if(screenButton&&screenButton.dataset.screen==='operations'&&!programmaticNavigation){
+        operationsView={filter:'all',context:'all'};
+        setTimeout(renderOperationsView,0);
+      }
+      if(screenButton&&screenButton.dataset.screen==='home')setTimeout(renderHome,0);
+
+      if(target.closest?.('#analyticsBtn')||target.closest?.('#categoriesAllBtn'))setTimeout(renderAnalytics,0);
+
+      if(target.closest?.('[data-fp-back]')){
+        event.preventDefault();
+        d.querySelector('[data-screen="home"]')?.click();
+      }
+
+      if(target.closest?.('#resetBtn'))setTimeout(renderAll,80);
+    },true);
+
+    d.addEventListener('keydown',event=>{
+      if((event.key==='Enter'||event.key===' ')&&event.target.closest?.('[data-fp-open-ops]')){
+        event.preventDefault();
+        openOperations(event.target.closest('[data-fp-open-ops]').dataset.fpOpenOps,'home');
+      }
+      if(event.key==='Escape'){
+        setOverlayOpen($('fpPicker'),false);
+        setOverlayOpen($('fpInfo'),false);
+      }
+    });
+
+    renderAll();
+  }
+
+  frame.addEventListener('load',boot);
+  frame.src='./main-v7.html?mobilefix=7&t='+Date.now();
+  setTimeout(boot,250);
+  setTimeout(boot,900);
 })();
-</script></body></html>
+</script>
+</body>
+</html>
