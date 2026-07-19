@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta http-equiv="cache-control" content="no-store">
+<meta name="theme-color" content="#f5f7fb">
+<title>FamilyPilot</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#f5f7fb}iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#f5f7fb}</style>
+</head>
+<body>
+<iframe id="shell" title="FamilyPilot"></iframe>
+<script>
+(()=>{
+  'use strict';
+  const shell=document.getElementById('shell');
+
+  function install(){
+    const shellWindow=shell.contentWindow;
+    const shellDocument=shellWindow&&shellWindow.document;
+    const appFrame=shellDocument&&shellDocument.getElementById('app');
+    const appDocument=appFrame&&appFrame.contentWindow&&appFrame.contentWindow.document;
+    if(!appDocument||appDocument.readyState==='loading'||appDocument.documentElement.dataset.fpPeriodClickFix==='1')return;
+
+    appDocument.documentElement.dataset.fpPeriodClickFix='1';
+    appDocument.addEventListener('click',event=>{
+      const button=event.target.closest?.('[data-fp-range][data-fp-context="analytics"]');
+      if(!button)return;
+      const picker=appDocument.getElementById('fpPicker');
+      if(!picker)return;
+      picker.classList.remove('open');
+      picker.setAttribute('aria-hidden','true');
+    },true);
+  }
+
+  shell.addEventListener('load',()=>{
+    install();
+    const inner=shell.contentWindow?.document?.getElementById('app');
+    inner?.addEventListener('load',install);
+    setTimeout(install,250);
+    setTimeout(install,900);
+  });
+
+  shell.src='./main-v7-mobilefix.html?periodfix=1&t='+Date.now();
+  setInterval(install,1200);
+})();
+</script>
+</body>
+</html>
