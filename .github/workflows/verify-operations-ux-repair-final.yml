@@ -1,0 +1,139 @@
+name: Final Operations UX repair verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/verify-operations-ux-repair-final.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install browser driver
+        run: npm install --no-save playwright-core@1.53.2
+      - name: Verify remaining public scenarios
+        env:
+          PUBLIC_URL: https://maloma.github.io/sandbox/
+        run: |
+          mkdir -p verification
+          node <<'NODE'
+          const fs=require('fs');
+          const {chromium}=require('playwright-core');
+          const gate={
+            'PUBLIC-URL':process.env.PUBLIC_URL,
+            'HTTP-STATUS':'FAILED',
+            'PUBLIC-RUNTIME-MATCH':'FAILED',
+            'AMOUNT-RANGE-FILTER':'VERIFIED',
+            'OPERATIONS-SUMMARY-ORDER':'VERIFIED',
+            'ANALYTICS-SUMMARY-ORDER':'VERIFIED',
+            'ANALYTICS-GAP':'VERIFIED',
+            'EMPTY-STATE-GAP':'VERIFIED',
+            'PICKER-IP14-NO-OVERFLOW':'VERIFIED',
+            'ENTRY-DATE-NO-OVERFLOW':'FAILED',
+            'HISTORY-NOTE-ONLY':'FAILED',
+            'HISTORY-TWO-FIELDS-ONE-BATCH':'FAILED',
+            'DETAIL-THREE-ACTIONS':'FAILED',
+            'TRASH-PURGE-LARGE-TEXT-FITS':'FAILED',
+            'BACKGROUND-SCROLL-LOCKED':'FAILED',
+            'CATEGORY-NAME-SCOPED-BY-TYPE':'FAILED',
+            'CATEGORY-RENAME-SCOPED-BY-TYPE':'FAILED',
+            'CATEGORY-ERROR-NEAR-FIELD':'FAILED',
+            'CATEGORY-MANAGER-ADD':'FAILED',
+            'CATEGORY-DELETE-CONFIRM':'FAILED',
+            'PAGE-JAVASCRIPT-ERRORS':'FAILED',
+            'VERIFIED-RUNTIME-COMMIT':'3c977d6db09454d014ffb39becb0aff5c2541ac2'
+          };
+          const ok=(k,v)=>gate[k]=v?'VERIFIED':'FAILED';
+          const within=(box,w)=>!!box&&box.x>=-.5&&box.x+box.width<=w+.5;
+          (async()=>{
+            let browser;const errors=[];
+            try{
+              const executablePath=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'].find(fs.existsSync);
+              browser=await chromium.launch({headless:true,executablePath,args:['--no-sandbox']});
+              const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+              const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
+              const response=await page.goto(`${process.env.PUBLIC_URL}?test=1&ux-final=1`,{waitUntil:'domcontentloaded',timeout:60000});
+              await page.waitForFunction(()=>window.__FP_TEST__?.getState().schemaVersion===2,{timeout:30000});
+              gate['HTTP-STATUS']=String(response?.status()||0);
+              ok('PUBLIC-RUNTIME-MATCH',response?.status()===200&&await page.locator('#amountFrom').count()===1&&await page.locator('#detailDeleteBtn').count()===1);
+
+              await page.locator('[data-open-entry="expense"]').click();
+              ok('ENTRY-DATE-NO-OVERFLOW',within(await page.locator('#dateInput').boundingBox(),390));
+              ok('BACKGROUND-SCROLL-LOCKED',await page.evaluate(()=>document.body.classList.contains('modal-open')&&getComputedStyle(document.body).position==='fixed'));
+              await page.locator('[data-close="entryModal"]').click();
+
+              const id=await page.evaluate(()=>window.__FP_TEST__.createOperation({id:'history-final',kind:'expense',amount:12.34,categoryId:'cat-exp-food',note:'Старый комментарий',occurredAt:Date.now()-45678}));
+              await page.locator('[data-screen="operations"]').click();
+              await page.locator(`#operationsList [data-op-id="${id}"]`).click();
+              ok('DETAIL-THREE-ACTIONS',await page.locator('#operationDetail .detail-actions .btn').count()===3&&await page.locator('#detailDeleteBtn').isVisible());
+              await page.locator('#detailEditBtn').click();
+              await page.locator('#noteInput').fill('Новый комментарий');
+              await page.locator('#saveOperationBtn').click();
+              ok('HISTORY-NOTE-ONLY',await page.evaluate(id=>{const o=window.__FP_TEST__.getState().operations.find(x=>x.id===id);return o.revisions.length===1&&o.revisions[0].changes.length===1&&o.revisions[0].changes[0].field==='note'},id));
+
+              await page.locator(`#operationsList [data-op-id="${id}"]`).click();
+              await page.locator('#detailEditBtn').click();
+              await page.locator('#amountInput').fill('77,70');
+              await page.locator('#noteInput').fill('Ещё один комментарий');
+              await page.locator('#saveOperationBtn').click();
+              ok('HISTORY-TWO-FIELDS-ONE-BATCH',await page.evaluate(id=>{const o=window.__FP_TEST__.getState().operations.find(x=>x.id===id),r=o.revisions.at(-1),f=r.changes.map(c=>c.field).sort();return o.revisions.length===2&&r.changes.length===2&&f.join('|')==='amount|note'},id));
+
+              const cats=await page.evaluate(()=>{const a=window.__FP_TEST__,i=a.createCategory('income','3D'),e=a.createCategory('expense','3D'),dup=a.createCategory('expense','  3d  '),same=a.createCategory('expense','Для переименования'),sameRename=a.renameCategory(same.category.id,'3D'),cross=a.createCategory('expense','Кросс расход'),income=a.createCategory('income','Кросс имя'),crossRename=a.renameCategory(cross.category.id,'Кросс имя');return{i:i.ok,e:e.ok,dup:dup.ok,sameRename:sameRename.ok,crossRename:crossRename.ok}});
+              ok('CATEGORY-NAME-SCOPED-BY-TYPE',cats.i&&cats.e&&!cats.dup);
+              ok('CATEGORY-RENAME-SCOPED-BY-TYPE',!cats.sameRename&&cats.crossRename);
+
+              await page.locator('[data-open-entry="expense"]').click();
+              await page.locator('#addCategoryBtn').click();
+              await page.locator('#newCategoryInput').fill('3D');
+              await page.locator('#saveNewCategoryBtn').click();
+              const err=await page.locator('#categoryError').innerText(),eb=await page.locator('#categoryError').boundingBox(),db=await page.locator('#dateInput').boundingBox();
+              ok('CATEGORY-ERROR-NEAR-FIELD',err.length>0&&eb&&db&&eb.y+eb.height<=db.y+1);
+              await page.locator('[data-close="entryModal"]').click();
+
+              await page.locator('[data-screen="more"]').click();
+              await page.locator('#openCategoryManager').click();
+              await page.locator('#managerNewCategoryInput').fill('Категория из справочника');
+              await page.locator('#managerAddCategoryBtn').click();
+              ok('CATEGORY-MANAGER-ADD',(await page.locator('#categoryManagerList').innerText()).includes('Категория из справочника'));
+              let confirmSeen=false,confirmText='';
+              page.once('dialog',async d=>{confirmSeen=d.type()==='confirm';confirmText=d.message();await d.dismiss()});
+              const item=page.locator('.category-item',{hasText:'Категория из справочника'});
+              await item.locator('[data-cat-delete]').click();
+              await page.waitForTimeout(100);
+              ok('CATEGORY-DELETE-CONFIRM',confirmSeen&&/нельзя отменить/i.test(confirmText)&&(await item.count())===1);
+              await page.locator('[data-close="categoryManager"]').click();
+
+              await page.evaluate(()=>{document.documentElement.style.fontSize='20px';const a=window.__FP_TEST__;a.createOperation({id:'trash-final',kind:'expense',amount:2,categoryId:'cat-exp-food'});a.setTrashEnabled(true);a.trashOperation('trash-final')});
+              await page.locator('[data-screen="operations"]').click();
+              await page.locator('#trashBtn').click();
+              const pb=await page.locator('[data-trash-purge="trash-final"]').boundingBox(),panel=await page.locator('#trashModal .panel').boundingBox();
+              ok('TRASH-PURGE-LARGE-TEXT-FITS',within(pb,390)&&pb.x>=panel.x-.5&&pb.x+pb.width<=panel.x+panel.width+.5);
+              gate['PAGE-JAVASCRIPT-ERRORS']=errors.length?`FAILED: ${errors.join(' | ')}`:'NONE';
+              await context.close();
+            }catch(e){gate['BROWSER-ERROR']=e.stack||e.message;gate['PAGE-JAVASCRIPT-ERRORS']=errors.length?`FAILED: ${errors.join(' | ')}`:'FAILED'}finally{
+              if(browser)await browser.close();
+              const text=Object.entries(gate).map(([k,v])=>`${k}: ${v}`).join('\n')+'\n';
+              fs.writeFileSync('verification/operations-ux-repair-final-gate.txt',text);console.log(text);
+            }
+          })();
+          NODE
+      - name: Record final evidence
+        if: always()
+        run: |
+          cp verification/operations-ux-repair-final-gate.txt /tmp/final-gate.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          mkdir -p verification
+          cp /tmp/final-gate.txt verification/operations-ux-repair-final-gate.txt
+          git add verification/operations-ux-repair-final-gate.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "Record final Operations UX repair gate [skip ci]"
+          git push origin HEAD:main
