@@ -1,0 +1,34 @@
+name: Expose patched FamilyPilot runtime source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/expose-runtime-source-v3.yml
+
+permissions:
+  contents: write
+
+jobs:
+  expose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Decode runtime source
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re,base64,gzip
+          s=Path('index.html').read_text(encoding='utf-8')
+          m=re.search(r'const b="([A-Za-z0-9+/=]+)"',s)
+          if not m: raise SystemExit('payload not found')
+          Path('runtime-source.html').write_bytes(gzip.decompress(base64.b64decode(m.group(1))))
+          PY
+      - name: Commit source and remove workflow
+        run: |
+          rm -f .github/workflows/expose-runtime-source-v3.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add runtime-source.html .github/workflows/expose-runtime-source-v3.yml
+          git commit -m "Expose patched FamilyPilot runtime source"
+          git push origin HEAD:main
