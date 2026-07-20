@@ -33,3 +33,4 @@ jobs:
           git add .github/workflows/verify-operations-ux-repair.yml .github/workflows/patch-ux-verifier-operation-selector.yml
           git commit -m "Limit Operations UX verifier to active operation list"
           git push origin HEAD:main
+# trigger
