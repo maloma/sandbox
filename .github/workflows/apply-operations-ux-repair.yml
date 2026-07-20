@@ -1,0 +1,57 @@
+name: Apply Operations UX and history repair
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/apply-operations-ux-repair.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v6
+      - name: Apply bounded source patch
+        run: python runtime-patch.py
+      - name: Validate JavaScript syntax and required UI
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('runtime-source.html').read_text(encoding='utf-8')
+          scripts=re.findall(r'<script>(.*?)</script>',s,re.S)
+          if not scripts: raise SystemExit('runtime script missing')
+          Path('/tmp/runtime.js').write_text(scripts[-1],encoding='utf-8')
+          required=['id="amountFrom"','id="amountTo"','id="detailDeleteBtn"','id="managerAddCategoryBtn"','function revisionBatch','normalizeRevisionHistory','body.modal-open']
+          for x in required:
+            if x not in s: raise SystemExit(f'missing {x}')
+          PY
+          node --check /tmp/runtime.js
+      - name: Build deterministic standalone index
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import gzip,base64,hashlib
+          html=Path('runtime-source.html').read_bytes()
+          payload=base64.b64encode(gzip.compress(html,compresslevel=9,mtime=0)).decode('ascii')
+          wrapper=f'''<!doctype html>
+          <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta http-equiv="cache-control" content="no-store"><meta name="theme-color" content="#071824"><title>FamilyPilot</title><style>html,body{{margin:0;min-height:100%;background:#071824}}</style></head><body><script>
+          (async()=>{{const b="{payload}",a=Uint8Array.from(atob(b),c=>c.charCodeAt(0)),s=new Blob([a]).stream().pipeThrough(new DecompressionStream('gzip')),h=await new Response(s).text();document.open();document.write(h);document.close()}})().catch(e=>{{document.body.textContent='Ошибка загрузки FamilyPilot';console.error(e)}});
+          </script></body></html>'''
+          wrapper='\n'.join(line.strip() for line in wrapper.splitlines())
+          Path('index.html').write_text(wrapper,encoding='utf-8')
+          print('SOURCE-SHA256',hashlib.sha256(html).hexdigest())
+          print('INDEX-SHA256',hashlib.sha256(wrapper.encode()).hexdigest())
+          PY
+      - name: Commit repaired runtime and clean staging
+        run: |
+          rm -f runtime-source.html runtime-patch.py .github/workflows/apply-operations-ux-repair.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html runtime-source.html runtime-patch.py .github/workflows/apply-operations-ux-repair.yml
+          git commit -m "Repair Operations filters history categories and mobile UX"
+          git push origin HEAD:main
