@@ -1,0 +1,40 @@
+name: Prepare final FamilyPilot filter analytics gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/rerun-family-filter-analytics-final.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Point full verifier to final runtime
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          p=Path('.github/workflows/verify-family-filter-analytics-v3.yml')
+          s=p.read_text(encoding='utf-8')
+          replacements={
+            'bcc82d776e29b6d81db759415e62593c80c805f7efd0e919304a1f73d2258de0':'23683961f0cd266bd984b98d9fb0daf821ba0797a4f565186896ac3aa0990838',
+            '90869932e2228932c310787869f407ea77d80385':'f4e9dbb37e3e7bf3bacd1637e62e5e819bbe7437',
+            'v3=90869932':'v3=f4e9dbb3'
+          }
+          for old,new in replacements.items():
+            if old not in s: raise SystemExit(f'marker missing: {old}')
+            s=s.replace(old,new)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit verifier update and remove helper
+        run: |
+          rm -f .github/workflows/rerun-family-filter-analytics-final.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/verify-family-filter-analytics-v3.yml .github/workflows/rerun-family-filter-analytics-final.yml
+          git commit -m "Verify final FamilyPilot filter analytics runtime"
+          git push origin HEAD:main
