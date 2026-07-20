@@ -1,0 +1,78 @@
+PUBLIC-URL: https://maloma.github.io/sandbox/
+HTTP-STATUS: 200
+PUBLIC-RUNTIME-MATCH: VERIFIED
+IPHONE14-VIEWPORT: 390x844
+ENLARGED-TEXT: VERIFIED
+CATEGORY-MODAL-VISUAL-VIEWPORT-BOUND: FAILED
+SEARCH-INPUT-ABOVE-KEYBOARD: FAILED
+EMPTY-RESULT-DOES-NOT-MOVE-INPUT: FAILED
+SEARCH-REMAINS-FOCUSED: FAILED
+EMPTY-RESULT-MESSAGE-VISIBLE: FAILED
+VALID-RESULT-RESTORES-LIST: FAILED
+VISUAL-VIEWPORT-RESTORES: FAILED
+PAGE-JAVASCRIPT-ERRORS: FAILED
+PACKAGE-CLOSURE: FAILED
+VERIFIED-RUNTIME-COMMIT: 152fab417f19ac5e1b95a58dea09c581f7741918
+BROWSER-ERROR: locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator('[data-screen="operations"]')
+    - locator resolved to <button class="nav" data-screen="operations">…</button>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+      - done scrolling
+      - <span>Сегодня · 20 июля 2026 г.</span> from <main>…</main> subtree intercepts pointer events
+    - retrying click action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+      - done scrolling
+      - <div class="day-heading">…</div> from <main>…</main> subtree intercepts pointer events
+    - retrying click action
+      - waiting 100ms
+    14 × waiting for element to be visible, enabled and stable
+       - element is visible, enabled and stable
+       - scrolling into view if needed
+       - done scrolling
+       - <div class="day-heading">…</div> from <main>…</main> subtree intercepts pointer events
+     - retrying click action
+       - waiting 500ms
+       - waiting for element to be visible, enabled and stable
+       - element is visible, enabled and stable
+       - scrolling into view if needed
+       - done scrolling
+       - <span>Сегодня · 20 июля 2026 г.</span> from <main>…</main> subtree intercepts pointer events
+     - retrying click action
+       - waiting 500ms
+       - waiting for element to be visible, enabled and stable
+       - element is visible, enabled and stable
+       - scrolling into view if needed
+       - done scrolling
+       - <div class="day-heading">…</div> from <main>…</main> subtree intercepts pointer events
+     - retrying click action
+       - waiting 500ms
+       - waiting for element to be visible, enabled and stable
+       - element is visible, enabled and stable
+       - scrolling into view if needed
+       - done scrolling
+       - <div class="day-heading">…</div> from <main>…</main> subtree intercepts pointer events
+     - retrying click action
+       - waiting 500ms
+    - waiting for element to be visible, enabled and stable
+    - element is visible, enabled and stable
+    - scrolling into view if needed
+    - done scrolling
+    - <div class="day-heading">…</div> from <main>…</main> subtree intercepts pointer events
+  - retrying click action
+    - waiting 500ms
+    - waiting for element to be visible, enabled and stable
+    - element is visible, enabled and stable
+    - scrolling into view if needed
+    - done scrolling
+    - <span>Сегодня · 20 июля 2026 г.</span> from <main>…</main> subtree intercepts pointer events
+  - retrying click action
+    - waiting 500ms
+
+    at [stdin]:36:54
