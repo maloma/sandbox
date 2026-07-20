@@ -1,0 +1,120 @@
+name: Verify action dock regression fix v2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/verify-action-dock-regression-v2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v6
+      - run: npm install --no-save playwright-core@1.53.2
+      - name: Run public responsive gate
+        env:
+          PUBLIC_URL: https://maloma.github.io/sandbox/
+        run: |
+          mkdir -p verification
+          node <<'NODE'
+          const fs = require('fs');
+          const { chromium } = require('playwright-core');
+          const baseUrl = process.env.PUBLIC_URL;
+          const url = `${baseUrl}?action-dock-v2=${process.env.GITHUB_SHA}`;
+          const gate = {
+            'PUBLIC-URL': baseUrl,
+            'HTTP-LOAD': 'FAILED',
+            'HTTP-STATUS': 'NOT VERIFIED',
+            'FINAL-ADDRESS': 'NOT VERIFIED',
+            'DESKTOP-DOCK-IN-FLOW': 'NOT VERIFIED',
+            'DESKTOP-DOCK-GAP': 'NOT VERIFIED',
+            'DESKTOP-DOCK-CLEAR-OF-NAV': 'NOT VERIFIED',
+            'DESKTOP-INCOME-COPY-STACKED': 'NOT VERIFIED',
+            'DESKTOP-EXPENSE-COPY-STACKED': 'NOT VERIFIED',
+            'DESKTOP-BUTTON-OVERFLOW': 'NOT VERIFIED',
+            'DESKTOP-DARK-CANVAS': 'NOT VERIFIED',
+            'MOBILE-DOCK-FIXED': 'NOT VERIFIED',
+            'MOBILE-BUTTON-COPY-STACKED': 'NOT VERIFIED',
+            'PAGE-JAVASCRIPT-ERRORS': 'NOT VERIFIED',
+            'VERIFIED-COMMIT': process.env.GITHUB_SHA,
+          };
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const stacked = async button => {
+            const [a,b] = await Promise.all([button.locator('strong').boundingBox(), button.locator('small').boundingBox()]);
+            return !!a && !!b && Math.abs(a.x-b.x) <= 2 && a.y+a.height <= b.y+1;
+          };
+          (async()=>{
+            let source = '', status = 0;
+            for (let i=0;i<48;i++) {
+              try {
+                const response = await fetch(url,{cache:'no-store',redirect:'follow'});
+                status = response.status;
+                source = await response.text();
+                if (response.ok && source.includes('desktop-dock-clear-of-fixed-nav')) break;
+              } catch {}
+              await sleep(5000);
+            }
+            gate['HTTP-STATUS'] = String(status);
+            if (!(status>=200&&status<400) || !source.includes('desktop-dock-clear-of-fixed-nav')) throw new Error('Published runtime missing final dock fix');
+            gate['HTTP-LOAD'] = 'SUCCEEDED';
+            const executablePath = ['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'].find(fs.existsSync);
+            const browser = await chromium.launch({headless:true,executablePath,args:['--no-sandbox']});
+            const errors = [];
+
+            const desktop = await browser.newContext({viewport:{width:1720,height:966}});
+            await desktop.addInitScript(()=>localStorage.setItem('familypilot.theme','dark'));
+            const page = await desktop.newPage();
+            page.on('pageerror',e=>errors.push(`desktop: ${e.message}`));
+            const response = await page.goto(url,{waitUntil:'networkidle',timeout:60000});
+            gate['FINAL-ADDRESS'] = page.url();
+            gate['HTTP-STATUS'] = String(response?.status()||status);
+            await page.locator('[data-screen="operations"]').click();
+            const dock = page.locator('#actionDock');
+            const [dockBox,screenBox,navBox] = await Promise.all([dock.boundingBox(),page.locator('#operationsScreen').boundingBox(),page.locator('.bottom').boundingBox()]);
+            const pos = await dock.evaluate(el=>getComputedStyle(el).position);
+            gate['DESKTOP-DOCK-IN-FLOW'] = pos==='static'?'VERIFIED':`FAILED: ${pos}`;
+            const gap = Math.round(dockBox.y-(screenBox.y+screenBox.height));
+            gate['DESKTOP-DOCK-GAP'] = gap>=0&&gap<=30?`VERIFIED: ${gap}px`:`FAILED: ${gap}px`;
+            const dockBottom = Math.round(dockBox.y+dockBox.height), navTop = Math.round(navBox.y);
+            gate['DESKTOP-DOCK-CLEAR-OF-NAV'] = dockBottom<=navTop?`VERIFIED: bottom=${dockBottom}px, navTop=${navTop}px`:`FAILED: bottom=${dockBottom}px, navTop=${navTop}px`;
+            gate['DESKTOP-INCOME-COPY-STACKED'] = await stacked(page.locator('.action.income'))?'VERIFIED':'FAILED';
+            gate['DESKTOP-EXPENSE-COPY-STACKED'] = await stacked(page.locator('.action.expense'))?'VERIFIED':'FAILED';
+            const overflow = await page.locator('.action').evaluateAll(nodes=>nodes.some(el=>el.scrollWidth>el.clientWidth||el.scrollHeight>el.clientHeight));
+            gate['DESKTOP-BUTTON-OVERFLOW'] = overflow?'FAILED':'NONE';
+            const rootBg = await page.evaluate(()=>getComputedStyle(document.documentElement).backgroundColor.replace(/\s+/g,''));
+            gate['DESKTOP-DARK-CANVAS'] = rootBg==='rgb(7,24,36)'?'VERIFIED':`FAILED: ${rootBg}`;
+            await desktop.close();
+
+            const mobile = await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+            const mobilePage = await mobile.newPage();
+            mobilePage.on('pageerror',e=>errors.push(`mobile: ${e.message}`));
+            await mobilePage.goto(url,{waitUntil:'networkidle',timeout:60000});
+            const mobilePos = await mobilePage.locator('#actionDock').evaluate(el=>getComputedStyle(el).position);
+            gate['MOBILE-DOCK-FIXED'] = mobilePos==='fixed'?'VERIFIED':`FAILED: ${mobilePos}`;
+            gate['MOBILE-BUTTON-COPY-STACKED'] = await stacked(mobilePage.locator('.action.income'))&&await stacked(mobilePage.locator('.action.expense'))?'VERIFIED':'FAILED';
+            await mobile.close();
+            await browser.close();
+            gate['PAGE-JAVASCRIPT-ERRORS'] = errors.length?`FAILED: ${errors.join(' | ')}`:'NONE';
+          })().catch(error=>{gate['ERROR']=error.stack||error.message}).finally(()=>{
+            fs.writeFileSync('verification/action-dock-regression-v2-gate.txt',Object.entries(gate).map(([k,v])=>`${k}: ${v}`).join('\n')+'\n');
+          });
+          NODE
+      - name: Record evidence
+        if: always()
+        run: |
+          cp verification/action-dock-regression-v2-gate.txt /tmp/action-dock-regression-v2-gate.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          mkdir -p verification
+          cp /tmp/action-dock-regression-v2-gate.txt verification/action-dock-regression-v2-gate.txt
+          git add verification/action-dock-regression-v2-gate.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "Record final action dock regression verification [skip ci]"
+          git push origin HEAD:main
