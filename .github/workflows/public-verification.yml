@@ -22,38 +22,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Initialize fallback evidence
-        run: |
-          mkdir -p verification
-          cat > verification/public-gate.txt <<EOF
-          PUBLIC-URL: https://maloma.github.io/sandbox/
-          HTTP-LOAD: FAILED
-          404: NOT VERIFIED
-          FINAL-ADDRESS: NOT VERIFIED
-          HOME-PERIOD-TYPE-TAP: NOT VERIFIED
-          ANALYTICS-PERIOD-TYPE-TAP: NOT VERIFIED
-          HOME-PERIOD-LABEL-TAP: NOT VERIFIED
-          ANALYTICS-PERIOD-LABEL-TAP: NOT VERIFIED
-          OPERATIONS-PERIOD-LABEL: NOT VERIFIED
-          OPERATIONS-ARROWS: NOT VERIFIED
-          OPERATIONS-INDEPENDENCE: NOT VERIFIED
-          HOME-ANALYTICS-INDEPENDENCE: NOT VERIFIED
-          FINANCIAL-BALANCE-FILTER-INHERITANCE: NOT VERIFIED
-          FUTURE-PERIODS-BLOCKED: NOT VERIFIED
-          NO-IFRAME: NOT VERIFIED
-          PAGE-JAVASCRIPT-ERRORS: NOT VERIFIED
-          VERIFIED-COMMIT: $GITHUB_SHA
-          EOF
-
       - name: Install browser driver
-        continue-on-error: true
         run: npm install --no-save playwright-core@1.53.2
 
       - name: Run public gate
-        continue-on-error: true
         env:
           PUBLIC_URL: https://maloma.github.io/sandbox/
         run: |
+          mkdir -p verification
           node <<'NODE'
           const fs = require('fs');
           const { chromium } = require('playwright-core');
@@ -63,17 +39,25 @@ jobs:
             'HTTP-LOAD': 'FAILED',
             '404': 'NOT VERIFIED',
             'FINAL-ADDRESS': 'NOT VERIFIED',
+            'NO-IFRAME': 'NOT VERIFIED',
             'HOME-PERIOD-TYPE-TAP': 'NOT VERIFIED',
-            'ANALYTICS-PERIOD-TYPE-TAP': 'NOT VERIFIED',
             'HOME-PERIOD-LABEL-TAP': 'NOT VERIFIED',
+            'SAME-PERIOD-SELECTION-PRESERVES': 'NOT VERIFIED',
+            'ANALYTICS-PERIOD-TYPE-TAP': 'NOT VERIFIED',
             'ANALYTICS-PERIOD-LABEL-TAP': 'NOT VERIFIED',
+            'HOME-ANALYTICS-INDEPENDENCE': 'NOT VERIFIED',
             'OPERATIONS-PERIOD-LABEL': 'NOT VERIFIED',
             'OPERATIONS-ARROWS': 'NOT VERIFIED',
             'OPERATIONS-INDEPENDENCE': 'NOT VERIFIED',
-            'HOME-ANALYTICS-INDEPENDENCE': 'NOT VERIFIED',
+            'OPERATIONS-FILTER-ORDER': 'NOT VERIFIED',
             'FINANCIAL-BALANCE-FILTER-INHERITANCE': 'NOT VERIFIED',
             'FUTURE-PERIODS-BLOCKED': 'NOT VERIFIED',
-            'NO-IFRAME': 'NOT VERIFIED',
+            'CAPITAL-BACKDROP-CLOSE': 'NOT VERIFIED',
+            'ENTRY-HEADER-TONE': 'NOT VERIFIED',
+            'CUSTOM-CATEGORY': 'NOT VERIFIED',
+            'SAFE-EDIT-BUTTON': 'NOT VERIFIED',
+            'DEBT-LAYOUT': 'NOT VERIFIED',
+            'CATEGORY-HEADING-COPY': 'NOT VERIFIED',
             'PAGE-JAVASCRIPT-ERRORS': 'NOT VERIFIED',
             'VERIFIED-COMMIT': process.env.GITHUB_SHA,
           };
@@ -93,22 +77,35 @@ jobs:
               gate['HTTP-STATUS'] = String(status);
               gate['FINAL-ADDRESS'] = page.url();
               gate['NO-IFRAME'] = await page.locator('iframe').count() === 0 ? 'VERIFIED' : 'FAILED';
-              const pickerOpen = () => page.locator('#picker').evaluate(el => el.classList.contains('open'));
-              await page.locator('[data-range="day"][data-context="home"]').click();
-              gate['HOME-PERIOD-TYPE-TAP'] = !(await pickerOpen()) ? 'NO PICKER' : 'FAILED';
-              const homeLabel = await page.locator('[data-label="home"]').innerText();
+              const isOpen = id => page.locator(id).evaluate(el => el.classList.contains('open'));
+
+              await page.locator('#capitalInfoBtn').click();
+              await page.locator('#capitalInfo').click({ position: { x: 10, y: 10 } });
+              gate['CAPITAL-BACKDROP-CLOSE'] = !(await isOpen('#capitalInfo')) ? 'VERIFIED' : 'FAILED';
+
+              await page.locator('[data-range="month"][data-context="home"]').click();
+              await page.locator('[data-prev="home"]').click();
+              const oldMonth = await page.locator('[data-label="home"]').innerText();
+              await page.locator('[data-range="month"][data-context="home"]').click();
+              gate['SAME-PERIOD-SELECTION-PRESERVES'] = (await page.locator('[data-label="home"]').innerText()) === oldMonth ? 'VERIFIED' : 'FAILED';
+              gate['HOME-PERIOD-TYPE-TAP'] = !(await isOpen('#picker')) ? 'NO PICKER' : 'FAILED';
               await page.locator('[data-label="home"]').click();
-              gate['HOME-PERIOD-LABEL-TAP'] = (await pickerOpen()) ? 'PICKER OPENS' : 'FAILED';
-              await page.locator('[data-close="picker"]').click();
+              gate['HOME-PERIOD-LABEL-TAP'] = (await isOpen('#picker')) ? 'PICKER OPENS' : 'FAILED';
+              await page.locator('#pickerCurrent').click();
+              const homeLabel = await page.locator('[data-label="home"]').innerText();
+
               await page.locator('#analyticsBtn').click();
               await page.locator('[data-range="week"][data-context="analytics"]').click();
-              gate['ANALYTICS-PERIOD-TYPE-TAP'] = !(await pickerOpen()) ? 'NO PICKER' : 'FAILED';
+              gate['ANALYTICS-PERIOD-TYPE-TAP'] = !(await isOpen('#picker')) ? 'NO PICKER' : 'FAILED';
               await page.locator('[data-label="analytics"]').click();
-              gate['ANALYTICS-PERIOD-LABEL-TAP'] = (await pickerOpen()) ? 'PICKER OPENS' : 'FAILED';
+              gate['ANALYTICS-PERIOD-LABEL-TAP'] = (await isOpen('#picker')) ? 'PICKER OPENS' : 'FAILED';
               await page.locator('[data-close="picker"]').click();
               await page.locator('#analyticsScreen [data-back]').click();
               gate['HOME-ANALYTICS-INDEPENDENCE'] = (await page.locator('[data-label="home"]').innerText()) === homeLabel ? 'VERIFIED' : 'FAILED';
+
               await page.locator('[data-screen="operations"]').click();
+              const filterOrder = await page.locator('#operationsFilters [data-filter]').evaluateAll(els => els.map(el => `${el.dataset.filter}:${el.textContent.trim()}`));
+              gate['OPERATIONS-FILTER-ORDER'] = JSON.stringify(filterOrder) === JSON.stringify(['expense:Расход','all:Все','income:Приход']) ? 'VERIFIED' : 'FAILED';
               const opsInitial = await page.locator('[data-label="operations"]').innerText();
               gate['OPERATIONS-PERIOD-LABEL'] = opsInitial.trim() ? 'VISIBLE' : 'FAILED';
               const inherited = opsInitial === homeLabel;
@@ -116,13 +113,43 @@ jobs:
               const opsAfter = await page.locator('[data-label="operations"]').innerText();
               gate['OPERATIONS-ARROWS'] = opsAfter !== opsInitial ? 'WORKING' : 'FAILED';
               await page.locator('#operationsScreen [data-back]').click();
-              const homeAfterOps = await page.locator('[data-label="home"]').innerText();
-              gate['OPERATIONS-INDEPENDENCE'] = inherited && homeAfterOps === homeLabel ? 'VERIFIED' : 'FAILED';
+              gate['OPERATIONS-INDEPENDENCE'] = inherited && (await page.locator('[data-label="home"]').innerText()) === homeLabel ? 'VERIFIED' : 'FAILED';
+
               await page.locator('[data-open-ops="expense"]').first().click();
               const expenseActive = await page.locator('[data-filter="expense"]').evaluate(el => el.classList.contains('active'));
               const inheritedBalancePeriod = (await page.locator('[data-label="operations"]').innerText()) === homeLabel;
               gate['FINANCIAL-BALANCE-FILTER-INHERITANCE'] = expenseActive && inheritedBalancePeriod ? 'VERIFIED' : 'FAILED';
               gate['FUTURE-PERIODS-BLOCKED'] = await page.locator('[data-next="operations"]').isDisabled() ? 'VERIFIED' : 'FAILED';
+
+              const firstRow = page.locator('#operationsList .operation').first();
+              await firstRow.locator('.op-title').click();
+              const rowSafe = !(await isOpen('#entryModal'));
+              await firstRow.locator('[data-edit-op]').click();
+              const editOpens = await isOpen('#entryModal');
+              gate['SAFE-EDIT-BUTTON'] = rowSafe && editOpens ? 'VERIFIED' : 'FAILED';
+              await page.locator('[data-close="entryModal"]').click();
+
+              await page.locator('#operationsScreen [data-back]').click();
+              await page.locator('[data-open-entry="expense"]').click();
+              const redHeader = await page.locator('#entrySheet').evaluate(el => el.classList.contains('entry-expense'));
+              await page.locator('[data-close="entryModal"]').click();
+              await page.locator('[data-open-entry="income"]').click();
+              const greenHeader = await page.locator('#entrySheet').evaluate(el => el.classList.contains('entry-income'));
+              gate['ENTRY-HEADER-TONE'] = redHeader && greenHeader ? 'VERIFIED' : 'FAILED';
+              await page.locator('#showCategoryBtn').click();
+              const categoryName = `Тест ${process.env.GITHUB_SHA.slice(0,7)}`;
+              await page.locator('#newCategoryInput').fill(categoryName);
+              await page.locator('#saveCategoryBtn').click();
+              gate['CUSTOM-CATEGORY'] = (await page.locator('#categoryInput').inputValue()) === categoryName ? 'VERIFIED' : 'FAILED';
+              await page.locator('[data-close="entryModal"]').click();
+
+              const debtGap = parseFloat(await page.locator('.debts').evaluate(el => getComputedStyle(el).marginBottom));
+              const labelGap = parseFloat(await page.locator('.debt b').first().evaluate(el => getComputedStyle(el).marginBottom));
+              await page.locator('.debt strong').nth(1).evaluate(el => el.textContent = '12 345 €');
+              const numberFits = await page.locator('.debt strong').nth(1).evaluate(el => el.scrollWidth <= el.clientWidth);
+              const debtCopy = await page.locator('.debt b').nth(1).innerText();
+              gate['DEBT-LAYOUT'] = debtGap >= 9 && labelGap >= 6 && numberFits && debtCopy === 'Я верну' ? 'VERIFIED' : 'FAILED';
+              gate['CATEGORY-HEADING-COPY'] = (await page.locator('.section-head h2').first().innerText()) === 'Самые затратные категории' ? 'VERIFIED' : 'FAILED';
               gate['PAGE-JAVASCRIPT-ERRORS'] = errors.length ? `FAILED: ${errors.join(' | ')}` : 'NONE';
             } catch (error) {
               gate['BROWSER-ERROR'] = error.stack || error.message;
@@ -139,10 +166,14 @@ jobs:
       - name: Record verification evidence
         if: always()
         run: |
+          cp verification/public-gate.txt /tmp/public-gate.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
           git checkout -B main origin/main
+          mkdir -p verification
+          cp /tmp/public-gate.txt verification/public-gate.txt
           git add verification/public-gate.txt
+          git diff --cached --quiet && exit 0
           git commit -m "Record public verification gate [skip ci]"
           git push origin HEAD:main
