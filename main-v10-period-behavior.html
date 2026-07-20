@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta http-equiv="cache-control" content="no-store">
+<meta name="theme-color" content="#f5f7fb">
+<title>FamilyPilot</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#f5f7fb}iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#f5f7fb}</style>
+</head>
+<body>
+<iframe id="shell" title="FamilyPilot"></iframe>
+<script>
+(()=>{
+  'use strict';
+  const shell=document.getElementById('shell');
+
+  function deepestDocument(){
+    let doc=shell.contentWindow&&shell.contentWindow.document;
+    for(let i=0;i<8&&doc;i++){
+      if(doc.getElementById('homeScreen'))return doc;
+      const frame=doc.querySelector('iframe');
+      if(!frame||!frame.contentWindow)break;
+      doc=frame.contentWindow.document;
+    }
+    return null;
+  }
+
+  function install(){
+    const doc=deepestDocument();
+    if(!doc||doc.readyState==='loading'||doc.documentElement.dataset.fpUnifiedPeriodBehavior==='1')return;
+    doc.documentElement.dataset.fpUnifiedPeriodBehavior='1';
+
+    const closePicker=()=>{
+      const picker=doc.getElementById('fpPicker');
+      if(!picker)return;
+      picker.classList.remove('open');
+      picker.setAttribute('aria-hidden','true');
+    };
+
+    doc.addEventListener('click',event=>{
+      const periodTypeButton=event.target.closest?.('[data-fp-range], [data-ops-range]');
+      if(!periodTypeButton)return;
+      queueMicrotask(closePicker);
+      setTimeout(closePicker,0);
+    },true);
+  }
+
+  function boot(){
+    install();
+    setTimeout(install,250);
+    setTimeout(install,900);
+  }
+
+  shell.addEventListener('load',()=>{
+    boot();
+    let doc=shell.contentWindow&&shell.contentWindow.document;
+    for(let i=0;i<8&&doc;i++){
+      const frame=doc.querySelector('iframe');
+      if(!frame)break;
+      frame.addEventListener('load',boot);
+      doc=frame.contentWindow&&frame.contentWindow.document;
+    }
+  });
+
+  shell.src='./main-v9-operations-period.html?periodbehavior=10&t='+Date.now();
+  setInterval(install,1200);
+})();
+</script>
+</body>
+</html>
