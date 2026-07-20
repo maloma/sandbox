@@ -35,3 +35,4 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "Use custom stable category select arrow"
           git push origin HEAD:main
+# trigger
