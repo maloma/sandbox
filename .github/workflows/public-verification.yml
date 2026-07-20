@@ -18,7 +18,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 6
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -57,13 +57,11 @@ jobs:
             'VERIFIED-COMMIT': process.env.GITHUB_SHA,
           };
           let source = '';
-          let lastHttp = '';
-          for (let attempt = 1; attempt <= 60; attempt++) {
+          for (let attempt = 1; attempt <= 18; attempt++) {
             try {
               const response = await fetch(url, { cache: 'no-store', redirect: 'follow' });
-              lastHttp = String(response.status);
               source = await response.text();
-              gate['HTTP-STATUS'] = lastHttp;
+              gate['HTTP-STATUS'] = String(response.status);
               gate['404'] = response.status === 404 ? 'YES' : 'NO';
               if (response.ok && source.includes('canonical-single-runtime') && !source.toLowerCase().includes('<iframe')) {
                 gate['HTTP-LOAD'] = 'SUCCEEDED';
@@ -88,7 +86,6 @@ jobs:
               await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
               gate['FINAL-ADDRESS'] = page.url();
               gate['NO-IFRAME'] = await page.locator('iframe').count() === 0 ? 'VERIFIED' : 'FAILED';
-
               const pickerOpen = () => page.locator('#picker').evaluate(el => el.classList.contains('open'));
               await page.locator('[data-range="day"][data-context="home"]').click();
               gate['HOME-PERIOD-TYPE-TAP'] = !(await pickerOpen()) ? 'NO PICKER' : 'FAILED';
@@ -96,7 +93,6 @@ jobs:
               await page.locator('[data-label="home"]').click();
               gate['HOME-PERIOD-LABEL-TAP'] = (await pickerOpen()) ? 'PICKER OPENS' : 'FAILED';
               await page.locator('[data-close="picker"]').click();
-
               await page.locator('#analyticsBtn').click();
               await page.locator('[data-range="week"][data-context="analytics"]').click();
               gate['ANALYTICS-PERIOD-TYPE-TAP'] = !(await pickerOpen()) ? 'NO PICKER' : 'FAILED';
@@ -105,7 +101,6 @@ jobs:
               await page.locator('[data-close="picker"]').click();
               await page.locator('#analyticsScreen [data-back]').click();
               gate['HOME-ANALYTICS-INDEPENDENCE'] = (await page.locator('[data-label="home"]').innerText()) === homeLabel ? 'VERIFIED' : 'FAILED';
-
               await page.locator('[data-screen="operations"]').click();
               const opsInitial = await page.locator('[data-label="operations"]').innerText();
               gate['OPERATIONS-PERIOD-LABEL'] = opsInitial.trim() ? 'VISIBLE' : 'FAILED';
@@ -116,7 +111,6 @@ jobs:
               await page.locator('#operationsScreen [data-back]').click();
               const homeAfterOps = await page.locator('[data-label="home"]').innerText();
               gate['OPERATIONS-INDEPENDENCE'] = inherited && homeAfterOps === homeLabel ? 'VERIFIED' : 'FAILED';
-
               await page.locator('[data-open-ops="expense"]').first().click();
               const expenseActive = await page.locator('[data-filter="expense"]').evaluate(el => el.classList.contains('active'));
               const balancePeriodInherited = (await page.locator('[data-label="operations"]').innerText()) === homeLabel;
