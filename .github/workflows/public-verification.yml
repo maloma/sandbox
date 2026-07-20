@@ -57,7 +57,7 @@ jobs:
             'VERIFIED-COMMIT': process.env.GITHUB_SHA,
           };
           let source = '';
-          for (let attempt = 1; attempt <= 18; attempt++) {
+          for (let attempt = 1; attempt <= 12; attempt++) {
             try {
               const response = await fetch(url, { cache: 'no-store', redirect: 'follow' });
               source = await response.text();
@@ -133,6 +133,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
           git add verification/public-gate.txt
           git diff --cached --quiet && exit 0
           git commit -m "Record public verification gate [skip ci]"
