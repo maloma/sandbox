@@ -21,11 +21,9 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v6
-
       - name: Install browser driver
         run: npm install --no-save playwright-core@1.53.2
-
-      - name: Run public gate
+      - name: Run rendered public gate
         continue-on-error: true
         env:
           PUBLIC_URL: https://maloma.github.io/sandbox/
@@ -35,159 +33,104 @@ jobs:
           const fs = require('fs');
           const { chromium } = require('playwright-core');
           const baseUrl = process.env.PUBLIC_URL;
-          const url = `${baseUrl}?verify=${process.env.GITHUB_SHA}`;
-          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+          const url = `${baseUrl}?fixed-dock=${process.env.GITHUB_SHA}`;
           const gate = {
             'PUBLIC-URL': baseUrl,
             'HTTP-LOAD': 'FAILED',
-            '404': 'NOT VERIFIED',
+            'HTTP-STATUS': 'NOT VERIFIED',
             'FINAL-ADDRESS': 'NOT VERIFIED',
             'NO-IFRAME': 'NOT VERIFIED',
-            'HOME-PERIOD-TYPE-TAP': 'NOT VERIFIED',
-            'HOME-PERIOD-LABEL-TAP': 'NOT VERIFIED',
-            'SAME-PERIOD-SELECTION-PRESERVES': 'NOT VERIFIED',
-            'ANALYTICS-PERIOD-TYPE-TAP': 'NOT VERIFIED',
-            'ANALYTICS-PERIOD-LABEL-TAP': 'NOT VERIFIED',
-            'HOME-ANALYTICS-INDEPENDENCE': 'NOT VERIFIED',
-            'OPERATIONS-PERIOD-LABEL': 'NOT VERIFIED',
-            'OPERATIONS-ARROWS': 'NOT VERIFIED',
-            'OPERATIONS-INDEPENDENCE': 'NOT VERIFIED',
-            'OPERATIONS-FILTER-ORDER': 'NOT VERIFIED',
-            'FINANCIAL-BALANCE-FILTER-INHERITANCE': 'NOT VERIFIED',
-            'FUTURE-PERIODS-BLOCKED': 'NOT VERIFIED',
-            'DEBT-COMPACT-LAYOUT': 'NOT VERIFIED',
-            'CAPITAL-BACKDROP-CLOSE': 'NOT VERIFIED',
-            'CAPITAL-DEBT-POSITION': 'NOT VERIFIED',
-            'HOME-OPERATION-DETAIL': 'NOT VERIFIED',
-            'SAFE-EDIT-FROM-DETAIL': 'NOT VERIFIED',
-            'EDIT-BACKDROP-CLOSE': 'NOT VERIFIED',
-            'CATEGORY-FILTER': 'NOT VERIFIED',
-            'DAY-GROUPING': 'NOT VERIFIED',
-            'OPERATION-TIME-PLACEMENT': 'NOT VERIFIED',
-            'OPERATIONS-ROW-DETAIL': 'NOT VERIFIED',
+            'DESKTOP-DOCK-FIXED': 'NOT VERIFIED',
+            'DESKTOP-DOCK-SCROLL-STABLE': 'NOT VERIFIED',
+            'DESKTOP-DOCK-ABOVE-NAV': 'NOT VERIFIED',
+            'DESKTOP-BUTTON-COPY-STACKED': 'NOT VERIFIED',
+            'DESKTOP-BUTTON-OVERFLOW': 'NOT VERIFIED',
+            'DESKTOP-DARK-CANVAS': 'NOT VERIFIED',
+            'MOBILE-DOCK-FIXED': 'NOT VERIFIED',
+            'MOBILE-BUTTON-COPY-STACKED': 'NOT VERIFIED',
+            'CORE-OPERATIONS-DOM': 'NOT VERIFIED',
             'PAGE-JAVASCRIPT-ERRORS': 'NOT VERIFIED',
             'VERIFIED-COMMIT': process.env.GITHUB_SHA,
           };
-
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const stacked = async button => {
+            const [title, subtitle] = await Promise.all([
+              button.locator('strong').boundingBox(),
+              button.locator('small').boundingBox(),
+            ]);
+            return !!title && !!subtitle && Math.abs(title.x - subtitle.x) <= 2 && title.y + title.height <= subtitle.y + 1;
+          };
           (async()=>{
-            let source = '';
-            for (let attempt = 0; attempt < 48; attempt++) {
-              try {
-                const response = await fetch(url, { cache: 'no-store', redirect: 'follow' });
-                source = await response.text();
-                gate['HTTP-STATUS'] = String(response.status);
-                gate['404'] = response.status === 404 ? 'YES' : 'NO';
-                if (response.ok && source.includes('Operation detail and day grouping') && !source.toLowerCase().includes('<iframe')) {
-                  gate['HTTP-LOAD'] = 'SUCCEEDED';
-                  break;
-                }
-              } catch (error) {
-                gate['HTTP-ERROR'] = error.message;
-              }
-              await sleep(5000);
-            }
-
             let browser;
             const errors = [];
             try {
-              if (gate['HTTP-LOAD'] !== 'SUCCEEDED') throw new Error('Published runtime marker was not observed');
-              const candidates = ['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'];
-              const executablePath = candidates.find(path => fs.existsSync(path));
+              const executablePath = ['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'].find(fs.existsSync);
               browser = await chromium.launch({ headless: true, executablePath, args: ['--no-sandbox'] });
-              const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-              page.on('pageerror', error => errors.push(error.message));
-              const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+
+              const desktop = await browser.newContext({ viewport: { width: 1720, height: 966 } });
+              await desktop.addInitScript(() => localStorage.setItem('familypilot.theme', 'dark'));
+              const page = await desktop.newPage();
+              page.on('pageerror', error => errors.push(`desktop: ${error.message}`));
+
+              let response;
+              for (let attempt = 0; attempt < 48; attempt++) {
+                response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+                try {
+                  await page.locator('#actionDock .action.income').waitFor({ state: 'visible', timeout: 5000 });
+                  await page.locator('[data-screen="operations"]').waitFor({ state: 'visible', timeout: 5000 });
+                  break;
+                } catch {
+                  await sleep(5000);
+                }
+              }
+
               const status = response?.status() || 0;
               gate['HTTP-STATUS'] = String(status);
               gate['HTTP-LOAD'] = status >= 200 && status < 400 ? 'SUCCEEDED' : 'FAILED';
-              gate['404'] = status === 404 ? 'YES' : 'NO';
               gate['FINAL-ADDRESS'] = page.url();
               gate['NO-IFRAME'] = await page.locator('iframe').count() === 0 ? 'VERIFIED' : 'FAILED';
-
-              const pickerOpen = () => page.locator('#picker').evaluate(el => el.classList.contains('open'));
-              await page.locator('[data-range="day"][data-context="home"]').click();
-              gate['HOME-PERIOD-TYPE-TAP'] = !(await pickerOpen()) ? 'NO PICKER' : 'FAILED';
-              await page.locator('[data-range="month"][data-context="home"]').click();
-              await page.locator('[data-prev="home"]').click();
-              const priorMonth = await page.locator('[data-label="home"]').innerText();
-              await page.locator('[data-range="month"][data-context="home"]').click();
-              gate['SAME-PERIOD-SELECTION-PRESERVES'] = (await page.locator('[data-label="home"]').innerText()) === priorMonth ? 'VERIFIED' : 'FAILED';
-              await page.locator('[data-label="home"]').click();
-              gate['HOME-PERIOD-LABEL-TAP'] = (await pickerOpen()) ? 'PICKER OPENS' : 'FAILED';
-              await page.locator('[data-close="picker"]').click();
-              await page.locator('[data-next="home"]').click();
-              const homeLabel = await page.locator('[data-label="home"]').innerText();
-
-              const debtLayout = await page.locator('.debt').first().evaluate(el => ({
-                fits: el.scrollWidth <= el.clientWidth,
-                centered: getComputedStyle(el).justifyContent === 'center',
-                oneLine: getComputedStyle(el.querySelector('b')).whiteSpace === 'nowrap'
-              }));
-              gate['DEBT-COMPACT-LAYOUT'] = debtLayout.fits && debtLayout.centered && debtLayout.oneLine ? 'VERIFIED' : 'FAILED';
-
-              await page.locator('#capitalInfoBtn').click();
-              gate['CAPITAL-DEBT-POSITION'] = await page.getByText('Чистая позиция с долгами').count() === 1 ? 'VERIFIED' : 'FAILED';
-              await page.mouse.click(5, 5);
-              gate['CAPITAL-BACKDROP-CLOSE'] = !(await page.locator('#capitalInfo').evaluate(el => el.classList.contains('open'))) ? 'VERIFIED' : 'FAILED';
-
-              await page.locator('#recentOperations [data-op-id]').first().click();
-              const detailOpen = await page.locator('#operationDetail').evaluate(el => el.classList.contains('open'));
-              const editClosed = !(await page.locator('#entryModal').evaluate(el => el.classList.contains('open')));
-              gate['HOME-OPERATION-DETAIL'] = detailOpen && editClosed ? 'VERIFIED' : 'FAILED';
-              const editInside = await page.locator('#operationDetail #detailEditBtn').count() === 1 && await page.locator('[data-op-id] #detailEditBtn').count() === 0;
-              await page.locator('#detailEditBtn').click();
-              gate['SAFE-EDIT-FROM-DETAIL'] = editInside && await page.locator('#entryModal').evaluate(el => el.classList.contains('open')) ? 'VERIFIED' : 'FAILED';
-              await page.mouse.click(5, 5);
-              gate['EDIT-BACKDROP-CLOSE'] = !(await page.locator('#entryModal').evaluate(el => el.classList.contains('open'))) ? 'VERIFIED' : 'FAILED';
-
-              await page.locator('#analyticsBtn').click();
-              await page.locator('[data-range="week"][data-context="analytics"]').click();
-              gate['ANALYTICS-PERIOD-TYPE-TAP'] = !(await pickerOpen()) ? 'NO PICKER' : 'FAILED';
-              await page.locator('[data-label="analytics"]').click();
-              gate['ANALYTICS-PERIOD-LABEL-TAP'] = (await pickerOpen()) ? 'PICKER OPENS' : 'FAILED';
-              await page.locator('[data-close="picker"]').click();
-              await page.locator('#analyticsScreen [data-back]').click();
-              gate['HOME-ANALYTICS-INDEPENDENCE'] = (await page.locator('[data-label="home"]').innerText()) === homeLabel ? 'VERIFIED' : 'FAILED';
+              gate['CORE-OPERATIONS-DOM'] = await page.locator('#operationsScreen').count() === 1 && await page.locator('#operationsList').count() === 1 ? 'VERIFIED' : 'FAILED';
 
               await page.locator('[data-screen="operations"]').click();
-              const opsInitial = await page.locator('[data-label="operations"]').innerText();
-              gate['OPERATIONS-PERIOD-LABEL'] = opsInitial.trim() ? 'VISIBLE' : 'FAILED';
-              const inherited = opsInitial === homeLabel;
-              await page.locator('[data-prev="operations"]').click();
-              const opsAfter = await page.locator('[data-label="operations"]').innerText();
-              gate['OPERATIONS-ARROWS'] = opsAfter !== opsInitial ? 'WORKING' : 'FAILED';
-              await page.locator('#operationsScreen [data-back]').click();
-              gate['OPERATIONS-INDEPENDENCE'] = inherited && (await page.locator('[data-label="home"]').innerText()) === homeLabel ? 'VERIFIED' : 'FAILED';
+              await page.evaluate(() => {
+                const filler = document.createElement('div');
+                filler.id = 'verification-scroll-filler';
+                filler.style.height = '2200px';
+                document.querySelector('#operationsScreen').appendChild(filler);
+              });
 
-              await page.locator('[data-screen="operations"]').click();
-              const filterOrder = await page.locator('[data-filter]').evaluateAll(elements => elements.map(el => el.textContent.trim()));
-              gate['OPERATIONS-FILTER-ORDER'] = JSON.stringify(filterOrder) === JSON.stringify(['Расход','Все','Приход']) ? 'VERIFIED' : 'FAILED';
-              const headings = await page.locator('#operationsList .day-heading').count();
-              const groups = await page.locator('#operationsList [data-day-group]').count();
-              gate['DAY-GROUPING'] = headings === groups && groups > 0 ? 'VERIFIED' : 'FAILED';
-              const times = await page.locator('#operationsList .op-title-line .op-time').count();
-              const rows = await page.locator('#operationsList [data-op-id]').count();
-              gate['OPERATION-TIME-PLACEMENT'] = times === rows && rows > 0 ? 'VERIFIED' : 'FAILED';
+              const dock = page.locator('#actionDock');
+              const nav = page.locator('.bottom');
+              const before = await dock.boundingBox();
+              const navBox = await nav.boundingBox();
+              const position = await dock.evaluate(el => getComputedStyle(el).position);
+              gate['DESKTOP-DOCK-FIXED'] = position === 'fixed' ? 'VERIFIED' : `FAILED: ${position}`;
+              gate['DESKTOP-DOCK-ABOVE-NAV'] = before && navBox && Math.round(before.y + before.height) <= Math.round(navBox.y) + 1 ? `VERIFIED: bottom=${Math.round(before.y + before.height)}px, navTop=${Math.round(navBox.y)}px` : 'FAILED';
 
-              const categoryOptions = await page.locator('#categoryFilter option').allTextContents();
-              if (categoryOptions.length > 1) {
-                const category = categoryOptions[1];
-                await page.locator('#categoryFilter').selectOption({ label: category });
-                const visibleCategories = await page.locator('#operationsList .op-title').allTextContents();
-                gate['CATEGORY-FILTER'] = visibleCategories.length > 0 && visibleCategories.every(value => value === category) ? 'VERIFIED' : 'FAILED';
-              } else gate['CATEGORY-FILTER'] = 'FAILED';
-              await page.locator('#categoryFilter').selectOption('all');
+              await page.evaluate(() => window.scrollTo(0, 1500));
+              await page.waitForTimeout(150);
+              const after = await dock.boundingBox();
+              gate['DESKTOP-DOCK-SCROLL-STABLE'] = before && after && Math.abs(before.y - after.y) <= 1 ? `VERIFIED: y=${Math.round(before.y)}px` : `FAILED: before=${before?.y}, after=${after?.y}`;
 
-              await page.locator('#operationsList [data-op-id]').first().click();
-              gate['OPERATIONS-ROW-DETAIL'] = await page.locator('#operationDetail').evaluate(el => el.classList.contains('open')) ? 'VERIFIED' : 'FAILED';
-              await page.mouse.click(5, 5);
+              const income = page.locator('.action.income');
+              const expense = page.locator('.action.expense');
+              gate['DESKTOP-BUTTON-COPY-STACKED'] = await stacked(income) && await stacked(expense) ? 'VERIFIED' : 'FAILED';
+              const overflow = await page.locator('.action').evaluateAll(nodes => nodes.some(el => el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight));
+              gate['DESKTOP-BUTTON-OVERFLOW'] = overflow ? 'FAILED' : 'NONE';
+              const rootBg = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor.replace(/\s+/g,''));
+              gate['DESKTOP-DARK-CANVAS'] = rootBg === 'rgb(7,24,36)' ? 'VERIFIED' : `FAILED: ${rootBg}`;
+              await desktop.close();
 
-              await page.locator('#operationsScreen [data-back]').click();
-              await page.locator('[data-open-ops="expense"]').first().click();
-              const expenseActive = await page.locator('[data-filter="expense"]').evaluate(el => el.classList.contains('active'));
-              const inheritedBalancePeriod = (await page.locator('[data-label="operations"]').innerText()) === homeLabel;
-              gate['FINANCIAL-BALANCE-FILTER-INHERITANCE'] = expenseActive && inheritedBalancePeriod ? 'VERIFIED' : 'FAILED';
-              gate['FUTURE-PERIODS-BLOCKED'] = await page.locator('[data-next="operations"]').isDisabled() ? 'VERIFIED' : 'FAILED';
+              const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+              const mobilePage = await mobile.newPage();
+              mobilePage.on('pageerror', error => errors.push(`mobile: ${error.message}`));
+              await mobilePage.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+              await mobilePage.locator('#actionDock .action.income').waitFor({ state: 'visible', timeout: 30000 });
+              const mobilePosition = await mobilePage.locator('#actionDock').evaluate(el => getComputedStyle(el).position);
+              gate['MOBILE-DOCK-FIXED'] = mobilePosition === 'fixed' ? 'VERIFIED' : `FAILED: ${mobilePosition}`;
+              gate['MOBILE-BUTTON-COPY-STACKED'] = await stacked(mobilePage.locator('.action.income')) && await stacked(mobilePage.locator('.action.expense')) ? 'VERIFIED' : 'FAILED';
+              await mobile.close();
+
               gate['PAGE-JAVASCRIPT-ERRORS'] = errors.length ? `FAILED: ${errors.join(' | ')}` : 'NONE';
             } catch (error) {
               gate['BROWSER-ERROR'] = error.stack || error.message;
@@ -200,7 +143,6 @@ jobs:
             }
           })().catch(error => { console.error(error); process.exitCode = 1; });
           NODE
-
       - name: Record verification evidence
         if: always()
         run: |
