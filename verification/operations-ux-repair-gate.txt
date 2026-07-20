@@ -1,0 +1,42 @@
+PUBLIC-URL: https://maloma.github.io/sandbox/
+HTTP-STATUS: 200
+PUBLIC-SHA256: 7713530b8fe78e29c6a835db00c9a5679b6afb6dbe14d84c1fe34754d152f316
+EXPECTED-SHA256: 7713530b8fe78e29c6a835db00c9a5679b6afb6dbe14d84c1fe34754d152f316
+AMOUNT-RANGE-FILTER: VERIFIED
+OPERATIONS-SUMMARY-ORDER: VERIFIED
+ANALYTICS-SUMMARY-ORDER: VERIFIED
+ANALYTICS-GAP: VERIFIED
+EMPTY-STATE-GAP: VERIFIED
+PICKER-IP14-NO-OVERFLOW: VERIFIED
+ENTRY-DATE-NO-OVERFLOW: FAILED
+HISTORY-NOTE-ONLY: FAILED
+HISTORY-TWO-FIELDS-ONE-BATCH: FAILED
+DETAIL-THREE-ACTIONS: FAILED
+TRASH-PURGE-LARGE-TEXT-FITS: FAILED
+BACKGROUND-SCROLL-LOCKED: FAILED
+CATEGORY-NAME-SCOPED-BY-TYPE: FAILED
+CATEGORY-RENAME-SCOPED-BY-TYPE: FAILED
+CATEGORY-ERROR-NEAR-FIELD: FAILED
+CATEGORY-MANAGER-ADD: FAILED
+CATEGORY-DELETE-CONFIRM: FAILED
+PAGE-JAVASCRIPT-ERRORS: FAILED
+VERIFIED-RUNTIME-COMMIT: 3c977d6db09454d014ffb39becb0aff5c2541ac2
+BROWSER-ERROR: locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator('[data-back]').first()
+    - locator resolved to <button class="back" data-back="">‹</button>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is not visible
+    - retrying click action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and stable
+      - element is not visible
+    - retrying click action
+      - waiting 100ms
+    58 × waiting for element to be visible, enabled and stable
+       - element is not visible
+     - retrying click action
+       - waiting 500ms
+
+    at [stdin]:63:47
