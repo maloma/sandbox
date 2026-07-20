@@ -22,48 +22,61 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Initialize evidence
+      - name: Initialize fallback evidence
         run: |
           mkdir -p verification
-          {
-            printf 'PUBLIC-URL: https://maloma.github.io/sandbox/\n'
-            printf 'HTTP-LOAD: FAILED\n'
-            printf '404: NOT VERIFIED\n'
-            printf 'FINAL-ADDRESS: NOT VERIFIED\n'
-            printf 'HOME-PERIOD-TYPE-TAP: NOT VERIFIED\n'
-            printf 'ANALYTICS-PERIOD-TYPE-TAP: NOT VERIFIED\n'
-            printf 'HOME-PERIOD-LABEL-TAP: NOT VERIFIED\n'
-            printf 'ANALYTICS-PERIOD-LABEL-TAP: NOT VERIFIED\n'
-            printf 'OPERATIONS-PERIOD-LABEL: NOT VERIFIED\n'
-            printf 'OPERATIONS-ARROWS: NOT VERIFIED\n'
-            printf 'OPERATIONS-INDEPENDENCE: NOT VERIFIED\n'
-            printf 'HOME-ANALYTICS-INDEPENDENCE: NOT VERIFIED\n'
-            printf 'FINANCIAL-BALANCE-FILTER-INHERITANCE: NOT VERIFIED\n'
-            printf 'NO-IFRAME: NOT VERIFIED\n'
-            printf 'PAGE-JAVASCRIPT-ERRORS: NOT VERIFIED\n'
-            printf 'VERIFIED-COMMIT: %s\n' "$GITHUB_SHA"
-          } > verification/public-gate.txt
+          cat > verification/public-gate.txt <<EOF
+          PUBLIC-URL: https://maloma.github.io/sandbox/
+          HTTP-LOAD: FAILED
+          404: NOT VERIFIED
+          FINAL-ADDRESS: NOT VERIFIED
+          HOME-PERIOD-TYPE-TAP: NOT VERIFIED
+          ANALYTICS-PERIOD-TYPE-TAP: NOT VERIFIED
+          HOME-PERIOD-LABEL-TAP: NOT VERIFIED
+          ANALYTICS-PERIOD-LABEL-TAP: NOT VERIFIED
+          OPERATIONS-PERIOD-LABEL: NOT VERIFIED
+          OPERATIONS-ARROWS: NOT VERIFIED
+          OPERATIONS-INDEPENDENCE: NOT VERIFIED
+          HOME-ANALYTICS-INDEPENDENCE: NOT VERIFIED
+          FINANCIAL-BALANCE-FILTER-INHERITANCE: NOT VERIFIED
+          FUTURE-PERIODS-BLOCKED: NOT VERIFIED
+          NO-IFRAME: NOT VERIFIED
+          PAGE-JAVASCRIPT-ERRORS: NOT VERIFIED
+          VERIFIED-COMMIT: $GITHUB_SHA
+          EOF
 
       - name: Install browser driver
         continue-on-error: true
-        run: |
-          set +e
-          npm install --no-save playwright-core@1.53.2 > /tmp/npm-install.log 2>&1
-          CODE=$?
-          printf 'PLAYWRIGHT-INSTALL-EXIT: %s\n' "$CODE" >> verification/public-gate.txt
-          exit "$CODE"
+        run: npm install --no-save playwright-core@1.53.2
 
       - name: Run public gate
         continue-on-error: true
         env:
           PUBLIC_URL: https://maloma.github.io/sandbox/
         run: |
-          set +e
-          node <<'NODE' > /tmp/public-gate.log 2>&1
+          node <<'NODE'
           const fs = require('fs');
           const { chromium } = require('playwright-core');
           const url = `${process.env.PUBLIC_URL}?verify=${process.env.GITHUB_SHA}`;
-          const results = {};
+          const gate = {
+            'PUBLIC-URL': process.env.PUBLIC_URL,
+            'HTTP-LOAD': 'FAILED',
+            '404': 'NOT VERIFIED',
+            'FINAL-ADDRESS': 'NOT VERIFIED',
+            'HOME-PERIOD-TYPE-TAP': 'NOT VERIFIED',
+            'ANALYTICS-PERIOD-TYPE-TAP': 'NOT VERIFIED',
+            'HOME-PERIOD-LABEL-TAP': 'NOT VERIFIED',
+            'ANALYTICS-PERIOD-LABEL-TAP': 'NOT VERIFIED',
+            'OPERATIONS-PERIOD-LABEL': 'NOT VERIFIED',
+            'OPERATIONS-ARROWS': 'NOT VERIFIED',
+            'OPERATIONS-INDEPENDENCE': 'NOT VERIFIED',
+            'HOME-ANALYTICS-INDEPENDENCE': 'NOT VERIFIED',
+            'FINANCIAL-BALANCE-FILTER-INHERITANCE': 'NOT VERIFIED',
+            'FUTURE-PERIODS-BLOCKED': 'NOT VERIFIED',
+            'NO-IFRAME': 'NOT VERIFIED',
+            'PAGE-JAVASCRIPT-ERRORS': 'NOT VERIFIED',
+            'VERIFIED-COMMIT': process.env.GITHUB_SHA,
+          };
           const errors = [];
           const candidates = ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser'];
           const executablePath = candidates.find(path => fs.existsSync(path));
@@ -75,53 +88,53 @@ jobs:
               page.on('pageerror', error => errors.push(error.message));
               const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
               const status = response?.status() || 0;
-              results['HTTP-LOAD'] = status >= 200 && status < 400 ? 'SUCCEEDED' : 'FAILED';
-              results['404'] = status === 404 ? 'YES' : 'NO';
-              results['HTTP-STATUS'] = String(status);
-              results['FINAL-ADDRESS'] = page.url();
-              results['NO-IFRAME'] = await page.locator('iframe').count() === 0 ? 'VERIFIED' : 'FAILED';
+              gate['HTTP-LOAD'] = status >= 200 && status < 400 ? 'SUCCEEDED' : 'FAILED';
+              gate['404'] = status === 404 ? 'YES' : 'NO';
+              gate['HTTP-STATUS'] = String(status);
+              gate['FINAL-ADDRESS'] = page.url();
+              gate['NO-IFRAME'] = await page.locator('iframe').count() === 0 ? 'VERIFIED' : 'FAILED';
               const pickerOpen = () => page.locator('#picker').evaluate(el => el.classList.contains('open'));
               await page.locator('[data-range="day"][data-context="home"]').click();
-              results['HOME-PERIOD-TYPE-TAP'] = !(await pickerOpen()) ? 'NO PICKER' : 'FAILED';
+              gate['HOME-PERIOD-TYPE-TAP'] = !(await pickerOpen()) ? 'NO PICKER' : 'FAILED';
               const homeLabel = await page.locator('[data-label="home"]').innerText();
               await page.locator('[data-label="home"]').click();
-              results['HOME-PERIOD-LABEL-TAP'] = (await pickerOpen()) ? 'PICKER OPENS' : 'FAILED';
+              gate['HOME-PERIOD-LABEL-TAP'] = (await pickerOpen()) ? 'PICKER OPENS' : 'FAILED';
               await page.locator('[data-close="picker"]').click();
               await page.locator('#analyticsBtn').click();
               await page.locator('[data-range="week"][data-context="analytics"]').click();
-              results['ANALYTICS-PERIOD-TYPE-TAP'] = !(await pickerOpen()) ? 'NO PICKER' : 'FAILED';
+              gate['ANALYTICS-PERIOD-TYPE-TAP'] = !(await pickerOpen()) ? 'NO PICKER' : 'FAILED';
               await page.locator('[data-label="analytics"]').click();
-              results['ANALYTICS-PERIOD-LABEL-TAP'] = (await pickerOpen()) ? 'PICKER OPENS' : 'FAILED';
+              gate['ANALYTICS-PERIOD-LABEL-TAP'] = (await pickerOpen()) ? 'PICKER OPENS' : 'FAILED';
               await page.locator('[data-close="picker"]').click();
               await page.locator('#analyticsScreen [data-back]').click();
-              results['HOME-ANALYTICS-INDEPENDENCE'] = (await page.locator('[data-label="home"]').innerText()) === homeLabel ? 'VERIFIED' : 'FAILED';
+              gate['HOME-ANALYTICS-INDEPENDENCE'] = (await page.locator('[data-label="home"]').innerText()) === homeLabel ? 'VERIFIED' : 'FAILED';
               await page.locator('[data-screen="operations"]').click();
               const opsInitial = await page.locator('[data-label="operations"]').innerText();
-              results['OPERATIONS-PERIOD-LABEL'] = opsInitial.trim() ? 'VISIBLE' : 'FAILED';
+              gate['OPERATIONS-PERIOD-LABEL'] = opsInitial.trim() ? 'VISIBLE' : 'FAILED';
               const inherited = opsInitial === homeLabel;
               await page.locator('[data-prev="operations"]').click();
               const opsAfter = await page.locator('[data-label="operations"]').innerText();
-              results['OPERATIONS-ARROWS'] = opsAfter !== opsInitial ? 'WORKING' : 'FAILED';
+              gate['OPERATIONS-ARROWS'] = opsAfter !== opsInitial ? 'WORKING' : 'FAILED';
               await page.locator('#operationsScreen [data-back]').click();
               const homeAfterOps = await page.locator('[data-label="home"]').innerText();
-              results['OPERATIONS-INDEPENDENCE'] = inherited && homeAfterOps === homeLabel ? 'VERIFIED' : 'FAILED';
+              gate['OPERATIONS-INDEPENDENCE'] = inherited && homeAfterOps === homeLabel ? 'VERIFIED' : 'FAILED';
               await page.locator('[data-open-ops="expense"]').first().click();
               const expenseActive = await page.locator('[data-filter="expense"]').evaluate(el => el.classList.contains('active'));
               const inheritedBalancePeriod = (await page.locator('[data-label="operations"]').innerText()) === homeLabel;
-              results['FINANCIAL-BALANCE-FILTER-INHERITANCE'] = expenseActive && inheritedBalancePeriod ? 'VERIFIED' : 'FAILED';
-              results['FUTURE-PERIODS-BLOCKED'] = await page.locator('[data-next="operations"]').isDisabled() ? 'VERIFIED' : 'FAILED';
-              results['PAGE-JAVASCRIPT-ERRORS'] = errors.length ? `FAILED: ${errors.join(' | ')}` : 'NONE';
+              gate['FINANCIAL-BALANCE-FILTER-INHERITANCE'] = expenseActive && inheritedBalancePeriod ? 'VERIFIED' : 'FAILED';
+              gate['FUTURE-PERIODS-BLOCKED'] = await page.locator('[data-next="operations"]').isDisabled() ? 'VERIFIED' : 'FAILED';
+              gate['PAGE-JAVASCRIPT-ERRORS'] = errors.length ? `FAILED: ${errors.join(' | ')}` : 'NONE';
             } catch (error) {
-              results['BROWSER-ERROR'] = error.stack || error.message;
-              results['PAGE-JAVASCRIPT-ERRORS'] = errors.length ? `FAILED: ${errors.join(' | ')}` : 'NOT VERIFIED';
+              gate['BROWSER-ERROR'] = error.stack || error.message;
+              gate['PAGE-JAVASCRIPT-ERRORS'] = errors.length ? `FAILED: ${errors.join(' | ')}` : 'NOT VERIFIED';
             } finally {
               if (browser) await browser.close();
-              for (const [key,value] of Object.entries(results)) console.log(`${key}: ${value}`);
+              const lines = Object.entries(gate).map(([key,value]) => `${key}: ${value}`);
+              fs.writeFileSync('verification/public-gate.txt', lines.join('\n') + '\n');
+              console.log(lines.join('\n'));
             }
           })().catch(error=>{console.error(error);process.exitCode=1});
           NODE
-          cat /tmp/public-gate.log >> verification/public-gate.txt
-          exit 0
 
       - name: Record verification evidence
         if: always()
