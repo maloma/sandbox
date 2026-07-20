@@ -1,0 +1,43 @@
+name: Fix desktop action dock flow
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/desktop-action-dock-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Apply responsive desktop flow layout
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path('index.html')
+          text = path.read_text(encoding='utf-8')
+          marker = '<!-- Layout: desktop-flow-action-dock -->'
+          css = '''
+          @media (hover:hover) and (pointer:fine){
+            .app{padding-bottom:calc(var(--nav) + 24px + env(safe-area-inset-bottom))}
+            .action-dock{position:static;left:auto;right:auto;bottom:auto;transform:none;width:auto;padding:10px 12px 12px;background:none}
+          }
+          '''
+          if marker not in text:
+              text = text.replace('</style>', css + '\n</style>', 1)
+              text = text.replace('</body>', marker + '\n</body>', 1)
+              path.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit canonical runtime change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix desktop action dock spacing"
+          git push origin HEAD:main
