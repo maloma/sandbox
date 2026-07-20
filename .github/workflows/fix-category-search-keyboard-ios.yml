@@ -83,9 +83,8 @@ jobs:
           from pathlib import Path
           import re
           s=Path('/tmp/runtime-source.html').read_text(encoding='utf-8')
-          required=['--category-vv-height','keyboard-visible','syncCategoryVisualViewport','visualViewport.addEventListener','syncCategoryViewport','categorySearch').scrollIntoView']
-          # final marker is checked separately because it contains quotes
-          for marker in required[:-1]:
+          required=['--category-vv-height','keyboard-visible','syncCategoryVisualViewport','visualViewport.addEventListener','syncCategoryViewport']
+          for marker in required:
             if marker not in s: raise SystemExit(f'missing {marker}')
           if "$('categorySearch').scrollIntoView" not in s: raise SystemExit('missing search scrollIntoView')
           scripts=re.findall(r'<script>(.*?)</script>',s,re.S)
@@ -115,3 +114,4 @@ jobs:
           git add index.html verification/category-search-keyboard-ios-sha.txt .github/workflows/fix-category-search-keyboard-ios.yml
           git commit -m "Keep category search visible above iPhone keyboard"
           git push origin HEAD:main
+# corrected trigger
