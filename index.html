@@ -39,6 +39,12 @@ main{padding:8px 12px}.screen{display:none}.screen.active{display:block}.card{ba
 .detail-sheet{padding-top:0}.detail-head{margin:0 -18px;padding:17px 18px;color:#fff;border-radius:24px 24px 0 0}.detail-head.income{background:linear-gradient(135deg,var(--green),var(--green2))}.detail-head.expense{background:linear-gradient(135deg,var(--red),var(--red2))}.detail-head .close{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.4);color:#fff}.detail-amount{font-size:36px;font-weight:950;margin:18px 0 6px}.detail-grid{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--card)}.detail-row{display:flex;justify-content:space-between;gap:18px;padding:12px 13px;border-top:1px solid var(--line)}.detail-row:first-child{border-top:0}.detail-row span{color:var(--muted);font-size:13px}.detail-row strong{text-align:right;overflow-wrap:anywhere}.detail-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}
 .breakdown{border:1px solid var(--line);border-radius:16px;background:var(--card);overflow:hidden;margin-top:14px}.breakdown-row{display:flex;justify-content:space-between;gap:15px;padding:11px 13px;border-top:1px solid var(--line)}.breakdown-row:first-child{border-top:0}.breakdown-row.total{background:var(--card2);font-size:16px}.explain{color:var(--muted);line-height:1.45;font-size:13px;margin-top:12px}
 @media(max-width:360px){.debt{gap:5px;padding:9px 8px}.debt b{font-size:12px}.debt strong{font-size:14px}.operation{grid-template-columns:minmax(0,1fr) auto;gap:9px}}
+
+@media (hover:hover) and (pointer:fine){
+  .app{padding-bottom:calc(var(--nav) + 24px + env(safe-area-inset-bottom))}
+  .action-dock{position:static;left:auto;right:auto;bottom:auto;transform:none;width:auto;padding:10px 12px 12px;background:none}
+}
+
 </style>
 </head>
 <body>
@@ -118,5 +124,6 @@ renderAll();
 })();
 </script>
 <!-- Build: canonical-single-runtime | No iframe | No version redirect | Calm operation rows and standard debt spacing -->
+<!-- Layout: desktop-flow-action-dock -->
 </body>
 </html>
