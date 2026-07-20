@@ -1,0 +1,48 @@
+name: Fix action dock regression
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/fix-action-dock-regression.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Patch canonical runtime
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          path = Path('index.html')
+          text = path.read_text(encoding='utf-8')
+
+          text = text.replace(
+              '.action{height:68px;border:0;border-radius:19px;color:#fff;display:grid;grid-template-columns:38px 1fr;align-items:center;gap:9px;padding:8px 12px;text-align:left;box-shadow:0 12px 25px rgba(0,0,0,.18)}',
+              '.action{height:68px;border:0;border-radius:19px;color:#fff;display:grid;grid-template-columns:38px minmax(0,1fr);align-items:center;gap:9px;padding:8px 12px;text-align:left;box-shadow:0 12px 25px rgba(0,0,0,.18);overflow:hidden}.action>span:last-child{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0}.action>span:last-child strong,.action>span:last-child small{display:block;white-space:nowrap}.action>span:last-child strong{font-size:16px;line-height:1.1}.action>span:last-child small{font-size:12px;line-height:1.2;margin-top:4px;opacity:.92}',
+              1,
+          )
+
+          text = text.replace(
+              '@media (hover:hover) and (pointer:fine){\n  .app{padding-bottom:calc(var(--nav) + 24px + env(safe-area-inset-bottom))}\n  .action-dock{position:static;left:auto;right:auto;bottom:auto;transform:none;width:auto;padding:10px 12px 12px;background:none}\n}',
+              '@media (min-width:700px){\n  .app{min-height:auto;padding-bottom:calc(var(--nav) + 24px + env(safe-area-inset-bottom))}\n  .action-dock{position:static;left:auto;right:auto;bottom:auto;transform:none;width:auto;padding:10px 12px 12px;background:none}\n}',
+              1,
+          )
+
+          marker = '<!-- Layout: width-based-desktop-dock-and-stacked-action-copy -->'
+          if marker not in text:
+              text = text.replace('</body>', marker + '\n</body>', 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit canonical runtime change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix action dock visibility and button typography"
+          git push origin HEAD:main
