@@ -1,0 +1,46 @@
+name: Diagnose FamilyPilot runtime patch v3
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/diagnose-runtime-patch-v3.yml
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run patch and capture exact result
+        run: |
+          mkdir -p verification
+          set +e
+          python runtime-patch-v3.py > verification/runtime-patch-v3-diagnostic.txt 2>&1
+          code=$?
+          echo "EXIT-CODE: $code" >> verification/runtime-patch-v3-diagnostic.txt
+          if [ $code -eq 0 ]; then
+            python - <<'PY' >> verification/runtime-patch-v3-diagnostic.txt 2>&1
+          from pathlib import Path
+          import re
+          s=Path('runtime-source.html').read_text(encoding='utf-8')
+          scripts=re.findall(r'<script>(.*?)</script>',s,re.S)
+          Path('/tmp/runtime.js').write_text(scripts[-1],encoding='utf-8')
+          print('PATCHED-SOURCE-LENGTH:',len(s))
+          PY
+            node --check /tmp/runtime.js >> verification/runtime-patch-v3-diagnostic.txt 2>&1
+            echo "NODE-CHECK: $?" >> verification/runtime-patch-v3-diagnostic.txt
+          fi
+          cat verification/runtime-patch-v3-diagnostic.txt
+      - name: Record diagnostic
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add verification/runtime-patch-v3-diagnostic.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "Record FamilyPilot runtime patch diagnostic [skip ci]"
+          git push origin HEAD:main
