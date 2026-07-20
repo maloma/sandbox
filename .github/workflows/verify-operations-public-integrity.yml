@@ -1,0 +1,65 @@
+name: Verify Operations public integrity
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/verify-operations-public-integrity.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify exact published runtime
+        env:
+          PUBLIC_URL: https://maloma.github.io/sandbox/
+          EXPECTED_SHA256: bf64855fbddde4b7dde75eacb0068e13762154d93c4c544b551b2ca3977e2c0a
+          TARGET_COMMIT: 4b931fba44216717d39253da0bcc7a91919b773c
+        run: |
+          mkdir -p verification
+          status=0
+          actual=""
+          result="FAILED"
+          for attempt in $(seq 1 72); do
+            status=$(curl -L -sS -o /tmp/public-index.html -w '%{http_code}' "${PUBLIC_URL}?integrity=${TARGET_COMMIT}&attempt=${attempt}" || true)
+            if [ -f /tmp/public-index.html ]; then
+              actual=$(sha256sum /tmp/public-index.html | awk '{print $1}')
+            fi
+            if [ "$status" = "200" ] && [ "$actual" = "$EXPECTED_SHA256" ]; then
+              result="VERIFIED"
+              break
+            fi
+            sleep 5
+          done
+          iframe="NO"
+          if grep -Eqi '<iframe([[:space:]>])' /tmp/public-index.html 2>/dev/null; then iframe="YES"; fi
+          {
+            echo "PUBLIC-URL: ${PUBLIC_URL}"
+            echo "HTTP-STATUS: ${status}"
+            echo "EXPECTED-SHA256: ${EXPECTED_SHA256}"
+            echo "ACTUAL-SHA256: ${actual}"
+            echo "PUBLIC-RUNTIME-INTEGRITY: ${result}"
+            echo "IFRAME-PRESENT: ${iframe}"
+            echo "VERIFIED-RUNTIME-COMMIT: ${TARGET_COMMIT}"
+          } > verification/operations-public-integrity-gate.txt
+          cat verification/operations-public-integrity-gate.txt
+      - name: Record integrity evidence
+        if: always()
+        run: |
+          cp verification/operations-public-integrity-gate.txt /tmp/gate.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          mkdir -p verification
+          cp /tmp/gate.txt verification/operations-public-integrity-gate.txt
+          git add verification/operations-public-integrity-gate.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "Record Operations public integrity gate [skip ci]"
+          git push origin HEAD:main
