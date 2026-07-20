@@ -54,3 +54,4 @@ jobs:
           git add index.html verification/runtime-v3-sha.txt runtime-source.html runtime-patch-v3.py .github/workflows/apply-runtime-patch-v3.yml
           git commit -m "Expand FamilyPilot filters analytics and category lifecycle"
           git push origin HEAD:main
+# trigger
