@@ -1,0 +1,51 @@
+name: Public Pages HTTP Diagnostic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/public-http-diagnostic.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Fetch public URL
+        env:
+          PUBLIC_URL: https://maloma.github.io/sandbox/
+        run: |
+          mkdir -p verification
+          set +e
+          curl -L --max-time 30 -sS -D /tmp/headers.txt -o /tmp/body.html -w '%{http_code}' "$PUBLIC_URL?diagnostic=$GITHUB_SHA" > /tmp/status.txt
+          CURL_EXIT=$?
+          STATUS=$(cat /tmp/status.txt 2>/dev/null || printf '000')
+          FINAL_URL=$(curl -L --max-time 30 -sS -o /dev/null -w '%{url_effective}' "$PUBLIC_URL?diagnostic=$GITHUB_SHA")
+          MARKER=NO
+          IFRAME=NO
+          grep -q 'canonical-single-runtime' /tmp/body.html && MARKER=YES
+          grep -qi '<iframe' /tmp/body.html && IFRAME=YES
+          {
+            printf 'PUBLIC-URL: %s\n' "$PUBLIC_URL"
+            printf 'CURL-EXIT: %s\n' "$CURL_EXIT"
+            printf 'HTTP-STATUS: %s\n' "$STATUS"
+            printf 'FINAL-ADDRESS: %s\n' "$FINAL_URL"
+            printf 'CANONICAL-RUNTIME-MARKER: %s\n' "$MARKER"
+            printf 'IFRAME-PRESENT: %s\n' "$IFRAME"
+            printf 'VERIFIED-COMMIT: %s\n' "$GITHUB_SHA"
+          } > verification/public-http.txt
+          cat verification/public-http.txt
+      - name: Record diagnostic
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          git add verification/public-http.txt
+          git commit -m "Record public HTTP diagnostic [skip ci]"
+          git push origin HEAD:main
