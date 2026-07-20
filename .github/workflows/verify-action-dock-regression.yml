@@ -1,0 +1,132 @@
+name: Verify action dock regression fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/verify-action-dock-regression.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v6
+      - run: npm install --no-save playwright-core@1.53.2
+      - name: Run public responsive action dock gate
+        env:
+          PUBLIC_URL: https://maloma.github.io/sandbox/
+        run: |
+          mkdir -p verification
+          node <<'NODE'
+          const fs = require('fs');
+          const { chromium } = require('playwright-core');
+          const baseUrl = process.env.PUBLIC_URL;
+          const url = `${baseUrl}?action-dock-regression=${process.env.GITHUB_SHA}`;
+          const gate = {
+            'PUBLIC-URL': baseUrl,
+            'HTTP-LOAD': 'FAILED',
+            'HTTP-STATUS': 'NOT VERIFIED',
+            'FINAL-ADDRESS': 'NOT VERIFIED',
+            'DESKTOP-DOCK-IN-FLOW': 'NOT VERIFIED',
+            'DESKTOP-DOCK-GAP': 'NOT VERIFIED',
+            'DESKTOP-DOCK-IN-VIEWPORT': 'NOT VERIFIED',
+            'DESKTOP-INCOME-COPY-STACKED': 'NOT VERIFIED',
+            'DESKTOP-EXPENSE-COPY-STACKED': 'NOT VERIFIED',
+            'DESKTOP-BUTTON-OVERFLOW': 'NOT VERIFIED',
+            'DESKTOP-DARK-CANVAS': 'NOT VERIFIED',
+            'MOBILE-DOCK-FIXED': 'NOT VERIFIED',
+            'MOBILE-BUTTON-COPY-STACKED': 'NOT VERIFIED',
+            'PAGE-JAVASCRIPT-ERRORS': 'NOT VERIFIED',
+            'VERIFIED-COMMIT': process.env.GITHUB_SHA,
+          };
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const stacked = async button => {
+            const strong = button.locator('strong');
+            const small = button.locator('small');
+            const [a,b] = await Promise.all([strong.boundingBox(), small.boundingBox()]);
+            if (!a || !b) return false;
+            return Math.abs(a.x - b.x) <= 2 && a.y + a.height <= b.y + 1;
+          };
+          (async()=>{
+            let source = '';
+            let status = 0;
+            for (let i = 0; i < 48; i++) {
+              try {
+                const response = await fetch(url, { cache: 'no-store', redirect: 'follow' });
+                status = response.status;
+                source = await response.text();
+                if (response.ok && source.includes('width-based-desktop-dock-and-stacked-action-copy')) break;
+              } catch {}
+              await sleep(5000);
+            }
+            gate['HTTP-STATUS'] = String(status);
+            if (!(status >= 200 && status < 400) || !source.includes('width-based-desktop-dock-and-stacked-action-copy')) {
+              throw new Error('Published runtime did not expose action dock regression fix');
+            }
+            gate['HTTP-LOAD'] = 'SUCCEEDED';
+            const executablePath = ['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'].find(fs.existsSync);
+            const browser = await chromium.launch({ headless: true, executablePath, args: ['--no-sandbox'] });
+            const errors = [];
+
+            const desktop = await browser.newContext({ viewport: { width: 1720, height: 966 } });
+            await desktop.addInitScript(() => localStorage.setItem('familypilot.theme', 'dark'));
+            const page = await desktop.newPage();
+            page.on('pageerror', error => errors.push(`desktop: ${error.message}`));
+            const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+            gate['FINAL-ADDRESS'] = page.url();
+            gate['HTTP-STATUS'] = String(response?.status() || status);
+            await page.locator('[data-screen="operations"]').click();
+            const dock = page.locator('#actionDock');
+            const dockBox = await dock.boundingBox();
+            const screenBox = await page.locator('#operationsScreen').boundingBox();
+            const navBox = await page.locator('.bottom').boundingBox();
+            const dockPosition = await dock.evaluate(el => getComputedStyle(el).position);
+            gate['DESKTOP-DOCK-IN-FLOW'] = dockPosition === 'static' ? 'VERIFIED' : `FAILED: ${dockPosition}`;
+            const gap = Math.round(dockBox.y - (screenBox.y + screenBox.height));
+            gate['DESKTOP-DOCK-GAP'] = gap >= 0 && gap <= 30 ? `VERIFIED: ${gap}px` : `FAILED: ${gap}px`;
+            const viewportBottomLimit = navBox?.y ?? 966;
+            gate['DESKTOP-DOCK-IN-VIEWPORT'] = dockBox.y >= 0 && dockBox.y + dockBox.height <= viewportBottomLimit + 1 ? `VERIFIED: bottom=${Math.round(dockBox.y + dockBox.height)}px, navTop=${Math.round(viewportBottomLimit)}px` : `FAILED: bottom=${Math.round(dockBox.y + dockBox.height)}px, navTop=${Math.round(viewportBottomLimit)}px`;
+            const incomeButton = page.locator('.action.income');
+            const expenseButton = page.locator('.action.expense');
+            gate['DESKTOP-INCOME-COPY-STACKED'] = await stacked(incomeButton) ? 'VERIFIED' : 'FAILED';
+            gate['DESKTOP-EXPENSE-COPY-STACKED'] = await stacked(expenseButton) ? 'VERIFIED' : 'FAILED';
+            const overflow = await page.locator('.action').evaluateAll(nodes => nodes.some(el => el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight));
+            gate['DESKTOP-BUTTON-OVERFLOW'] = overflow ? 'FAILED' : 'NONE';
+            const bottomBg = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor.replace(/\s+/g,''));
+            gate['DESKTOP-DARK-CANVAS'] = bottomBg === 'rgb(7,24,36)' ? 'VERIFIED' : `FAILED: ${bottomBg}`;
+            await desktop.close();
+
+            const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+            const mobilePage = await mobile.newPage();
+            mobilePage.on('pageerror', error => errors.push(`mobile: ${error.message}`));
+            await mobilePage.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+            const mobileDockPosition = await mobilePage.locator('#actionDock').evaluate(el => getComputedStyle(el).position);
+            gate['MOBILE-DOCK-FIXED'] = mobileDockPosition === 'fixed' ? 'VERIFIED' : `FAILED: ${mobileDockPosition}`;
+            gate['MOBILE-BUTTON-COPY-STACKED'] = await stacked(mobilePage.locator('.action.income')) && await stacked(mobilePage.locator('.action.expense')) ? 'VERIFIED' : 'FAILED';
+            await mobile.close();
+            await browser.close();
+            gate['PAGE-JAVASCRIPT-ERRORS'] = errors.length ? `FAILED: ${errors.join(' | ')}` : 'NONE';
+          })().catch(error => {
+            gate['ERROR'] = error.stack || error.message;
+          }).finally(() => {
+            fs.writeFileSync('verification/action-dock-regression-gate.txt', Object.entries(gate).map(([k,v]) => `${k}: ${v}`).join('\n') + '\n');
+          });
+          NODE
+      - name: Record evidence
+        if: always()
+        run: |
+          cp verification/action-dock-regression-gate.txt /tmp/action-dock-regression-gate.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          mkdir -p verification
+          cp /tmp/action-dock-regression-gate.txt verification/action-dock-regression-gate.txt
+          git add verification/action-dock-regression-gate.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "Record action dock regression verification [skip ci]"
+          git push origin HEAD:main
