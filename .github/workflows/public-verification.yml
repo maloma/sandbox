@@ -1,0 +1,145 @@
+name: Public Pages Verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - index.html
+      - .github/workflows/public-verification.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: public-pages-verification
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install browser driver
+        run: npm install --no-save playwright-core@1.53.2
+
+      - name: Verify public Pages runtime
+        env:
+          PUBLIC_URL: https://maloma.github.io/sandbox/
+        run: |
+          mkdir -p verification
+          node <<'NODE'
+          const fs = require('fs');
+          const { chromium } = require('playwright-core');
+          const baseUrl = process.env.PUBLIC_URL;
+          const url = `${baseUrl}?verify=${process.env.GITHUB_SHA}`;
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+          const gate = {
+            'PUBLIC-URL': baseUrl,
+            'HTTP-LOAD': 'FAILED',
+            '404': 'YES',
+            'FINAL-ADDRESS': 'NOT VERIFIED',
+            'HOME-PERIOD-TYPE-TAP': 'NOT VERIFIED',
+            'ANALYTICS-PERIOD-TYPE-TAP': 'NOT VERIFIED',
+            'HOME-PERIOD-LABEL-TAP': 'NOT VERIFIED',
+            'ANALYTICS-PERIOD-LABEL-TAP': 'NOT VERIFIED',
+            'OPERATIONS-PERIOD-LABEL': 'NOT VERIFIED',
+            'OPERATIONS-ARROWS': 'NOT VERIFIED',
+            'OPERATIONS-INDEPENDENCE': 'NOT VERIFIED',
+            'HOME-ANALYTICS-INDEPENDENCE': 'NOT VERIFIED',
+            'FINANCIAL-BALANCE-FILTER-INHERITANCE': 'NOT VERIFIED',
+            'NO-IFRAME': 'NOT VERIFIED',
+            'CANONICAL-RUNTIME-MARKER': 'NOT VERIFIED',
+            'PAGE-JAVASCRIPT-ERRORS': 'NOT VERIFIED',
+            'VERIFIED-COMMIT': process.env.GITHUB_SHA,
+          };
+          let source = '';
+          let lastHttp = '';
+          for (let attempt = 1; attempt <= 60; attempt++) {
+            try {
+              const response = await fetch(url, { cache: 'no-store', redirect: 'follow' });
+              lastHttp = String(response.status);
+              source = await response.text();
+              gate['HTTP-STATUS'] = lastHttp;
+              gate['404'] = response.status === 404 ? 'YES' : 'NO';
+              if (response.ok && source.includes('canonical-single-runtime') && !source.toLowerCase().includes('<iframe')) {
+                gate['HTTP-LOAD'] = 'SUCCEEDED';
+                gate['CANONICAL-RUNTIME-MARKER'] = 'VERIFIED';
+                gate['NO-IFRAME'] = 'VERIFIED';
+                break;
+              }
+            } catch (error) {
+              gate['HTTP-ERROR'] = error.message;
+            }
+            await sleep(5000);
+          }
+
+          if (gate['HTTP-LOAD'] === 'SUCCEEDED') {
+            const candidates = ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser'];
+            const executablePath = candidates.find(path => fs.existsSync(path));
+            const errors = [];
+            try {
+              const browser = await chromium.launch({ headless: true, executablePath, args: ['--no-sandbox'] });
+              const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+              page.on('pageerror', error => errors.push(error.message));
+              await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+              gate['FINAL-ADDRESS'] = page.url();
+              gate['NO-IFRAME'] = await page.locator('iframe').count() === 0 ? 'VERIFIED' : 'FAILED';
+
+              const pickerOpen = () => page.locator('#picker').evaluate(el => el.classList.contains('open'));
+              await page.locator('[data-range="day"][data-context="home"]').click();
+              gate['HOME-PERIOD-TYPE-TAP'] = !(await pickerOpen()) ? 'NO PICKER' : 'FAILED';
+              const homeLabel = await page.locator('[data-label="home"]').innerText();
+              await page.locator('[data-label="home"]').click();
+              gate['HOME-PERIOD-LABEL-TAP'] = (await pickerOpen()) ? 'PICKER OPENS' : 'FAILED';
+              await page.locator('[data-close="picker"]').click();
+
+              await page.locator('#analyticsBtn').click();
+              await page.locator('[data-range="week"][data-context="analytics"]').click();
+              gate['ANALYTICS-PERIOD-TYPE-TAP'] = !(await pickerOpen()) ? 'NO PICKER' : 'FAILED';
+              await page.locator('[data-label="analytics"]').click();
+              gate['ANALYTICS-PERIOD-LABEL-TAP'] = (await pickerOpen()) ? 'PICKER OPENS' : 'FAILED';
+              await page.locator('[data-close="picker"]').click();
+              await page.locator('#analyticsScreen [data-back]').click();
+              gate['HOME-ANALYTICS-INDEPENDENCE'] = (await page.locator('[data-label="home"]').innerText()) === homeLabel ? 'VERIFIED' : 'FAILED';
+
+              await page.locator('[data-screen="operations"]').click();
+              const opsInitial = await page.locator('[data-label="operations"]').innerText();
+              gate['OPERATIONS-PERIOD-LABEL'] = opsInitial.trim() ? 'VISIBLE' : 'FAILED';
+              const inherited = opsInitial === homeLabel;
+              await page.locator('[data-prev="operations"]').click();
+              const opsAfter = await page.locator('[data-label="operations"]').innerText();
+              gate['OPERATIONS-ARROWS'] = opsAfter !== opsInitial ? 'WORKING' : 'FAILED';
+              await page.locator('#operationsScreen [data-back]').click();
+              const homeAfterOps = await page.locator('[data-label="home"]').innerText();
+              gate['OPERATIONS-INDEPENDENCE'] = inherited && homeAfterOps === homeLabel ? 'VERIFIED' : 'FAILED';
+
+              await page.locator('[data-open-ops="expense"]').first().click();
+              const expenseActive = await page.locator('[data-filter="expense"]').evaluate(el => el.classList.contains('active'));
+              const balancePeriodInherited = (await page.locator('[data-label="operations"]').innerText()) === homeLabel;
+              gate['FINANCIAL-BALANCE-FILTER-INHERITANCE'] = expenseActive && balancePeriodInherited ? 'VERIFIED' : 'FAILED';
+              gate['PAGE-JAVASCRIPT-ERRORS'] = errors.length ? `FAILED: ${errors.join(' | ')}` : 'NONE';
+              await browser.close();
+            } catch (error) {
+              gate['BROWSER-ERROR'] = error.stack || error.message;
+              gate['PAGE-JAVASCRIPT-ERRORS'] = errors.length ? `FAILED: ${errors.join(' | ')}` : 'NOT VERIFIED';
+            }
+          }
+
+          const lines = Object.entries(gate).map(([key, value]) => `${key}: ${value}`);
+          fs.writeFileSync('verification/public-gate.txt', lines.join('\n') + '\n');
+          console.log(lines.join('\n'));
+          NODE
+
+      - name: Record verification evidence
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add verification/public-gate.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "Record public verification gate [skip ci]"
+          git push origin HEAD:main
