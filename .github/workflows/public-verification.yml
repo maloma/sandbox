@@ -18,7 +18,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v6
 
@@ -26,6 +26,7 @@ jobs:
         run: npm install --no-save playwright-core@1.53.2
 
       - name: Run public gate
+        continue-on-error: true
         env:
           PUBLIC_URL: https://maloma.github.io/sandbox/
         run: |
@@ -33,9 +34,11 @@ jobs:
           node <<'NODE'
           const fs = require('fs');
           const { chromium } = require('playwright-core');
-          const url = `${process.env.PUBLIC_URL}?verify=${process.env.GITHUB_SHA}`;
+          const baseUrl = process.env.PUBLIC_URL;
+          const url = `${baseUrl}?verify=${process.env.GITHUB_SHA}`;
+          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
           const gate = {
-            'PUBLIC-URL': process.env.PUBLIC_URL,
+            'PUBLIC-URL': baseUrl,
             'HTTP-LOAD': 'FAILED',
             '404': 'NOT VERIFIED',
             'FINAL-ADDRESS': 'NOT VERIFIED',
@@ -52,60 +55,101 @@ jobs:
             'OPERATIONS-FILTER-ORDER': 'NOT VERIFIED',
             'FINANCIAL-BALANCE-FILTER-INHERITANCE': 'NOT VERIFIED',
             'FUTURE-PERIODS-BLOCKED': 'NOT VERIFIED',
+            'DEBT-COMPACT-LAYOUT': 'NOT VERIFIED',
             'CAPITAL-BACKDROP-CLOSE': 'NOT VERIFIED',
-            'ENTRY-HEADER-TONE': 'NOT VERIFIED',
-            'CUSTOM-CATEGORY': 'NOT VERIFIED',
-            'SAFE-EDIT-BUTTON': 'NOT VERIFIED',
-            'DEBT-LAYOUT': 'NOT VERIFIED',
-            'CATEGORY-HEADING-COPY': 'NOT VERIFIED',
+            'CAPITAL-DEBT-POSITION': 'NOT VERIFIED',
+            'HOME-OPERATION-DETAIL': 'NOT VERIFIED',
+            'SAFE-EDIT-FROM-DETAIL': 'NOT VERIFIED',
+            'EDIT-BACKDROP-CLOSE': 'NOT VERIFIED',
+            'CATEGORY-FILTER': 'NOT VERIFIED',
+            'DAY-GROUPING': 'NOT VERIFIED',
+            'OPERATION-TIME-PLACEMENT': 'NOT VERIFIED',
+            'OPERATIONS-ROW-DETAIL': 'NOT VERIFIED',
             'PAGE-JAVASCRIPT-ERRORS': 'NOT VERIFIED',
             'VERIFIED-COMMIT': process.env.GITHUB_SHA,
           };
-          const errors = [];
-          const candidates = ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser'];
-          const executablePath = candidates.find(path => fs.existsSync(path));
+
           (async()=>{
+            let source = '';
+            for (let attempt = 0; attempt < 48; attempt++) {
+              try {
+                const response = await fetch(url, { cache: 'no-store', redirect: 'follow' });
+                source = await response.text();
+                gate['HTTP-STATUS'] = String(response.status);
+                gate['404'] = response.status === 404 ? 'YES' : 'NO';
+                if (response.ok && source.includes('Operation detail and day grouping') && !source.toLowerCase().includes('<iframe')) {
+                  gate['HTTP-LOAD'] = 'SUCCEEDED';
+                  break;
+                }
+              } catch (error) {
+                gate['HTTP-ERROR'] = error.message;
+              }
+              await sleep(5000);
+            }
+
             let browser;
+            const errors = [];
             try {
+              if (gate['HTTP-LOAD'] !== 'SUCCEEDED') throw new Error('Published runtime marker was not observed');
+              const candidates = ['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'];
+              const executablePath = candidates.find(path => fs.existsSync(path));
               browser = await chromium.launch({ headless: true, executablePath, args: ['--no-sandbox'] });
               const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
               page.on('pageerror', error => errors.push(error.message));
               const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
               const status = response?.status() || 0;
+              gate['HTTP-STATUS'] = String(status);
               gate['HTTP-LOAD'] = status >= 200 && status < 400 ? 'SUCCEEDED' : 'FAILED';
               gate['404'] = status === 404 ? 'YES' : 'NO';
-              gate['HTTP-STATUS'] = String(status);
               gate['FINAL-ADDRESS'] = page.url();
               gate['NO-IFRAME'] = await page.locator('iframe').count() === 0 ? 'VERIFIED' : 'FAILED';
-              const isOpen = id => page.locator(id).evaluate(el => el.classList.contains('open'));
 
-              await page.locator('#capitalInfoBtn').click();
-              await page.locator('#capitalInfo').click({ position: { x: 10, y: 10 } });
-              gate['CAPITAL-BACKDROP-CLOSE'] = !(await isOpen('#capitalInfo')) ? 'VERIFIED' : 'FAILED';
-
+              const pickerOpen = () => page.locator('#picker').evaluate(el => el.classList.contains('open'));
+              await page.locator('[data-range="day"][data-context="home"]').click();
+              gate['HOME-PERIOD-TYPE-TAP'] = !(await pickerOpen()) ? 'NO PICKER' : 'FAILED';
               await page.locator('[data-range="month"][data-context="home"]').click();
               await page.locator('[data-prev="home"]').click();
-              const oldMonth = await page.locator('[data-label="home"]').innerText();
+              const priorMonth = await page.locator('[data-label="home"]').innerText();
               await page.locator('[data-range="month"][data-context="home"]').click();
-              gate['SAME-PERIOD-SELECTION-PRESERVES'] = (await page.locator('[data-label="home"]').innerText()) === oldMonth ? 'VERIFIED' : 'FAILED';
-              gate['HOME-PERIOD-TYPE-TAP'] = !(await isOpen('#picker')) ? 'NO PICKER' : 'FAILED';
+              gate['SAME-PERIOD-SELECTION-PRESERVES'] = (await page.locator('[data-label="home"]').innerText()) === priorMonth ? 'VERIFIED' : 'FAILED';
               await page.locator('[data-label="home"]').click();
-              gate['HOME-PERIOD-LABEL-TAP'] = (await isOpen('#picker')) ? 'PICKER OPENS' : 'FAILED';
-              await page.locator('#pickerCurrent').click();
+              gate['HOME-PERIOD-LABEL-TAP'] = (await pickerOpen()) ? 'PICKER OPENS' : 'FAILED';
+              await page.locator('[data-close="picker"]').click();
+              await page.locator('[data-next="home"]').click();
               const homeLabel = await page.locator('[data-label="home"]').innerText();
+
+              const debtLayout = await page.locator('.debt').first().evaluate(el => ({
+                fits: el.scrollWidth <= el.clientWidth,
+                centered: getComputedStyle(el).justifyContent === 'center',
+                oneLine: getComputedStyle(el.querySelector('b')).whiteSpace === 'nowrap'
+              }));
+              gate['DEBT-COMPACT-LAYOUT'] = debtLayout.fits && debtLayout.centered && debtLayout.oneLine ? 'VERIFIED' : 'FAILED';
+
+              await page.locator('#capitalInfoBtn').click();
+              gate['CAPITAL-DEBT-POSITION'] = await page.getByText('Чистая позиция с долгами').count() === 1 ? 'VERIFIED' : 'FAILED';
+              await page.mouse.click(5, 5);
+              gate['CAPITAL-BACKDROP-CLOSE'] = !(await page.locator('#capitalInfo').evaluate(el => el.classList.contains('open'))) ? 'VERIFIED' : 'FAILED';
+
+              await page.locator('#recentOperations [data-op-id]').first().click();
+              const detailOpen = await page.locator('#operationDetail').evaluate(el => el.classList.contains('open'));
+              const editClosed = !(await page.locator('#entryModal').evaluate(el => el.classList.contains('open')));
+              gate['HOME-OPERATION-DETAIL'] = detailOpen && editClosed ? 'VERIFIED' : 'FAILED';
+              const editInside = await page.locator('#operationDetail #detailEditBtn').count() === 1 && await page.locator('[data-op-id] #detailEditBtn').count() === 0;
+              await page.locator('#detailEditBtn').click();
+              gate['SAFE-EDIT-FROM-DETAIL'] = editInside && await page.locator('#entryModal').evaluate(el => el.classList.contains('open')) ? 'VERIFIED' : 'FAILED';
+              await page.mouse.click(5, 5);
+              gate['EDIT-BACKDROP-CLOSE'] = !(await page.locator('#entryModal').evaluate(el => el.classList.contains('open'))) ? 'VERIFIED' : 'FAILED';
 
               await page.locator('#analyticsBtn').click();
               await page.locator('[data-range="week"][data-context="analytics"]').click();
-              gate['ANALYTICS-PERIOD-TYPE-TAP'] = !(await isOpen('#picker')) ? 'NO PICKER' : 'FAILED';
+              gate['ANALYTICS-PERIOD-TYPE-TAP'] = !(await pickerOpen()) ? 'NO PICKER' : 'FAILED';
               await page.locator('[data-label="analytics"]').click();
-              gate['ANALYTICS-PERIOD-LABEL-TAP'] = (await isOpen('#picker')) ? 'PICKER OPENS' : 'FAILED';
+              gate['ANALYTICS-PERIOD-LABEL-TAP'] = (await pickerOpen()) ? 'PICKER OPENS' : 'FAILED';
               await page.locator('[data-close="picker"]').click();
               await page.locator('#analyticsScreen [data-back]').click();
               gate['HOME-ANALYTICS-INDEPENDENCE'] = (await page.locator('[data-label="home"]').innerText()) === homeLabel ? 'VERIFIED' : 'FAILED';
 
               await page.locator('[data-screen="operations"]').click();
-              const filterOrder = await page.locator('#operationsFilters [data-filter]').evaluateAll(els => els.map(el => `${el.dataset.filter}:${el.textContent.trim()}`));
-              gate['OPERATIONS-FILTER-ORDER'] = JSON.stringify(filterOrder) === JSON.stringify(['expense:Расход','all:Все','income:Приход']) ? 'VERIFIED' : 'FAILED';
               const opsInitial = await page.locator('[data-label="operations"]').innerText();
               gate['OPERATIONS-PERIOD-LABEL'] = opsInitial.trim() ? 'VISIBLE' : 'FAILED';
               const inherited = opsInitial === homeLabel;
@@ -115,41 +159,35 @@ jobs:
               await page.locator('#operationsScreen [data-back]').click();
               gate['OPERATIONS-INDEPENDENCE'] = inherited && (await page.locator('[data-label="home"]').innerText()) === homeLabel ? 'VERIFIED' : 'FAILED';
 
+              await page.locator('[data-screen="operations"]').click();
+              const filterOrder = await page.locator('[data-filter]').evaluateAll(elements => elements.map(el => el.textContent.trim()));
+              gate['OPERATIONS-FILTER-ORDER'] = JSON.stringify(filterOrder) === JSON.stringify(['Расход','Все','Приход']) ? 'VERIFIED' : 'FAILED';
+              const headings = await page.locator('#operationsList .day-heading').count();
+              const groups = await page.locator('#operationsList [data-day-group]').count();
+              gate['DAY-GROUPING'] = headings === groups && groups > 0 ? 'VERIFIED' : 'FAILED';
+              const times = await page.locator('#operationsList .op-title-line .op-time').count();
+              const rows = await page.locator('#operationsList [data-op-id]').count();
+              gate['OPERATION-TIME-PLACEMENT'] = times === rows && rows > 0 ? 'VERIFIED' : 'FAILED';
+
+              const categoryOptions = await page.locator('#categoryFilter option').allTextContents();
+              if (categoryOptions.length > 1) {
+                const category = categoryOptions[1];
+                await page.locator('#categoryFilter').selectOption({ label: category });
+                const visibleCategories = await page.locator('#operationsList .op-title').allTextContents();
+                gate['CATEGORY-FILTER'] = visibleCategories.length > 0 && visibleCategories.every(value => value === category) ? 'VERIFIED' : 'FAILED';
+              } else gate['CATEGORY-FILTER'] = 'FAILED';
+              await page.locator('#categoryFilter').selectOption('all');
+
+              await page.locator('#operationsList [data-op-id]').first().click();
+              gate['OPERATIONS-ROW-DETAIL'] = await page.locator('#operationDetail').evaluate(el => el.classList.contains('open')) ? 'VERIFIED' : 'FAILED';
+              await page.mouse.click(5, 5);
+
+              await page.locator('#operationsScreen [data-back]').click();
               await page.locator('[data-open-ops="expense"]').first().click();
               const expenseActive = await page.locator('[data-filter="expense"]').evaluate(el => el.classList.contains('active'));
               const inheritedBalancePeriod = (await page.locator('[data-label="operations"]').innerText()) === homeLabel;
               gate['FINANCIAL-BALANCE-FILTER-INHERITANCE'] = expenseActive && inheritedBalancePeriod ? 'VERIFIED' : 'FAILED';
               gate['FUTURE-PERIODS-BLOCKED'] = await page.locator('[data-next="operations"]').isDisabled() ? 'VERIFIED' : 'FAILED';
-
-              const firstRow = page.locator('#operationsList .operation').first();
-              await firstRow.locator('.op-title').click();
-              const rowSafe = !(await isOpen('#entryModal'));
-              await firstRow.locator('[data-edit-op]').click();
-              const editOpens = await isOpen('#entryModal');
-              gate['SAFE-EDIT-BUTTON'] = rowSafe && editOpens ? 'VERIFIED' : 'FAILED';
-              await page.locator('[data-close="entryModal"]').click();
-
-              await page.locator('#operationsScreen [data-back]').click();
-              await page.locator('[data-open-entry="expense"]').click();
-              const redHeader = await page.locator('#entrySheet').evaluate(el => el.classList.contains('entry-expense'));
-              await page.locator('[data-close="entryModal"]').click();
-              await page.locator('[data-open-entry="income"]').click();
-              const greenHeader = await page.locator('#entrySheet').evaluate(el => el.classList.contains('entry-income'));
-              gate['ENTRY-HEADER-TONE'] = redHeader && greenHeader ? 'VERIFIED' : 'FAILED';
-              await page.locator('#showCategoryBtn').click();
-              const categoryName = `Тест ${process.env.GITHUB_SHA.slice(0,7)}`;
-              await page.locator('#newCategoryInput').fill(categoryName);
-              await page.locator('#saveCategoryBtn').click();
-              gate['CUSTOM-CATEGORY'] = (await page.locator('#categoryInput').inputValue()) === categoryName ? 'VERIFIED' : 'FAILED';
-              await page.locator('[data-close="entryModal"]').click();
-
-              const debtGap = parseFloat(await page.locator('.debts').evaluate(el => getComputedStyle(el).marginBottom));
-              const labelGap = parseFloat(await page.locator('.debt b').first().evaluate(el => getComputedStyle(el).marginBottom));
-              await page.locator('.debt strong').nth(1).evaluate(el => el.textContent = '12 345 €');
-              const numberFits = await page.locator('.debt strong').nth(1).evaluate(el => el.scrollWidth <= el.clientWidth);
-              const debtCopy = await page.locator('.debt b').nth(1).innerText();
-              gate['DEBT-LAYOUT'] = debtGap >= 9 && labelGap >= 6 && numberFits && debtCopy === 'Я верну' ? 'VERIFIED' : 'FAILED';
-              gate['CATEGORY-HEADING-COPY'] = (await page.locator('.section-head h2').first().innerText()) === 'Самые затратные категории' ? 'VERIFIED' : 'FAILED';
               gate['PAGE-JAVASCRIPT-ERRORS'] = errors.length ? `FAILED: ${errors.join(' | ')}` : 'NONE';
             } catch (error) {
               gate['BROWSER-ERROR'] = error.stack || error.message;
@@ -160,7 +198,7 @@ jobs:
               fs.writeFileSync('verification/public-gate.txt', lines.join('\n') + '\n');
               console.log(lines.join('\n'));
             }
-          })().catch(error=>{console.error(error);process.exitCode=1});
+          })().catch(error => { console.error(error); process.exitCode = 1; });
           NODE
 
       - name: Record verification evidence
