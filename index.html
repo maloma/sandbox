@@ -41,8 +41,9 @@ main{padding:8px 12px}.screen{display:none}.screen.active{display:block}.card{ba
 @media(max-width:360px){.debt{gap:5px;padding:9px 8px}.debt b{font-size:12px}.debt strong{font-size:14px}.operation{grid-template-columns:minmax(0,1fr) auto;gap:9px}}
 
 @media (min-width:700px){
-  .app{min-height:auto;padding-bottom:calc(var(--nav) + 24px + env(safe-area-inset-bottom))}
-  .action-dock{position:static;left:auto;right:auto;bottom:auto;transform:none;width:auto;padding:10px 12px 12px;background:none}
+  .app{min-height:auto;padding-bottom:calc(var(--nav) + 16px + env(safe-area-inset-bottom))}
+  main{padding-bottom:0}
+  .action-dock{position:static;left:auto;right:auto;bottom:auto;transform:none;width:auto;padding:8px 12px 8px;background:none}
 }
 
 </style>
@@ -126,5 +127,6 @@ renderAll();
 <!-- Build: canonical-single-runtime | No iframe | No version redirect | Calm operation rows and standard debt spacing -->
 <!-- Layout: desktop-flow-action-dock -->
 <!-- Layout: width-based-desktop-dock-and-stacked-action-copy -->
+<!-- Layout: desktop-dock-clear-of-fixed-nav -->
 </body>
 </html>
