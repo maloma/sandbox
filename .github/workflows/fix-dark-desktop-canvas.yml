@@ -1,0 +1,52 @@
+name: Fix dark desktop canvas and viewport fill
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/fix-dark-desktop-canvas.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Patch canonical runtime
+        run: |
+          python <<'PY2'
+          from pathlib import Path
+          path = Path('index.html')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace(
+              'body[data-theme=dark]{color-scheme:dark;--bg:#071824;--card:#102532;--card2:#0c202c;--ink:#f4f8fb;--muted:#a5b3bf;--line:#263b47;--green:#25bb6b;--green2:#118a4d;--red:#ff474b;--red2:#ca2630;--yellow:#f4ca36;--shadow:0 9px 26px rgba(0,0,0,.28)}',
+              ':root[data-theme=dark],body[data-theme=dark]{color-scheme:dark;--bg:#071824;--card:#102532;--card2:#0c202c;--ink:#f4f8fb;--muted:#a5b3bf;--line:#263b47;--green:#25bb6b;--green2:#118a4d;--red:#ff474b;--red2:#ca2630;--yellow:#f4ca36;--shadow:0 9px 26px rgba(0,0,0,.28)}',
+              1,
+          )
+          text = text.replace(
+              'html,body{margin:0;min-height:100%;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);touch-action:manipulation}',
+              'html,body{margin:0;min-height:100dvh;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);touch-action:manipulation}',
+              1,
+          )
+          text = text.replace(
+              'body{overscroll-behavior-y:none}.app{width:min(100%,480px);margin:auto;padding-bottom:calc(var(--nav) + var(--dock) + 30px + env(safe-area-inset-bottom))}',
+              'body{overscroll-behavior-y:none;min-height:100dvh}.app{width:min(100%,480px);margin:auto;min-height:100dvh;padding-bottom:calc(var(--nav) + var(--dock) + 30px + env(safe-area-inset-bottom))}',
+              1,
+          )
+          text = text.replace(
+              "function renderAll(){document.body.dataset.theme=localStorage.getItem(THEME_KEY)||'light';renderRanges();renderCapital();renderHome();renderAnalytics();renderOperations();save()}",
+              "function renderAll(){const theme=localStorage.getItem(THEME_KEY)||'light';document.documentElement.dataset.theme=theme;document.body.dataset.theme=theme;renderRanges();renderCapital();renderHome();renderAnalytics();renderOperations();save()}",
+              1,
+          )
+          path.write_text(text, encoding='utf-8')
+          PY2
+      - name: Commit canonical runtime change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix dark desktop canvas and viewport fill"
+          git push origin HEAD:main
