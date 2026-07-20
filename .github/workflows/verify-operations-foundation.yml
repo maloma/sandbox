@@ -1,0 +1,154 @@
+name: Verify Operations foundation module
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/verify-operations-foundation.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install browser driver
+        run: npm install --no-save playwright-core@1.53.2
+      - name: Run public domain and UX gate
+        env:
+          PUBLIC_URL: https://maloma.github.io/sandbox/
+          TARGET_COMMIT: 4b931fba44216717d39253da0bcc7a91919b773c
+        run: |
+          mkdir -p verification
+          node <<'NODE'
+          const fs=require('fs');
+          const {chromium}=require('playwright-core');
+          const base=process.env.PUBLIC_URL;
+          const target=process.env.TARGET_COMMIT;
+          const url=`${base}?test=1&operations-foundation=${target}`;
+          const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+          const gate={
+            'PUBLIC-URL':base,'HTTP-LOAD':'FAILED','HTTP-STATUS':'NOT VERIFIED','NO-IFRAME':'NOT VERIFIED',
+            'SCHEMA-VERSION-2':'NOT VERIFIED','PERSONAL-WALLET-EXCLUDED-DEFAULT':'NOT VERIFIED','PERSONAL-WALLET-OWNER-VISIBLE':'NOT VERIFIED',
+            'OPERATION-AUTHORSHIP':'NOT VERIFIED','OPERATION-TIMESTAMPS':'NOT VERIFIED','LAST-EDITOR':'NOT VERIFIED','FIELD-LEVEL-HISTORY':'NOT VERIFIED',
+            'HISTORY-SOURCE-AND-BATCH':'NOT VERIFIED','DETAIL-WALLET-CURRENCY':'NOT VERIFIED','DETAIL-AUTHOR-EDITOR':'NOT VERIFIED','DETAIL-HISTORY':'NOT VERIFIED',
+            'TRASH-MODEL':'NOT VERIFIED','TRASH-EXCLUDED-FROM-ACTIVE':'NOT VERIFIED','TRASH-SURVIVES-FLAG-OFF':'NOT VERIFIED',
+            'RESTORE-SAME-LOGICAL-OPERATION':'NOT VERIFIED','RESTORE-PRESERVES-HISTORY':'NOT VERIFIED','PERMANENT-PURGE-NO-GHOST':'NOT VERIFIED',
+            'EXPIRY-PURGE-NO-GHOST':'NOT VERIFIED','ALL-OPERATIONS-WALLET-ID':'NOT VERIFIED','WALLET-DISPLAY':'NOT VERIFIED',
+            'MULTI-CATEGORY-OR-AND-TYPE':'NOT VERIFIED','CATEGORY-FILTER-UX':'NOT VERIFIED','DUPLICATE-CATEGORY-BLOCKED':'NOT VERIFIED',
+            'USED-CATEGORY-DELETE-BLOCKED':'NOT VERIFIED','UNUSED-CATEGORY-DELETE':'NOT VERIFIED','TRASH-VIEW-AND-RESTORE-UX':'NOT VERIFIED',
+            'DESKTOP-DOCK-FIXED':'NOT VERIFIED','MOBILE-DOCK-FIXED':'NOT VERIFIED','PAGE-JAVASCRIPT-ERRORS':'NOT VERIFIED',
+            'VERIFIED-RUNTIME-COMMIT':target
+          };
+          const executablePath=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'].find(fs.existsSync);
+          let browser; const errors=[];
+          const ok=(k,v)=>gate[k]=v?'VERIFIED':'FAILED';
+          try{
+            browser=await chromium.launch({headless:true,executablePath,args:['--no-sandbox']});
+            const context=await browser.newContext({viewport:{width:390,height:844}});
+            const page=await context.newPage();
+            page.on('pageerror',e=>errors.push(e.message));
+            let response;
+            for(let i=0;i<60;i++){
+              response=await page.goto(url,{waitUntil:'domcontentloaded',timeout:60000});
+              try{
+                await page.waitForFunction(()=>typeof window.__FP_TEST__==='object'&&window.__FP_TEST__.getState().schemaVersion===2,{timeout:5000});
+                break;
+              }catch{await sleep(5000)}
+            }
+            const status=response?.status()||0;
+            gate['HTTP-STATUS']=String(status); gate['HTTP-LOAD']=status>=200&&status<400?'SUCCEEDED':'FAILED';
+            ok('NO-IFRAME',await page.locator('iframe').count()===0);
+            const result=await page.evaluate(()=>{
+              const api=window.__FP_TEST__, out={};
+              const state=()=>api.getState();
+              let s=state();
+              out.schema=s.schemaVersion===2;
+              const personal=s.wallets.find(w=>w.type==='personal');
+              out.personalDefault=personal?.includedInHouseholdCapital===false;
+              out.personalOwner=personal?.allowedMemberIds?.includes(personal.ownerMemberId);
+              out.allWalletIds=s.operations.every(o=>!!o.walletId);
+              const cat=api.createCategory('expense','Публичная проверка'); out.categoryCreated=cat.ok===true;
+              const catId=cat.category.id;
+              const opId=api.createOperation({kind:'expense',amount:12.34,categoryId:catId,note:'Создала Анна'});
+              s=state(); let op=s.operations.find(o=>o.id===opId);
+              out.authorship=op.createdByMemberId==='member-anna';
+              out.timestamps=op.createdAt>0&&op.lastEditedAt>0;
+              api.setActor('member-martin');
+              api.editOperation(opId,{amount:55.5,occurredAt:Date.now()-123456,categoryId:'cat-exp-fuel',walletId:'wallet-personal-anna',note:'Изменил Мартин'});
+              s=state(); op=s.operations.find(o=>o.id===opId);
+              const fields=op.revisions.map(r=>r.field);
+              out.lastEditor=op.lastEditedByMemberId==='member-martin';
+              out.fieldHistory=['amount','occurredAt','categoryId','walletId','note'].every(f=>fields.includes(f));
+              out.sourceBatch=op.revisions.every(r=>r.source==='user'&&Object.prototype.hasOwnProperty.call(r,'batchId'));
+              const revBefore=op.revisions.length;
+              api.setActor('member-anna'); api.setTrashEnabled(true); api.trashOperation(opId);
+              s=state(); op=s.operations.find(o=>o.id===opId);
+              out.trash=op.status==='trash'&&op.deletedByMemberId==='member-anna'&&op.trashExpiresAt>op.deletedAt;
+              out.trashExcluded=!api.filteredOperations().includes(opId);
+              api.setTrashEnabled(false); s=state(); out.trashFlagOff=s.operations.some(o=>o.id===opId&&o.status==='trash');
+              api.restoreOperation(opId); s=state(); op=s.operations.find(o=>o.id===opId);
+              out.restoreSame=op?.id===opId&&op.status==='active'; out.restoreHistory=op.revisions.length>=revBefore+2;
+              api.permanentDelete(opId); s=state(); out.noGhost=!s.operations.some(o=>o.id===opId);
+              const exp=api.createOperation({kind:'expense',amount:1,categoryId:'cat-exp-food'}); api.setTrashEnabled(true); api.trashOperation(exp); api.setTrashExpiry(exp,Date.now()-1); api.renderAll();
+              s=state(); out.expiryNoGhost=!s.operations.some(o=>o.id===exp);
+              api.setTypeFilter('expense'); api.setCategoryFilter(['cat-exp-food','cat-exp-fuel']);
+              const ids=api.filteredOperations(), map=Object.fromEntries(state().operations.map(o=>[o.id,o]));
+              out.multiCategory=ids.length>0&&ids.every(id=>map[id].kind==='expense'&&['cat-exp-food','cat-exp-fuel'].includes(map[id].categoryId));
+              const duplicate=api.createCategory('expense','   ПРОДУКТЫ   '); out.duplicateBlocked=duplicate.ok===false;
+              const used=api.deleteCategory('cat-exp-food'); out.usedDeleteBlocked=used.ok===false&&/операц/i.test(used.error||'');
+              const unused=api.createCategory('expense','Временная пустая'); out.unusedDelete=unused.ok===true&&api.deleteCategory(unused.category.id).ok===true;
+              const trashView=api.createOperation({kind:'expense',amount:2,categoryId:'cat-exp-food'}); api.setTrashEnabled(true); api.trashOperation(trashView);
+              return {...out,opId,trashView};
+            });
+            ok('SCHEMA-VERSION-2',result.schema); ok('PERSONAL-WALLET-EXCLUDED-DEFAULT',result.personalDefault); ok('PERSONAL-WALLET-OWNER-VISIBLE',result.personalOwner);
+            ok('OPERATION-AUTHORSHIP',result.authorship); ok('OPERATION-TIMESTAMPS',result.timestamps); ok('LAST-EDITOR',result.lastEditor);
+            ok('FIELD-LEVEL-HISTORY',result.fieldHistory); ok('HISTORY-SOURCE-AND-BATCH',result.sourceBatch); ok('TRASH-MODEL',result.trash);
+            ok('TRASH-EXCLUDED-FROM-ACTIVE',result.trashExcluded); ok('TRASH-SURVIVES-FLAG-OFF',result.trashFlagOff); ok('RESTORE-SAME-LOGICAL-OPERATION',result.restoreSame);
+            ok('RESTORE-PRESERVES-HISTORY',result.restoreHistory); ok('PERMANENT-PURGE-NO-GHOST',result.noGhost); ok('EXPIRY-PURGE-NO-GHOST',result.expiryNoGhost);
+            ok('ALL-OPERATIONS-WALLET-ID',result.allWalletIds); ok('MULTI-CATEGORY-OR-AND-TYPE',result.multiCategory); ok('DUPLICATE-CATEGORY-BLOCKED',result.duplicateBlocked);
+            ok('USED-CATEGORY-DELETE-BLOCKED',result.usedDeleteBlocked); ok('UNUSED-CATEGORY-DELETE',result.unusedDelete);
+            await page.evaluate(()=>{window.__FP_TEST__.setTypeFilter('all');window.__FP_TEST__.setCategoryFilter([]);window.__FP_TEST__.renderAll()});
+            const first=page.locator('[data-op-id]').first(); await first.click();
+            ok('DETAIL-WALLET-CURRENCY',(await page.locator('#detailWallet').innerText()).length>0&&(await page.locator('#detailCurrency').innerText()).length===3);
+            ok('DETAIL-AUTHOR-EDITOR',(await page.locator('#detailCreated').innerText()).length>0&&(await page.locator('#detailEdited').innerText()).length>0);
+            ok('DETAIL-HISTORY',Number(await page.locator('#historyCount').innerText())>=0);
+            await page.locator('[data-close="operationDetail"]').first().click();
+            ok('WALLET-DISPLAY',await page.locator('.op-wallet').count()>0);
+            await page.locator('#categoryFilterBtn').click();
+            ok('CATEGORY-FILTER-UX',await page.locator('#categorySearch').count()===1&&await page.locator('[data-filter-category]').count()>0&&/Выбрано категорий/.test(await page.locator('#selectedCategoryCount').innerText()));
+            await page.locator('[data-close="categoryFilterModal"]').click();
+            await page.locator('#trashBtn').click();
+            ok('TRASH-VIEW-AND-RESTORE-UX',await page.locator('[data-trash-view]').count()>0&&await page.locator('[data-trash-restore]').count()>0);
+            await page.locator('[data-close="trashModal"]').click();
+            const dock=page.locator('#actionDock'); ok('MOBILE-DOCK-FIXED',await dock.evaluate(el=>getComputedStyle(el).position)==='fixed');
+            await context.close();
+            const desktop=await browser.newContext({viewport:{width:1720,height:966}}); const dp=await desktop.newPage(); dp.on('pageerror',e=>errors.push(e.message));
+            await dp.goto(url,{waitUntil:'domcontentloaded',timeout:60000}); await dp.waitForFunction(()=>typeof window.__FP_TEST__==='object',{timeout:30000});
+            ok('DESKTOP-DOCK-FIXED',await dp.locator('#actionDock').evaluate(el=>getComputedStyle(el).position)==='fixed'); await desktop.close();
+            gate['PAGE-JAVASCRIPT-ERRORS']=errors.length?`FAILED: ${errors.join(' | ')}`:'NONE';
+          }catch(e){gate['BROWSER-ERROR']=e.stack||e.message;gate['PAGE-JAVASCRIPT-ERRORS']=errors.length?`FAILED: ${errors.join(' | ')}`:'NOT VERIFIED'}
+          finally{
+            if(browser)await browser.close();
+            const lines=Object.entries(gate).map(([k,v])=>`${k}: ${v}`); fs.writeFileSync('verification/operations-foundation-gate.txt',lines.join('\n')+'\n'); console.log(lines.join('\n'));
+            if(lines.some(x=>x.includes('FAILED')||x.includes('NOT VERIFIED')))process.exitCode=1;
+          }
+          NODE
+      - name: Record evidence
+        if: always()
+        run: |
+          cp verification/operations-foundation-gate.txt /tmp/gate.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          mkdir -p verification
+          cp /tmp/gate.txt verification/operations-foundation-gate.txt
+          git add verification/operations-foundation-gate.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "Record Operations foundation public gate [skip ci]"
+          git push origin HEAD:main
