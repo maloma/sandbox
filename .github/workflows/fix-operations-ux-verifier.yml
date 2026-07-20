@@ -1,0 +1,40 @@
+name: Fix Operations UX verifier
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/fix-operations-ux-verifier.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Correct visible-screen selectors
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          p=Path('.github/workflows/verify-operations-ux-repair.yml')
+          s=p.read_text(encoding='utf-8')
+          old="await page.locator('[data-back]').first().click(); await page.locator('#analyticsBtn').click();"
+          new="await page.locator('#operationsScreen [data-back]').click(); await page.locator('#analyticsBtn').click();"
+          if old not in s: raise SystemExit('operations back marker missing')
+          s=s.replace(old,new,1)
+          old="await page.locator('[data-back]').first().click();"
+          new="await page.locator('#analyticsScreen [data-back]').click();"
+          if old not in s: raise SystemExit('analytics back marker missing')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit verifier correction and clean helper
+        run: |
+          rm -f .github/workflows/fix-operations-ux-verifier.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/verify-operations-ux-repair.yml .github/workflows/fix-operations-ux-verifier.yml
+          git commit -m "Correct Operations UX verifier navigation"
+          git push origin HEAD:main
