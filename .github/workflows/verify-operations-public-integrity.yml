@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
     paths:
+      - index.html
+      - .nojekyll
       - .github/workflows/verify-operations-public-integrity.yml
   workflow_dispatch:
 
@@ -17,7 +19,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v6
       - name: Verify exact published runtime
@@ -30,8 +32,8 @@ jobs:
           status=0
           actual=""
           result="FAILED"
-          for attempt in $(seq 1 6); do
-            status=$(curl -L -sS -o /tmp/public-index.html -w '%{http_code}' "${PUBLIC_URL}?integrity=${TARGET_COMMIT}&attempt=${attempt}" || true)
+          for attempt in $(seq 1 60); do
+            status=$(curl -L -sS -o /tmp/public-index.html -w '%{http_code}' "${PUBLIC_URL}?integrity=${TARGET_COMMIT}&attempt=${attempt}&ts=$(date +%s)" || true)
             if [ -f /tmp/public-index.html ]; then actual=$(sha256sum /tmp/public-index.html | awk '{print $1}'); fi
             if [ "$status" = "200" ] && [ "$actual" = "$EXPECTED_SHA256" ]; then result="VERIFIED"; break; fi
             sleep 5
