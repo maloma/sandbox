@@ -1,0 +1,118 @@
+name: Public Browser Interaction Diagnostic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/public-browser-diagnostic.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Initialize evidence
+        run: |
+          mkdir -p verification
+          {
+            printf 'PUBLIC-URL: https://maloma.github.io/sandbox/\n'
+            printf 'BROWSER-DIAGNOSTIC: STARTED\n'
+            printf 'VERIFIED-COMMIT: %s\n' "$GITHUB_SHA"
+          } > verification/public-browser.txt
+
+      - name: Install Playwright driver
+        id: install
+        continue-on-error: true
+        run: |
+          set +e
+          npm install --no-save playwright-core@1.53.2 > /tmp/npm-install.log 2>&1
+          CODE=$?
+          printf 'PLAYWRIGHT-INSTALL-EXIT: %s\n' "$CODE" >> verification/public-browser.txt
+          tail -40 /tmp/npm-install.log >> verification/public-browser.txt
+          exit "$CODE"
+
+      - name: Run public interaction gate
+        continue-on-error: true
+        env:
+          PUBLIC_URL: https://maloma.github.io/sandbox/
+        run: |
+          set +e
+          node <<'NODE' > /tmp/browser-gate.log 2>&1
+          const fs = require('fs');
+          const { chromium } = require('playwright-core');
+          const url = `${process.env.PUBLIC_URL}?browser=${process.env.GITHUB_SHA}`;
+          const results = {};
+          const errors = [];
+          const candidates = ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser'];
+          const executablePath = candidates.find(path => fs.existsSync(path));
+          results['CHROME-PATH'] = executablePath || 'NOT FOUND';
+          (async()=>{
+            let browser;
+            try {
+              browser = await chromium.launch({ headless: true, executablePath, args: ['--no-sandbox'] });
+              const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+              page.on('pageerror', error => errors.push(error.message));
+              const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+              results['HTTP-STATUS'] = String(response?.status() || 'NO RESPONSE');
+              results['FINAL-ADDRESS'] = page.url();
+              results['NO-IFRAME'] = await page.locator('iframe').count() === 0 ? 'VERIFIED' : 'FAILED';
+              const pickerOpen = () => page.locator('#picker').evaluate(el => el.classList.contains('open'));
+              await page.locator('[data-range="day"][data-context="home"]').click();
+              results['HOME-PERIOD-TYPE-TAP'] = !(await pickerOpen()) ? 'NO PICKER' : 'FAILED';
+              const homeLabel = await page.locator('[data-label="home"]').innerText();
+              await page.locator('[data-label="home"]').click();
+              results['HOME-PERIOD-LABEL-TAP'] = (await pickerOpen()) ? 'PICKER OPENS' : 'FAILED';
+              await page.locator('[data-close="picker"]').click();
+              await page.locator('#analyticsBtn').click();
+              await page.locator('[data-range="week"][data-context="analytics"]').click();
+              results['ANALYTICS-PERIOD-TYPE-TAP'] = !(await pickerOpen()) ? 'NO PICKER' : 'FAILED';
+              await page.locator('[data-label="analytics"]').click();
+              results['ANALYTICS-PERIOD-LABEL-TAP'] = (await pickerOpen()) ? 'PICKER OPENS' : 'FAILED';
+              await page.locator('[data-close="picker"]').click();
+              await page.locator('#analyticsScreen [data-back]').click();
+              results['HOME-ANALYTICS-INDEPENDENCE'] = (await page.locator('[data-label="home"]').innerText()) === homeLabel ? 'VERIFIED' : 'FAILED';
+              await page.locator('[data-screen="operations"]').click();
+              const opsInitial = await page.locator('[data-label="operations"]').innerText();
+              results['OPERATIONS-PERIOD-LABEL'] = opsInitial.trim() ? 'VISIBLE' : 'FAILED';
+              const inherited = opsInitial === homeLabel;
+              await page.locator('[data-prev="operations"]').click();
+              const opsAfter = await page.locator('[data-label="operations"]').innerText();
+              results['OPERATIONS-ARROWS'] = opsAfter !== opsInitial ? 'WORKING' : 'FAILED';
+              await page.locator('#operationsScreen [data-back]').click();
+              const homeAfterOps = await page.locator('[data-label="home"]').innerText();
+              results['OPERATIONS-INDEPENDENCE'] = inherited && homeAfterOps === homeLabel ? 'VERIFIED' : 'FAILED';
+              await page.locator('[data-open-ops="expense"]').first().click();
+              const expenseActive = await page.locator('[data-filter="expense"]').evaluate(el => el.classList.contains('active'));
+              const inheritedBalancePeriod = (await page.locator('[data-label="operations"]').innerText()) === homeLabel;
+              results['FINANCIAL-BALANCE-FILTER-INHERITANCE'] = expenseActive && inheritedBalancePeriod ? 'VERIFIED' : 'FAILED';
+              results['PAGE-JAVASCRIPT-ERRORS'] = errors.length ? `FAILED: ${errors.join(' | ')}` : 'NONE';
+            } catch (error) {
+              results['BROWSER-ERROR'] = error.stack || error.message;
+              results['PAGE-JAVASCRIPT-ERRORS'] = errors.length ? `FAILED: ${errors.join(' | ')}` : 'NOT VERIFIED';
+            } finally {
+              if (browser) await browser.close();
+              for (const [key,value] of Object.entries(results)) console.log(`${key}: ${value}`);
+            }
+          })().catch(error=>{console.error(error);process.exitCode=1});
+          NODE
+          CODE=$?
+          printf 'BROWSER-GATE-EXIT: %s\n' "$CODE" >> verification/public-browser.txt
+          cat /tmp/browser-gate.log >> verification/public-browser.txt
+          exit 0
+
+      - name: Record browser evidence
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          git add verification/public-browser.txt
+          git commit -m "Record public browser diagnostic [skip ci]"
+          git push origin HEAD:main
