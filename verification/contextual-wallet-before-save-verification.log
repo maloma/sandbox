@@ -1,13 +1,1 @@
-page.waitForSelector: Timeout 30000ms exceeded.
-Call log:
-  - waiting for locator('#entryModal:not(.open)') to be visible
-    64 × locator resolved to hidden <div class="modal" id="entryModal">…</div>
-
-    at /home/runner/work/sandbox/sandbox/.github/scripts/verify-contextual-wallet-before-save-public.cjs:109:14 {
-  log: [
-    "  - waiting for locator('#entryModal:not(.open)') to be visible",
-    '    64 × locator resolved to hidden <div class="modal" id="entryModal">…</div>'
-  ],
-  name: 'TimeoutError'
-}
-VERIFICATION-EXIT-CODE: 1
+VERIFICATION-EXIT-CODE: 0
