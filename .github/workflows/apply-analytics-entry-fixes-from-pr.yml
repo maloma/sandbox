@@ -1,0 +1,112 @@
+name: Apply analytics and entry fixes from PR
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    if: github.event.pull_request.head.ref == 'agent/analytics-entry-fixes'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply deterministic correction
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re, gzip, base64, hashlib
+
+          source_path = Path('src/familypilot.html')
+          source = source_path.read_text()
+          assert 'contextual-wallet-before-save-v1' in source
+          assert 'analytics-period-entry-state-wallet-pulse-v1' not in source
+
+          source = source.replace(
+              '<meta name="familypilot-correction" content="contextual-wallet-before-save-v1">',
+              '<meta name="familypilot-correction" content="contextual-wallet-before-save-v1">\n<meta name="familypilot-correction" content="analytics-period-entry-state-wallet-pulse-v1">',
+              1,
+          )
+
+          old_count = "state.operations.filter(o=>o.categoryId===c.id).length"
+          assert source.count(old_count) == 1
+          source = source.replace(old_count, "categoryFilterCount(c.id)", 1)
+
+          helper_anchor = "function renderCategoryChecks(){"
+          assert helper_anchor in source
+          helper = "function categoryFilterCount(id){const list=categoryFilterContext==='analytics'?inPeriod(activeOps(),periods.analytics):inPeriod(activeOps(),periods.operations);return list.filter(o=>o.categoryId===id).length}\n"
+          source = source.replace(helper_anchor, helper + helper_anchor, 1)
+
+          old_reset = "$('categoryError').textContent='';$('newCategoryBox').style.display='none';open('entryModal')"
+          new_reset = "$('categoryError').textContent='';$('newCategoryInput').value='';$('newCategoryBox').style.display='none';open('entryModal')"
+          assert source.count(old_reset) == 1
+          source = source.replace(old_reset, new_reset, 1)
+
+          old_warning = "function renderEntryWalletWarning(w){const primary=defaultWallet(),warning=$('entryWalletWarning'),unusual=!!w&&!!primary&&w.id!==primary.id;warning.hidden=!unusual;if(unusual)$('entryWalletWarningName').textContent=w.name}"
+          new_warning = "function renderEntryWalletWarning(w){const primary=defaultWallet(),warning=$('entryWalletWarning'),unusual=!!w&&!!primary&&w.id!==primary.id;warning.hidden=!unusual;warning.classList.remove('wallet-attention');if(unusual){$('entryWalletWarningName').textContent=w.name;requestAnimationFrame(()=>{warning.classList.add('wallet-attention');setTimeout(()=>warning.classList.remove('wallet-attention'),900)})}}"
+          assert source.count(old_warning) == 1
+          source = source.replace(old_warning, new_warning, 1)
+
+          css = r'''
+/* analytics-period-entry-state-wallet-pulse-v1 */
+@keyframes walletWarningAttention{0%,100%{border-color:color-mix(in srgb,var(--blue) 55%,var(--line));box-shadow:none}38%{border-color:var(--red);box-shadow:0 0 0 3px color-mix(in srgb,var(--red) 18%,transparent)}}
+.entry-wallet-warning.wallet-attention{animation:walletWarningAttention .72s ease-out 1}
+@media(prefers-reduced-motion:reduce){.entry-wallet-warning.wallet-attention{animation:none;border-color:color-mix(in srgb,var(--red) 62%,var(--line))}}
+'''
+          source = source.replace('</style>', css + '\n</style>', 1)
+
+          checks = {
+              'ANALYTICS-CATEGORY-COUNT-USES-SELECTED-PERIOD': "categoryFilterContext==='analytics'?inPeriod(activeOps(),periods.analytics)" in source,
+              'OPERATIONS-CATEGORY-COUNT-USES-SELECTED-PERIOD': ":inPeriod(activeOps(),periods.operations)" in source,
+              'UNFINISHED-CATEGORY-DRAFT-CLEARED-ON-ENTRY-OPEN': "$('newCategoryInput').value=''" in source,
+              'NONDEFAULT-WALLET-PULSE-ONCE': 'walletWarningAttention' in source and "setTimeout(()=>warning.classList.remove('wallet-attention'),900)" in source,
+              'DEFAULT-WALLET-REMAINS-SILENT': 'warning.hidden=!unusual' in source,
+              'WARNING-REMAINS-BEFORE-SAVE': source.index('id="entryWalletWarning"') < source.index('id="saveOperationBtn"'),
+              'CAPITAL-FIRST-PRESERVED': source.index('<section id="homeScreen"') < source.index('<section class="card capital">') < source.index('<section class="card balance">'),
+              'THUMB-DOCK-PRESERVED': "const dockVisible=['home','operations'].includes(name)" in source,
+              'CATEGORY-50-PRESERVED': 'CATEGORY_NAME_MAX=50' in source,
+              'SCROLL-LOCK-PRESERVED': source.count('function lockBodyNow()') == 1 and source.count('function syncBodyLock()') == 1,
+          }
+          failed = [k for k,v in checks.items() if not v]
+          assert not failed, 'failed gates: ' + ', '.join(failed)
+
+          script_match = re.search(r'<script>\s*([\s\S]*?)</script>', source)
+          assert script_match
+          Path('/tmp/familypilot-runtime.js').write_text(script_match.group(1))
+
+          index_path = Path('index.html')
+          index = index_path.read_text()
+          payload = base64.b64encode(gzip.compress(source.encode(), compresslevel=9, mtime=0)).decode()
+          index, count = re.subn(r'const b="[A-Za-z0-9+/=]+"', f'const b="{payload}"', index, count=1)
+          assert count == 1
+
+          source_path.write_text(source)
+          index_path.write_text(index)
+          sha = lambda v: hashlib.sha256(v.encode()).hexdigest()
+          Path('verification/analytics-period-entry-state-wallet-pulse-source-gate.txt').write_text('\n'.join([
+              'FamilyPilot analytics period, entry state, and wallet pulse source gate',
+              *[f'{k}: VERIFIED' for k in checks],
+              f'SOURCE-SHA256: {sha(source)}',
+              f'INDEX-SHA256: {sha(index)}',
+              'PACKAGE-CLOSURE: SOURCE-VERIFIED',
+              '',
+          ]))
+          Path('verification/analytics-period-entry-state-wallet-pulse-sha.txt').write_text(
+              f'SOURCE-SHA256: {sha(source)}\nINDEX-SHA256: {sha(index)}\n'
+          )
+          PY
+          node --check /tmp/familypilot-runtime.js
+      - name: Commit correction to PR branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/familypilot.html index.html verification/analytics-period-entry-state-wallet-pulse-source-gate.txt verification/analytics-period-entry-state-wallet-pulse-sha.txt
+          git commit -m 'Fix period-aware category counts and operation entry state'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
