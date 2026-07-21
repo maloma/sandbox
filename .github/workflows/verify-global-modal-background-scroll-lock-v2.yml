@@ -1,0 +1,113 @@
+name: Bounded global modal background scroll lock verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/verify-global-modal-background-scroll-lock-v2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+      - name: Wait for exact public runtime
+        run: |
+          expected=$(awk '/INDEX-SHA256:/{print $2}' verification/global-modal-scroll-lock-sha.txt)
+          status=0
+          actual=""
+          for i in $(seq 1 48); do
+            status=$(curl -L -sS -o /tmp/public.html -w '%{http_code}' "https://maloma.github.io/sandbox/?scroll-lock-v2=$i&ts=$(date +%s)" || true)
+            actual=$(sha256sum /tmp/public.html 2>/dev/null | awk '{print $1}')
+            [ "$status" = "200" ] && [ "$actual" = "$expected" ] && break
+            sleep 5
+          done
+          echo "HTTP_STATUS=$status" >> "$GITHUB_ENV"
+          echo "PUBLIC_SHA=$actual" >> "$GITHUB_ENV"
+          echo "EXPECTED_SHA=$expected" >> "$GITHUB_ENV"
+      - run: npm install --no-save playwright-core@1.53.2
+      - name: Verify locked background and scrollable foreground
+        run: |
+          mkdir -p verification
+          node <<'NODE'
+          const fs=require('fs');
+          const {chromium}=require('playwright-core');
+          const gate={
+            'PUBLIC-URL':'https://maloma.github.io/sandbox/',
+            'HTTP-STATUS':process.env.HTTP_STATUS||'0',
+            'PUBLIC-RUNTIME-MATCH':process.env.PUBLIC_SHA===process.env.EXPECTED_SHA?'VERIFIED':'FAILED',
+            'MOBILE-CATEGORY-BACKGROUND-LOCK':'FAILED',
+            'MOBILE-BACKGROUND-STABLE-DURING-GESTURE':'FAILED',
+            'MOBILE-SCROLL-POSITION-RESTORED':'FAILED',
+            'MOBILE-ENTRY-BACKGROUND-LOCK':'FAILED',
+            'MOBILE-FOREGROUND-SCROLL':'FAILED',
+            'DESKTOP-BACKGROUND-LOCK':'FAILED',
+            'PAGE-JAVASCRIPT-ERRORS':'FAILED',
+            'PACKAGE-CLOSURE':'FAILED',
+            'VERIFIED-RUNTIME-COMMIT':'8573e0c0a3e542ad4a88883d9fdf957388b716fd'
+          };
+          const set=(k,v)=>gate[k]=v?'VERIFIED':'FAILED';
+          (async()=>{
+            let browser;const errors=[];
+            try{
+              const executablePath=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'].find(fs.existsSync);
+              browser=await chromium.launch({headless:true,executablePath,args:['--no-sandbox']});
+              const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+              const page=await mobile.newPage();
+              page.on('pageerror',e=>errors.push(e.message));
+              await page.goto('https://maloma.github.io/sandbox/?test=1&scroll-lock-v2=1',{waitUntil:'domcontentloaded',timeout:60000});
+              await page.waitForFunction(()=>window.__FP_TEST__?.getState().schemaVersion===2,{timeout:30000});
+              await page.evaluate(()=>{document.body.style.minHeight='2800px';window.scrollTo(0,500)});
+              const initial=await page.evaluate(()=>window.scrollY);
+              await page.locator('[data-screen="operations"]').click();
+              await page.locator('#filterToggleBtn').click();
+              await page.locator('#categoryFilterBtn').click();
+              await page.waitForFunction(()=>document.body.classList.contains('background-locked'));
+              const locked=await page.evaluate(()=>({pos:getComputedStyle(document.body).position,top:document.body.style.top,y:document.querySelector('.app').getBoundingClientRect().y}));
+              set('MOBILE-CATEGORY-BACKGROUND-LOCK',locked.pos==='fixed'&&locked.top===`-${initial}px`);
+              await page.mouse.move(385,430);await page.mouse.wheel(0,1000);await page.waitForTimeout(120);
+              const afterGesture=await page.evaluate(()=>document.querySelector('.app').getBoundingClientRect().y);
+              set('MOBILE-BACKGROUND-STABLE-DURING-GESTURE',Math.abs(afterGesture-locked.y)<1);
+              await page.locator('[data-close="categoryFilterModal"]').click();
+              await page.waitForFunction(()=>!document.body.classList.contains('background-locked'));
+              set('MOBILE-SCROLL-POSITION-RESTORED',Math.abs((await page.evaluate(()=>window.scrollY))-initial)<2);
+              await page.locator('[data-screen="home"]').click();
+              await page.locator('[data-open-entry="expense"]').click();
+              await page.waitForFunction(()=>document.body.classList.contains('background-locked'));
+              set('MOBILE-ENTRY-BACKGROUND-LOCK',await page.evaluate(()=>getComputedStyle(document.body).position==='fixed'));
+              set('MOBILE-FOREGROUND-SCROLL',await page.evaluate(()=>{const s=document.querySelector('#entryModal .sheet');const before=s.scrollTop;s.scrollTop=before+80;return s.scrollTop>before||s.scrollHeight<=s.clientHeight}));
+              await mobile.close();
+              const desktop=await browser.newContext({viewport:{width:1720,height:966}});const dp=await desktop.newPage();dp.on('pageerror',e=>errors.push(e.message));
+              await dp.goto('https://maloma.github.io/sandbox/?test=1&scroll-lock-v2-desktop=1',{waitUntil:'domcontentloaded',timeout:60000});await dp.waitForFunction(()=>window.__FP_TEST__?.getState().schemaVersion===2);
+              await dp.locator('[data-screen="operations"]').click();await dp.locator('#filterToggleBtn').click();await dp.locator('#categoryFilterBtn').click();await dp.waitForFunction(()=>document.body.classList.contains('background-locked'));
+              set('DESKTOP-BACKGROUND-LOCK',await dp.evaluate(()=>getComputedStyle(document.body).position==='fixed'));
+              await desktop.close();
+              gate['PAGE-JAVASCRIPT-ERRORS']=errors.length?`FAILED: ${errors.join(' | ')}`:'NONE';
+            }catch(e){gate['BROWSER-ERROR']=e.stack||e.message;gate['PAGE-JAVASCRIPT-ERRORS']=errors.length?`FAILED: ${errors.join(' | ')}`:'FAILED'}finally{
+              if(browser)await browser.close();
+              const req=['PUBLIC-RUNTIME-MATCH','MOBILE-CATEGORY-BACKGROUND-LOCK','MOBILE-BACKGROUND-STABLE-DURING-GESTURE','MOBILE-SCROLL-POSITION-RESTORED','MOBILE-ENTRY-BACKGROUND-LOCK','MOBILE-FOREGROUND-SCROLL','DESKTOP-BACKGROUND-LOCK'];
+              gate['PACKAGE-CLOSURE']=req.every(k=>gate[k]==='VERIFIED')&&gate['PAGE-JAVASCRIPT-ERRORS']==='NONE'?'VERIFIED':'FAILED';
+              fs.writeFileSync('verification/global-modal-scroll-lock-v2-gate.txt',Object.entries(gate).map(([k,v])=>`${k}: ${v}`).join('\n')+'\n');
+            }
+          })();
+          NODE
+          cat verification/global-modal-scroll-lock-v2-gate.txt
+      - name: Record gate
+        if: always()
+        run: |
+          cp verification/global-modal-scroll-lock-v2-gate.txt /tmp/gate.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          mkdir -p verification
+          cp /tmp/gate.txt verification/global-modal-scroll-lock-v2-gate.txt
+          git add verification/global-modal-scroll-lock-v2-gate.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "Record bounded global modal scroll lock gate [skip ci]"
+          git push origin HEAD:main
