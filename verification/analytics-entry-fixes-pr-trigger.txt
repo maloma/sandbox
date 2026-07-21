@@ -1,0 +1,1 @@
+Apply selected-period category counts, clear unfinished category drafts between operation forms, and pulse the non-default-wallet warning once.
