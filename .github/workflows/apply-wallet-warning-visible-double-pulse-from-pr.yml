@@ -2,14 +2,14 @@ name: Apply visibility-aware wallet warning pulse from PR
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened]
 
 permissions:
   contents: write
 
 jobs:
   correct:
-    if: github.event.pull_request.head.ref == 'agent/wallet-warning-visible-double-pulse' && github.actor != 'github-actions[bot]'
+    if: github.event.pull_request.head.ref == 'agent/wallet-warning-visible-double-pulse'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,146 +18,115 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Reconcile readable source and apply visibility-aware pulse
+      - name: Apply correction to readable runtime source
         run: |
-          set +e
-          python3 <<'PY' > verification/wallet-warning-visible-double-pulse-diagnostic.log 2>&1
+          python3 <<'PY'
           from pathlib import Path
-          import re, hashlib, traceback
+          import re, hashlib
 
-          try:
-              source_path = Path('src/familypilot.html')
-              index_path = Path('index.html')
-              source = source_path.read_text()
-              index = index_path.read_text()
-              print('STAGE: readable-source-loaded')
+          source_path = Path('src/familypilot.html')
+          index_path = Path('index.html')
+          source = source_path.read_text()
+          index = index_path.read_text()
 
-              contextual_marker = '<meta name="familypilot-correction" content="contextual-wallet-before-save-v1">'
-              analytics_marker = '<meta name="familypilot-correction" content="analytics-period-entry-state-wallet-pulse-v1">'
-              pulse_marker = '<meta name="familypilot-correction" content="wallet-warning-visible-double-pulse-v1">'
+          contextual_marker = '<meta name="familypilot-correction" content="contextual-wallet-before-save-v1">'
+          analytics_marker = '<meta name="familypilot-correction" content="analytics-period-entry-state-wallet-pulse-v1">'
+          pulse_marker = '<meta name="familypilot-correction" content="wallet-warning-visible-double-pulse-v1">'
+          assert contextual_marker in source
+          assert pulse_marker not in source
 
-              assert contextual_marker in source, 'contextual wallet marker missing'
-              assert pulse_marker not in source, 'double-pulse correction already applied'
+          if analytics_marker not in source:
+              source = source.replace(contextual_marker, contextual_marker + '\n' + analytics_marker, 1)
 
-              if analytics_marker not in source:
-                  source = source.replace(contextual_marker, contextual_marker + '\n' + analytics_marker, 1)
-                  print('RESTORED: analytics correction marker')
+          if 'function categoryFilterCount(id)' not in source:
+              old_count = "state.operations.filter(o=>o.categoryId===c.id).length"
+              assert source.count(old_count) == 1
+              source = source.replace(old_count, 'categoryFilterCount(c.id)', 1)
+              helper_anchor = 'function renderCategoryChecks(){'
+              helper = "function categoryFilterCount(id){const list=categoryFilterContext==='analytics'?inPeriod(activeOps(),periods.analytics):inPeriod(activeOps(),periods.operations);return list.filter(o=>o.categoryId===id).length}\n"
+              assert helper_anchor in source
+              source = source.replace(helper_anchor, helper + helper_anchor, 1)
 
-              if 'function categoryFilterCount(id)' not in source:
-                  old_count = "state.operations.filter(o=>o.categoryId===c.id).length"
-                  assert source.count(old_count) == 1, f'category count occurrences={source.count(old_count)}'
-                  source = source.replace(old_count, 'categoryFilterCount(c.id)', 1)
-                  helper_anchor = 'function renderCategoryChecks(){'
-                  assert helper_anchor in source, 'category checks anchor missing'
-                  helper = "function categoryFilterCount(id){const list=categoryFilterContext==='analytics'?inPeriod(activeOps(),periods.analytics):inPeriod(activeOps(),periods.operations);return list.filter(o=>o.categoryId===id).length}\n"
-                  source = source.replace(helper_anchor, helper + helper_anchor, 1)
-                  print('RESTORED: selected-period category counts')
+          if "$('newCategoryInput').value=''" not in source:
+              old_reset = "$('categoryError').textContent='';$('newCategoryBox').style.display='none';open('entryModal')"
+              new_reset = "$('categoryError').textContent='';$('newCategoryInput').value='';$('newCategoryBox').style.display='none';open('entryModal')"
+              assert source.count(old_reset) == 1
+              source = source.replace(old_reset, new_reset, 1)
 
-              if "$('newCategoryInput').value=''" not in source:
-                  old_reset = "$('categoryError').textContent='';$('newCategoryBox').style.display='none';open('entryModal')"
-                  new_reset = "$('categoryError').textContent='';$('newCategoryInput').value='';$('newCategoryBox').style.display='none';open('entryModal')"
-                  assert source.count(old_reset) == 1, f'entry reset occurrences={source.count(old_reset)}'
-                  source = source.replace(old_reset, new_reset, 1)
-                  print('RESTORED: unfinished category draft reset')
+          source = source.replace(analytics_marker, analytics_marker + '\n' + pulse_marker, 1)
 
-              source = source.replace(analytics_marker, analytics_marker + '\n' + pulse_marker, 1)
+          new_warning = "function renderEntryWalletWarning(w){const primary=defaultWallet(),warning=$('entryWalletWarning'),unusual=!!w&&!!primary&&w.id!==primary.id;warning._attentionObserver?.disconnect();warning._attentionObserver=null;warning.hidden=!unusual;warning.classList.remove('wallet-attention');if(unusual){$('entryWalletWarningName').textContent=w.name;requestAnimationFrame(()=>{const root=warning.closest('.entry-sheet'),observer=new IntersectionObserver(entries=>{if(!entries.some(e=>e.isIntersecting&&e.intersectionRatio>=.6))return;observer.disconnect();warning._attentionObserver=null;warning.classList.remove('wallet-attention');void warning.offsetWidth;warning.classList.add('wallet-attention');setTimeout(()=>warning.classList.remove('wallet-attention'),1500)},{root,threshold:[.6]});warning._attentionObserver=observer;observer.observe(warning)})}}"
+          source, warning_count = re.subn(
+              r"function renderEntryWalletWarning\(w\)\{[\s\S]*?\}(?=\s*function renderMore\(\))",
+              new_warning,
+              source,
+              count=1,
+          )
+          assert warning_count == 1, f'wallet warning replacement count={warning_count}'
 
-              new_warning = "function renderEntryWalletWarning(w){const primary=defaultWallet(),warning=$('entryWalletWarning'),unusual=!!w&&!!primary&&w.id!==primary.id;warning._attentionObserver?.disconnect();warning._attentionObserver=null;warning.hidden=!unusual;warning.classList.remove('wallet-attention');if(unusual){$('entryWalletWarningName').textContent=w.name;requestAnimationFrame(()=>{const root=warning.closest('.entry-sheet'),observer=new IntersectionObserver(entries=>{if(!entries.some(e=>e.isIntersecting&&e.intersectionRatio>=.6))return;observer.disconnect();warning._attentionObserver=null;warning.classList.remove('wallet-attention');void warning.offsetWidth;warning.classList.add('wallet-attention');setTimeout(()=>warning.classList.remove('wallet-attention'),1500)},{root,threshold:[.6]});warning._attentionObserver=observer;observer.observe(warning)})}}"
-              source, warning_count = re.subn(
-                  r"function renderEntryWalletWarning\(w\)\{[\s\S]*?\}(?=\s*function renderMore\(\))",
-                  new_warning,
-                  source,
-                  count=1,
-              )
-              assert warning_count == 1, f'wallet warning replacement count={warning_count}'
-              print('APPLIED: viewport-triggered wallet warning')
-
-              pulse_css = """
+          pulse_css = """
 /* wallet-warning-visible-double-pulse-v1 */
 @keyframes walletWarningAttention{0%,100%{border-color:color-mix(in srgb,var(--blue) 55%,var(--line));box-shadow:none}38%{border-color:var(--red);box-shadow:0 0 0 3px color-mix(in srgb,var(--red) 18%,transparent)}}
 .entry-wallet-warning.wallet-attention{animation:walletWarningAttention .55s ease-out 2}
 @media(prefers-reduced-motion:reduce){.entry-wallet-warning.wallet-attention{animation:none;border-color:color-mix(in srgb,var(--red) 62%,var(--line))}}
 """
-              if '@keyframes walletWarningAttention' not in source:
-                  assert source.count('</style>') == 1, 'style close not unique'
-                  source = source.replace('</style>', pulse_css + '\n</style>', 1)
-              else:
-                  source, css_count = re.subn(
-                      r"\.entry-wallet-warning\.wallet-attention\{animation:walletWarningAttention [^}]+\}",
-                      '.entry-wallet-warning.wallet-attention{animation:walletWarningAttention .55s ease-out 2}',
-                      source,
-                      count=1,
-                  )
-                  assert css_count == 1, f'wallet pulse CSS replacement count={css_count}'
-              print('APPLIED: two pulse animation iterations')
-
-              old_query = 'analytics-entry-fixes-v1'
-              new_query = 'wallet-warning-visible-double-pulse-v1'
-              assert old_query in index or new_query in index, 'loader cache-bust token missing'
-              index = index.replace(old_query, new_query)
-
-              checks = {
-                  'READABLE-SOURCE-HAS-ANALYTICS-CORRECTION': analytics_marker in source,
-                  'ANALYTICS-CATEGORY-COUNT-USES-SELECTED-PERIOD': "categoryFilterContext==='analytics'?inPeriod(activeOps(),periods.analytics)" in source,
-                  'OPERATIONS-CATEGORY-COUNT-USES-SELECTED-PERIOD': ':inPeriod(activeOps(),periods.operations)' in source,
-                  'UNFINISHED-CATEGORY-DRAFT-CLEARED': "$('newCategoryInput').value=''" in source,
-                  'PULSE-WAITS-FOR-VISIBILITY': 'new IntersectionObserver' in source and 'e.intersectionRatio>=.6' in source,
-                  'PULSE-USES-FORM-SCROLL-ROOT': "warning.closest('.entry-sheet')" in source,
-                  'PULSE-RUNS-TWICE': 'animation:walletWarningAttention .55s ease-out 2' in source,
-                  'PULSE-ONLY-FOR-NONDEFAULT-WALLET': 'warning.hidden=!unusual' in source,
-                  'PULSE-REARMS-PER-FORM-OPEN': 'warning._attentionObserver?.disconnect()' in source,
-                  'WARNING-REMAINS-BEFORE-SAVE': source.index('id="entryWalletWarning"') < source.index('id="saveOperationBtn"'),
-                  'LOADER-CACHE-BUST-UPDATED': new_query in index,
-                  'CAPITAL-FIRST-PRESERVED': source.index('<section id="homeScreen"') < source.index('<section class="card capital">') < source.index('<section class="card balance">'),
-                  'THUMB-DOCK-PRESERVED': "const dockVisible=['home','operations'].includes(name)" in source,
-                  'CATEGORY-50-PRESERVED': 'CATEGORY_NAME_MAX=50' in source,
-                  'SCROLL-LOCK-PRESERVED': source.count('function lockBodyNow()') == 1 and source.count('function syncBodyLock()') == 1,
-              }
-              for key, value in checks.items():
-                  print(f'{key}:', 'VERIFIED' if value else 'FAILED')
-              failed = [key for key, value in checks.items() if not value]
-              assert not failed, 'failed gates: ' + ', '.join(failed)
-
-              script_match = re.search(r'<script>\s*([\s\S]*?)</script>', source)
-              assert script_match, 'runtime script missing'
-              Path('/tmp/familypilot-runtime.js').write_text(script_match.group(1))
-
-              source_path.write_text(source)
-              index_path.write_text(index)
-              sha = lambda value: hashlib.sha256(value.encode()).hexdigest()
-              Path('verification/wallet-warning-visible-double-pulse-source-gate.txt').write_text('\n'.join([
-                  'FamilyPilot wallet warning visible double pulse source gate',
-                  *[f'{key}: VERIFIED' for key in checks],
-                  f'SOURCE-SHA256: {sha(source)}',
-                  f'INDEX-SHA256: {sha(index)}',
-                  'PACKAGE-CLOSURE: SOURCE-VERIFIED',
-                  '',
-              ]))
-              Path('verification/wallet-warning-visible-double-pulse-sha.txt').write_text(
-                  f'SOURCE-SHA256: {sha(source)}\nINDEX-SHA256: {sha(index)}\n'
+          if '@keyframes walletWarningAttention' not in source:
+              source = source.replace('</style>', pulse_css + '\n</style>', 1)
+          else:
+              source, css_count = re.subn(
+                  r"\.entry-wallet-warning\.wallet-attention\{animation:walletWarningAttention [^}]+\}",
+                  '.entry-wallet-warning.wallet-attention{animation:walletWarningAttention .55s ease-out 2}',
+                  source,
+                  count=1,
               )
-              print('RESULT: SUCCESS')
-          except Exception:
-              print('RESULT: FAILURE')
-              traceback.print_exc()
-              raise
+              assert css_count == 1
+
+          index = index.replace('analytics-entry-fixes-v1', 'wallet-warning-visible-double-pulse-v1')
+
+          checks = {
+              'READABLE-SOURCE-HAS-ANALYTICS-CORRECTION': analytics_marker in source,
+              'ANALYTICS-CATEGORY-COUNT-USES-SELECTED-PERIOD': "categoryFilterContext==='analytics'?inPeriod(activeOps(),periods.analytics)" in source,
+              'OPERATIONS-CATEGORY-COUNT-USES-SELECTED-PERIOD': ':inPeriod(activeOps(),periods.operations)' in source,
+              'UNFINISHED-CATEGORY-DRAFT-CLEARED': "$('newCategoryInput').value=''" in source,
+              'PULSE-WAITS-FOR-VISIBILITY': 'new IntersectionObserver' in source and 'e.intersectionRatio>=.6' in source,
+              'PULSE-USES-FORM-SCROLL-ROOT': "warning.closest('.entry-sheet')" in source,
+              'PULSE-RUNS-TWICE': 'animation:walletWarningAttention .55s ease-out 2' in source,
+              'PULSE-ONLY-FOR-NONDEFAULT-WALLET': 'warning.hidden=!unusual' in source,
+              'PULSE-REARMS-PER-FORM-OPEN': 'warning._attentionObserver?.disconnect()' in source,
+              'WARNING-REMAINS-BEFORE-SAVE': source.index('id="entryWalletWarning"') < source.index('id="saveOperationBtn"'),
+              'LOADER-CACHE-BUST-UPDATED': 'wallet-warning-visible-double-pulse-v1' in index,
+              'CAPITAL-FIRST-PRESERVED': source.index('<section id="homeScreen"') < source.index('<section class="card capital">') < source.index('<section class="card balance">'),
+              'THUMB-DOCK-PRESERVED': "const dockVisible=['home','operations'].includes(name)" in source,
+              'CATEGORY-50-PRESERVED': 'CATEGORY_NAME_MAX=50' in source,
+              'SCROLL-LOCK-PRESERVED': source.count('function lockBodyNow()') == 1 and source.count('function syncBodyLock()') == 1,
+          }
+          failed = [key for key, value in checks.items() if not value]
+          assert not failed, 'failed gates: ' + ', '.join(failed)
+
+          script_match = re.search(r'<script>\s*([\s\S]*?)</script>', source)
+          assert script_match
+          Path('/tmp/familypilot-runtime.js').write_text(script_match.group(1))
+          source_path.write_text(source)
+          index_path.write_text(index)
+
+          sha = lambda value: hashlib.sha256(value.encode()).hexdigest()
+          Path('verification/wallet-warning-visible-double-pulse-source-gate.txt').write_text('\n'.join([
+              'FamilyPilot wallet warning visible double pulse source gate',
+              *[f'{key}: VERIFIED' for key in checks],
+              f'SOURCE-SHA256: {sha(source)}',
+              f'INDEX-SHA256: {sha(index)}',
+              'PACKAGE-CLOSURE: SOURCE-VERIFIED',
+              '',
+          ]))
+          Path('verification/wallet-warning-visible-double-pulse-sha.txt').write_text(
+              f'SOURCE-SHA256: {sha(source)}\nINDEX-SHA256: {sha(index)}\n'
+          )
           PY
-          status=$?
-          if [ -f /tmp/familypilot-runtime.js ]; then
-            node --check /tmp/familypilot-runtime.js >> verification/wallet-warning-visible-double-pulse-diagnostic.log 2>&1
-            node_status=$?
-            if [ "$node_status" -ne 0 ]; then status=$node_status; fi
-          fi
-          echo "EXIT-CODE: $status" >> verification/wallet-warning-visible-double-pulse-diagnostic.log
-          cat verification/wallet-warning-visible-double-pulse-diagnostic.log
-          echo "$status" > /tmp/wallet-pulse-exit-code
-          exit 0
-      - name: Commit correction or diagnostics to PR branch
+          node --check /tmp/familypilot-runtime.js
+      - name: Commit correction to PR branch
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/familypilot.html index.html verification/wallet-warning-visible-double-pulse-*.txt verification/wallet-warning-visible-double-pulse-diagnostic.log
-          git commit -m 'Record wallet warning visibility correction result'
+          git add src/familypilot.html index.html verification/wallet-warning-visible-double-pulse-source-gate.txt verification/wallet-warning-visible-double-pulse-sha.txt
+          git commit -m 'Trigger wallet warning pulse when it becomes visible'
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
-      - name: Enforce correction result
-        run: exit "$(cat /tmp/wallet-pulse-exit-code)"
