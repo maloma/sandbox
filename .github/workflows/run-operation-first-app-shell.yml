@@ -1,31 +1,66 @@
-name: Run operation-first FamilyPilot app shell patch
+name: Correct FamilyPilot operation-first runtime
 
 on:
   push:
     paths:
       - '.github/workflows/run-operation-first-app-shell.yml'
-      - '.github/scripts/operation-first-app-shell.cjs'
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  patch:
+  correct:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply patch
+      - name: Correct source
         run: |
-          node .github/scripts/operation-first-app-shell.cjs
+          python3 <<'PY'
+          from pathlib import Path
+          import re, gzip, base64, hashlib
+          p=Path('src/familypilot.html')
+          s=p.read_text()
+          start=s.index('function renderMore()')
+          end=s.index('function renderAll()', start)
+          fixed="""function renderMore(){let available=state.wallets.filter(w=>!w.archivedAt&&(!Array.isArray(w.allowedMemberIds)||w.allowedMemberIds.includes(state.currentMemberId)));if(!available.length)available=state.wallets.filter(w=>!w.archivedAt);if(available.length&&!available.some(w=>w.id===state.activeWalletId))state.activeWalletId=available[0].id;$('walletSelect').innerHTML=available.map(w=>`<option value="${esc(w.id)}"${w.id===state.activeWalletId?' selected':''}>${esc(w.name)} · ${esc(w.nativeCurrency)}</option>`).join('');$('themeSelect').value=themePreference();$('actorSelect').innerHTML=MEMBERS.map(m=>`<option value="${m.id}"${m.id===state.currentMemberId?' selected':''}>${m.name}</option>`).join('');$('trashFlagBtn').classList.toggle('on',state.config.trashRetentionEnabled);$('walletContracts').textContent=state.wallets.map(w=>{const rows=[w.name,`тип = ${w.type}`,`валюта = ${w.nativeCurrency}`,`в семейном капитале = ${w.includedInHouseholdCapital?'да':'нет'}`];if(w.ownerMemberId)rows.push(`владелец = ${memberName(w.ownerMemberId)}`);return rows.join(String.fromCharCode(10))}).join(String.fromCharCode(10,10))}
+"""
+          s=s[:start]+fixed+s[end:]
+          p.write_text(s)
+          m=re.search(r'<script>\s*([\s\S]*?)</script>',s)
+          if not m: raise SystemExit('script missing')
+          Path('/tmp/familypilot-runtime.js').write_text(m.group(1))
+          idxp=Path('index.html'); idx=idxp.read_text()
+          payload=base64.b64encode(gzip.compress(s.encode(),compresslevel=9)).decode()
+          idx,n=re.subn(r'const b="[A-Za-z0-9+/=]+"',f'const b="{payload}"',idx,count=1)
+          if n!=1: raise SystemExit('payload replacement failed')
+          idxp.write_text(idx)
+          checks={
+            'PACKAGE-MARKER':'operation-first-app-shell-v1' in s,
+            'PERSISTENT-TOP-BAR-REMOVED':'<header class="top">' not in s,
+            'HOME-OPERATIONS-FIRST':s.find('home-primary-actions')<s.find('card capital'),
+            'HOME-DOCK-DUPLICATION-REMOVED':'action-dock hidden' in s and "const dockVisible=name==='operations'" in s,
+            'WALLET-MOVED-TO-MORE':'id="walletSelect"' in s,
+            'THEME-MOVED-TO-MORE':'id="themeSelect"' in s and 'id="themeBtn"' not in s,
+            'PROFILE-INITIAL-REMOVED':'aria-label="Профиль"' not in s,
+            'NONDEFAULT-WALLET-CONTEXTUAL':'id="nonDefaultWalletNotice"' in s and 'renderWalletContext' in s,
+            'CATEGORY-LIMIT-50':'CATEGORY_NAME_MAX=50' in s and s.count('maxlength="50"')>=2,
+            'CATEGORY-OVERFLOW-SAFE':'.cat-row b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' in s,
+            'MODAL-SCROLL-LOCK-PRESERVED':s.count('function lockBodyNow()')==1 and s.count('function syncBodyLock()')==1,
+          }
+          bad=[k for k,v in checks.items() if not v]
+          if bad: raise SystemExit('failed '+','.join(bad))
+          h=lambda x:hashlib.sha256(x.encode()).hexdigest()
+          Path('verification/operation-first-app-shell-source-gate.txt').write_text('\n'.join(['FamilyPilot operation-first app shell source gate',*[f'{k}: VERIFIED' for k in checks],f'SOURCE-SHA256: {h(s)}',f'INDEX-SHA256: {h(idx)}','PACKAGE-CLOSURE: SOURCE-VERIFIED','']))
+          Path('verification/operation-first-app-shell-sha.txt').write_text(f'SOURCE-SHA256: {h(s)}\nINDEX-SHA256: {h(idx)}\n')
+          PY
           node --check /tmp/familypilot-runtime.js
-      - name: Commit package
+      - name: Commit correction
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add index.html src/familypilot.html verification/operation-first-app-shell-source-gate.txt verification/operation-first-app-shell-sha.txt
-          git commit -m 'Implement operation-first app shell and safe category names'
+          git commit -m 'Correct and verify operation-first app shell runtime'
           git push
