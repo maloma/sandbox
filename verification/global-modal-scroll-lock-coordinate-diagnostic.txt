@@ -1,7 +1,0 @@
-{"label":"CATEGORY-BEFORE","windowY":360,"docY":360,"bodyY":0,"bodyTop":"","bodyPosition":"static","bodyClasses":"","appY":-360,"open":[]}
-{"label":"CATEGORY-LOCKED","windowY":0,"docY":0,"bodyY":0,"bodyTop":"0px","bodyPosition":"fixed","bodyClasses":"background-locked modal-open","appY":0,"open":["categoryFilterModal"]}
-{"label":"CATEGORY-AFTER-GESTURE","windowY":0,"docY":0,"bodyY":0,"bodyTop":"0px","bodyPosition":"fixed","bodyClasses":"background-locked modal-open","appY":0,"open":["categoryFilterModal"]}
-{"label":"CATEGORY-CLOSED-300MS","windowY":0,"docY":0,"bodyY":0,"bodyTop":"","bodyPosition":"static","bodyClasses":"","appY":0,"open":[]}
-{"label":"ENTRY-BEFORE","windowY":300,"docY":300,"bodyY":0,"bodyTop":"","bodyPosition":"static","bodyClasses":"","appY":-300,"open":[]}
-{"label":"ENTRY-LOCKED","windowY":0,"docY":0,"bodyY":0,"bodyTop":"0px","bodyPosition":"fixed","bodyClasses":"background-locked modal-open","appY":0,"open":["entryModal"]}
-{"label":"ENTRY-CLOSED-300MS","windowY":0,"docY":0,"bodyY":0,"bodyTop":"","bodyPosition":"static","bodyClasses":"","appY":0,"open":[]}
