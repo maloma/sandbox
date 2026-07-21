@@ -1,4 +1,4 @@
 # FamilyPilot GitHub Pages direct publish trigger
-# Period-aware category counts, clean category draft state, wallet warning pulse
-# Runtime commit: f0e40c9e88d8e9afd0879a053be94306128a19b0
-# Package: analytics-period-entry-state-wallet-pulse-v1
+# Period-aware category counts, clean category draft state, visibility-triggered wallet warning
+# Runtime loader commit: fbbc9476f76f4a17fc14e9559ee2a35e83f07aa1
+# Package: wallet-warning-visible-double-pulse-v1
