@@ -106,7 +106,7 @@ const assert=(v,m)=>{if(!v)throw new Error(m)};
 
   await page.fill('#amountInput','12,34');
   await page.click('#saveOperationBtn');
-  await page.waitForSelector('#entryModal:not(.open)');
+  await page.waitForFunction(()=>!document.querySelector('#entryModal')?.classList.contains('open'));
   const savedWallet=await page.evaluate(()=>{const s=window.__FP_TEST__.getState();return s.operations[s.operations.length-1].walletId});
   assert(savedWallet==='wallet-personal-anna',`Operation saved to wrong wallet: ${savedWallet}`);
 
