@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Trigger wallet warning only when visible
+      - name: Reconcile prior fixes and trigger wallet warning only when visible
         run: |
           python3 <<'PY'
           from pathlib import Path
@@ -30,37 +30,62 @@ jobs:
           embedded = re.search(r'const b="([A-Za-z0-9+/=]+)"', index)
           assert embedded, 'embedded runtime not found'
           source = gzip.decompress(base64.b64decode(embedded.group(1))).decode()
-          assert 'analytics-period-entry-state-wallet-pulse-v1' in source
           assert 'wallet-warning-visible-double-pulse-v1' not in source
 
-          source = source.replace(
-              '<meta name="familypilot-correction" content="analytics-period-entry-state-wallet-pulse-v1">',
-              '<meta name="familypilot-correction" content="analytics-period-entry-state-wallet-pulse-v1">\n<meta name="familypilot-correction" content="wallet-warning-visible-double-pulse-v1">',
-              1,
-          )
+          if 'analytics-period-entry-state-wallet-pulse-v1' not in source:
+              anchor = '<meta name="familypilot-correction" content="contextual-wallet-before-save-v1">'
+              assert anchor in source
+              source = source.replace(anchor, anchor + '\n<meta name="familypilot-correction" content="analytics-period-entry-state-wallet-pulse-v1">', 1)
 
-          old_warning = "function renderEntryWalletWarning(w){const primary=defaultWallet(),warning=$('entryWalletWarning'),unusual=!!w&&!!primary&&w.id!==primary.id;warning.hidden=!unusual;warning.classList.remove('wallet-attention');if(unusual){$('entryWalletWarningName').textContent=w.name;requestAnimationFrame(()=>{warning.classList.add('wallet-attention');setTimeout(()=>warning.classList.remove('wallet-attention'),900)})}}"
+          if 'function categoryFilterCount(id)' not in source:
+              old_count = "state.operations.filter(o=>o.categoryId===c.id).length"
+              assert source.count(old_count) == 1
+              source = source.replace(old_count, 'categoryFilterCount(c.id)', 1)
+              helper_anchor = 'function renderCategoryChecks(){'
+              assert helper_anchor in source
+              helper = "function categoryFilterCount(id){const list=categoryFilterContext==='analytics'?inPeriod(activeOps(),periods.analytics):inPeriod(activeOps(),periods.operations);return list.filter(o=>o.categoryId===id).length}\n"
+              source = source.replace(helper_anchor, helper + helper_anchor, 1)
+
+          if "$('newCategoryInput').value=''" not in source:
+              old_reset = "$('categoryError').textContent='';$('newCategoryBox').style.display='none';open('entryModal')"
+              new_reset = "$('categoryError').textContent='';$('newCategoryInput').value='';$('newCategoryBox').style.display='none';open('entryModal')"
+              assert source.count(old_reset) == 1
+              source = source.replace(old_reset, new_reset, 1)
+
+          marker = '<meta name="familypilot-correction" content="wallet-warning-visible-double-pulse-v1">'
+          analytics_marker = '<meta name="familypilot-correction" content="analytics-period-entry-state-wallet-pulse-v1">'
+          source = source.replace(analytics_marker, analytics_marker + '\n' + marker, 1)
+
           new_warning = "function renderEntryWalletWarning(w){const primary=defaultWallet(),warning=$('entryWalletWarning'),unusual=!!w&&!!primary&&w.id!==primary.id;warning._attentionObserver?.disconnect();warning._attentionObserver=null;warning.hidden=!unusual;warning.classList.remove('wallet-attention');if(unusual){$('entryWalletWarningName').textContent=w.name;requestAnimationFrame(()=>{const root=warning.closest('.entry-sheet'),observer=new IntersectionObserver(entries=>{if(!entries.some(e=>e.isIntersecting&&e.intersectionRatio>=.6))return;observer.disconnect();warning._attentionObserver=null;warning.classList.remove('wallet-attention');void warning.offsetWidth;warning.classList.add('wallet-attention');setTimeout(()=>warning.classList.remove('wallet-attention'),1500)},{root,threshold:[.6]});warning._attentionObserver=observer;observer.observe(warning)})}}"
-          assert source.count(old_warning) == 1
-          source = source.replace(old_warning, new_warning, 1)
+          source, warning_count = re.subn(
+              r"function renderEntryWalletWarning\(w\)\{[\s\S]*?\}(?=\n?function renderMore\(\))",
+              new_warning,
+              source,
+              count=1,
+          )
+          assert warning_count == 1, f'wallet warning replacement count={warning_count}'
 
-          old_css = ".entry-wallet-warning.wallet-attention{animation:walletWarningAttention .72s ease-out 1}"
-          new_css = ".entry-wallet-warning.wallet-attention{animation:walletWarningAttention .55s ease-out 2}"
-          assert source.count(old_css) == 1
-          source = source.replace(old_css, new_css, 1)
+          source, css_count = re.subn(
+              r"\.entry-wallet-warning\.wallet-attention\{animation:walletWarningAttention [^}]+\}",
+              '.entry-wallet-warning.wallet-attention{animation:walletWarningAttention .55s ease-out 2}',
+              source,
+              count=1,
+          )
+          assert css_count == 1, f'wallet pulse CSS replacement count={css_count}'
 
           checks = {
-              'READABLE-SOURCE-RECONCILED-FROM-EMBEDDED-RUNTIME': 'analytics-period-entry-state-wallet-pulse-v1' in source,
-              'PULSE-WAITS-FOR-VISIBILITY': "new IntersectionObserver" in source and "e.intersectionRatio>=.6" in source,
+              'READABLE-SOURCE-RECONCILED-FROM-EMBEDDED-RUNTIME': marker in source,
+              'ANALYTICS-CATEGORY-COUNT-USES-SELECTED-PERIOD': "categoryFilterContext==='analytics'?inPeriod(activeOps(),periods.analytics)" in source,
+              'UNFINISHED-CATEGORY-DRAFT-CLEARED': "$('newCategoryInput').value=''" in source,
+              'PULSE-WAITS-FOR-VISIBILITY': 'new IntersectionObserver' in source and 'e.intersectionRatio>=.6' in source,
               'PULSE-USES-FORM-SCROLL-ROOT': "warning.closest('.entry-sheet')" in source,
               'PULSE-RUNS-TWICE': 'animation:walletWarningAttention .55s ease-out 2' in source,
               'PULSE-ONLY-FOR-NONDEFAULT-WALLET': 'warning.hidden=!unusual' in source,
               'PULSE-REARMS-PER-FORM-OPEN': 'warning._attentionObserver?.disconnect()' in source,
               'WARNING-REMAINS-BEFORE-SAVE': source.index('id="entryWalletWarning"') < source.index('id="saveOperationBtn"'),
-              'ANALYTICS-PERIOD-COUNTS-PRESERVED': "categoryFilterContext==='analytics'?inPeriod(activeOps(),periods.analytics)" in source,
-              'CATEGORY-DRAFT-RESET-PRESERVED': "$('newCategoryInput').value=''" in source,
               'CAPITAL-FIRST-PRESERVED': source.index('<section id="homeScreen"') < source.index('<section class="card capital">') < source.index('<section class="card balance">'),
               'THUMB-DOCK-PRESERVED': "const dockVisible=['home','operations'].includes(name)" in source,
+              'CATEGORY-50-PRESERVED': 'CATEGORY_NAME_MAX=50' in source,
               'SCROLL-LOCK-PRESERVED': source.count('function lockBodyNow()') == 1 and source.count('function syncBodyLock()') == 1,
           }
           failed = [k for k,v in checks.items() if not v]
