@@ -97,3 +97,4 @@ jobs:
           git add index.html .nojekyll verification/synchronous-modal-scroll-lock-sha.txt .github/workflows/fix-single-synchronous-modal-scroll-lock.yml
           git commit -m "Use one synchronous modal background scroll lock"
           git push origin HEAD:main
+# trigger
