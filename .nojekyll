@@ -1,4 +1,3 @@
 # FamilyPilot GitHub Pages direct publish trigger
-# Global background scroll lock for all foreground forms
-# Runtime commit: 8573e0c0a3e542ad4a88883d9fdf957388b716fd
-# Trigger: 2026-07-21T02:40:00+02:00
+# Single synchronous modal background scroll lock
+# Build source: 2c501d2e4d9499dad5c563f1a27ed16b1568bbd7
