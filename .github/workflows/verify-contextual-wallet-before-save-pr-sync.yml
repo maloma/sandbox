@@ -1,0 +1,46 @@
+name: Verify contextual wallet warning before Save on PR sync
+
+on:
+  pull_request:
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.event.pull_request.head.ref == 'agent/verify-contextual-wallet-before-save'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser verifier
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Run verifier with durable diagnostics
+        run: |
+          mkdir -p verification
+          set +e
+          node .github/scripts/verify-contextual-wallet-before-save-public.cjs > verification/contextual-wallet-before-save-verification.log 2>&1
+          status=$?
+          echo "VERIFICATION-EXIT-CODE: $status" >> verification/contextual-wallet-before-save-verification.log
+          echo "$status" > /tmp/contextual-wallet-verification-status
+          exit 0
+      - name: Commit verification evidence or diagnostics
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add verification/contextual-wallet-before-save-verification.log
+          if [ -f verification/contextual-wallet-before-save-final-gate.txt ]; then
+            git add verification/contextual-wallet-before-save-final-gate.txt
+          fi
+          git commit -m 'Record contextual wallet public verification result'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+      - name: Enforce verification success
+        run: test "$(cat /tmp/contextual-wallet-verification-status)" = "0"
