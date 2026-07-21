@@ -1,0 +1,33 @@
+name: Verify operation-first FamilyPilot public runtime
+
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-operation-first-public.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser verifier
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Verify public runtime
+        run: node .github/scripts/verify-operation-first-public.cjs
+      - name: Commit final public gate
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add verification/operation-first-app-shell-final-gate.txt
+          git commit -m 'Verify operation-first app shell public runtime'
+          git push
