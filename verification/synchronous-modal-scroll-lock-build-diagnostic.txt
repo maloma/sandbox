@@ -1,0 +1,16 @@
+PAYLOAD: True
+SOURCE-LENGTH: 98787
+OLD-CSS-COUNT: 1
+OLD-FUNCTIONS-COUNT: 1
+BACKGROUND-LOCKED-COUNT: 5
+SYNC-BACKGROUND-COUNT: 3
+FOREGROUND-OBSERVER-COUNT: 2
+DUPLICATE-BLOCK-REGEX-COUNT: 1
+DUPLICATE-BLOCK-LENGTH: 1364
+DUPLICATE-BLOCK-START: "let backgroundScrollLocked=false;\nlet backgroundScrollLockY=0;\nfunction hasOpenForegroundLayer(){return !!document.querySelector('.overlay.open,.modal.open')}\nfunction syncBackgrou"
+html.background-locked,body.background-locked : 1
+document.addEventListener('touchmove' : 1
+function syncBodyLock() : 1
+function open(id) : 1
+function close(id) : 1
+DIAGNOSTIC: COMPLETE
