@@ -1,0 +1,1 @@
+Corrected verifier waits for the modal class to clear rather than waiting for a hidden element to become visible.
