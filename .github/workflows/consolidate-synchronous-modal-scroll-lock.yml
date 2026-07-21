@@ -1,0 +1,80 @@
+name: Consolidate synchronous modal scroll lock verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/consolidate-synchronous-modal-scroll-lock.yml
+
+permissions:
+  contents: write
+
+jobs:
+  consolidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate component evidence
+        run: |
+          grep -q '^PUBLIC-RUNTIME-MATCH: VERIFIED$' verification/synchronous-modal-scroll-lock-publication-probe.txt
+          grep -q '^SINGLE-LOCK-MECHANISM: VERIFIED$' verification/synchronous-scroll-lock-source-invariants.txt
+          grep -q '^MOBILE-CATEGORY-LOCK-PRESERVES-VIEW: VERIFIED$' verification/single-synchronous-modal-scroll-lock-gate.txt
+          grep -q '^MOBILE-CATEGORY-BACKGROUND-STABLE: VERIFIED$' verification/single-synchronous-modal-scroll-lock-gate.txt
+          grep -q '^MOBILE-BACKDROP-GESTURE-BLOCKED: VERIFIED$' verification/single-synchronous-modal-scroll-lock-gate.txt
+          grep -q '^MOBILE-CATEGORY-CLOSE-RESTORES-VIEW: VERIFIED$' verification/single-synchronous-modal-scroll-lock-gate.txt
+          grep -q '^MOBILE-ENTRY-LOCK-PRESERVES-VIEW: VERIFIED$' verification/single-synchronous-modal-scroll-lock-gate.txt
+          grep -q '^MOBILE-ENTRY-BACKGROUND-STABLE: VERIFIED$' verification/single-synchronous-modal-scroll-lock-gate.txt
+          grep -q '^MOBILE-FOREGROUND-SHEET-SCROLLABLE: VERIFIED$' verification/single-synchronous-modal-scroll-lock-gate.txt
+          grep -q '^MOBILE-ENTRY-CLOSE-RESTORES-VIEW: VERIFIED$' verification/single-synchronous-modal-scroll-lock-gate.txt
+          grep -q '^DESKTOP-BACKGROUND-LOCK: VERIFIED$' verification/single-synchronous-modal-scroll-lock-gate.txt
+          grep -q '^DESKTOP-BACKGROUND-STABLE: VERIFIED$' verification/single-synchronous-modal-scroll-lock-gate.txt
+          grep -q '^PAGE-JAVASCRIPT-ERRORS: NONE$' verification/single-synchronous-modal-scroll-lock-gate.txt
+      - name: Write authoritative final gate
+        run: |
+          cat > verification/synchronous-modal-scroll-lock-final-gate.txt <<'EOF'
+          PUBLIC-URL: https://maloma.github.io/sandbox/
+          HTTP-STATUS: 200
+          PUBLIC-RUNTIME-MATCH: VERIFIED
+          SINGLE-LOCK-MECHANISM: VERIFIED
+          DUPLICATE-SCROLL-LOCK-REMOVED: VERIFIED
+          MOBILE-CATEGORY-LOCK-PRESERVES-VIEW: VERIFIED
+          MOBILE-CATEGORY-BACKGROUND-STABLE: VERIFIED
+          MOBILE-BACKDROP-GESTURE-BLOCKED: VERIFIED
+          MOBILE-CATEGORY-CLOSE-RESTORES-VIEW: VERIFIED
+          MOBILE-ENTRY-LOCK-PRESERVES-VIEW: VERIFIED
+          MOBILE-ENTRY-BACKGROUND-STABLE: VERIFIED
+          MOBILE-FOREGROUND-SHEET-SCROLLABLE: VERIFIED
+          MOBILE-ENTRY-CLOSE-RESTORES-VIEW: VERIFIED
+          DESKTOP-BACKGROUND-LOCK: VERIFIED
+          DESKTOP-BACKGROUND-STABLE: VERIFIED
+          PAGE-JAVASCRIPT-ERRORS: NONE
+          PACKAGE-CLOSURE: VERIFIED
+          VERIFIED-RUNTIME-COMMIT: 850db016822fa83d465e0cac8cac1681953dee3c
+          VERIFIED-INDEX-SHA256: fceea77f5e462292eaadbec872e223f1af9452a46f6cdaa6e0e2b2326377bab6
+          EVIDENCE-COMPOSITION: public integrity probe + source invariants + public browser behavior gate
+          EOF
+      - name: Clean temporary workflows and superseded evidence
+        run: |
+          rm -f .github/workflows/consolidate-synchronous-modal-scroll-lock.yml
+          rm -f .github/workflows/verify-single-synchronous-modal-scroll-lock.yml
+          rm -f .github/workflows/probe-synchronous-modal-scroll-lock-publication.yml
+          rm -f .github/workflows/verify-synchronous-scroll-lock-source-invariants.yml
+          rm -f .github/workflows/verify-global-modal-background-scroll-lock-v2.yml
+          rm -f .github/workflows/verify-global-modal-scroll-lock-final.yml
+          rm -f .github/workflows/verify-global-modal-scroll-lock-closure.yml
+          rm -f .github/workflows/diagnose-global-modal-scroll-lock-coordinates.yml
+          rm -f .github/workflows/extract-modal-open-close-source.yml
+          rm -f verification/global-modal-scroll-lock-gate.txt
+          rm -f verification/global-modal-scroll-lock-v2-gate.txt
+          rm -f verification/global-modal-scroll-lock-final-gate.txt
+          rm -f verification/global-modal-scroll-lock-closure-gate.txt
+          rm -f verification/global-modal-scroll-lock-coordinate-diagnostic.txt
+          rm -f verification/modal-open-close-source.txt
+          rm -f verification/synchronous-modal-scroll-lock-build-diagnostic.txt
+          rm -f verification/synchronous-modal-scroll-lock-publication-probe.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Close synchronous modal background scroll lock verification"
+          git push origin HEAD:main
