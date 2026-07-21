@@ -1,0 +1,31 @@
+name: Run operation-first FamilyPilot app shell patch
+
+on:
+  push:
+    paths:
+      - '.github/workflows/run-operation-first-app-shell.yml'
+      - '.github/scripts/operation-first-app-shell.cjs'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply patch
+        run: |
+          node .github/scripts/operation-first-app-shell.cjs
+          node --check /tmp/familypilot-runtime.js
+      - name: Commit package
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html src/familypilot.html verification/operation-first-app-shell-source-gate.txt verification/operation-first-app-shell-sha.txt
+          git commit -m 'Implement operation-first app shell and safe category names'
+          git push
