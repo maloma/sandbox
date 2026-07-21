@@ -1,30 +1,26 @@
-name: Apply operation-first FamilyPilot package
+name: Verify GitHub Actions execution
 
 on:
   push:
     paths:
       - '.github/workflows/extract-current-familypilot-source.yml'
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  implement:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Apply operation-first package
+      - name: Write probe
         run: |
-          node .github/scripts/operation-first-app-shell.cjs
-          node --check /tmp/familypilot-runtime.js
-      - name: Commit package
+          mkdir -p verification
+          echo 'ACTIONS-EXECUTION: VERIFIED' > verification/actions-execution-probe.txt
+      - name: Commit probe
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add index.html src/familypilot.html verification/operation-first-app-shell-source-gate.txt verification/operation-first-app-shell-sha.txt
-          git commit -m 'Implement operation-first app shell and safe category names'
+          git add verification/actions-execution-probe.txt
+          git commit -m 'Verify GitHub Actions execution' || exit 0
           git push
