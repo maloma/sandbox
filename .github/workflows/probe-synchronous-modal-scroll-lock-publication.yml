@@ -18,7 +18,7 @@ jobs:
       - name: Probe public SHA
         run: |
           mkdir -p verification
-          status=$(curl -L -sS -o /tmp/public.html -w '%{http_code}' "https://maloma.github.io/sandbox/?sync-probe=$(date +%s)" || true)
+          status=$(curl -L -sS -o /tmp/public.html -w '%{http_code}' "https://maloma.github.io/sandbox/?sync-probe-2=$(date +%s)" || true)
           actual=$(sha256sum /tmp/public.html 2>/dev/null | awk '{print $1}')
           expected=fceea77f5e462292eaadbec872e223f1af9452a46f6cdaa6e0e2b2326377bab6
           result=FAILED
@@ -36,3 +36,4 @@ jobs:
           git add verification/synchronous-modal-scroll-lock-publication-probe.txt
           git commit -m "Record synchronous modal scroll lock publication probe [skip ci]"
           git push origin HEAD:main
+# probe 2
