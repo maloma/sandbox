@@ -1,0 +1,98 @@
+name: Verify published global modal scroll lock
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/verify-global-modal-scroll-lock-final.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+      - name: Wait for final public runtime
+        run: |
+          expected=d4aab98cb5271bd7f7cfb9faced1cfe3c61644e10f1fe55d6687d636fdbc722b
+          for i in $(seq 1 60); do
+            status=$(curl -L -sS -o /tmp/public.html -w '%{http_code}' "https://maloma.github.io/sandbox/?final-scroll-lock=$i&ts=$(date +%s)" || true)
+            actual=$(sha256sum /tmp/public.html 2>/dev/null | awk '{print $1}')
+            [ "$status" = "200" ] && [ "$actual" = "$expected" ] && break
+            sleep 5
+          done
+          echo "HTTP_STATUS=$status" >> "$GITHUB_ENV"
+          echo "ACTUAL_SHA=$actual" >> "$GITHUB_ENV"
+          echo "EXPECTED_SHA=$expected" >> "$GITHUB_ENV"
+      - run: npm install --no-save playwright-core@1.53.2
+      - name: Verify background lock
+        run: |
+          mkdir -p verification
+          node <<'NODE'
+          const fs=require('fs');
+          const {chromium}=require('playwright-core');
+          const g={
+            'PUBLIC-URL':'https://maloma.github.io/sandbox/',
+            'HTTP-STATUS':process.env.HTTP_STATUS||'0',
+            'PUBLIC-RUNTIME-MATCH':process.env.ACTUAL_SHA===process.env.EXPECTED_SHA?'VERIFIED':'FAILED',
+            'MOBILE-CATEGORY-BACKGROUND-LOCK':'FAILED',
+            'MOBILE-BACKGROUND-STABLE-DURING-GESTURE':'FAILED',
+            'MOBILE-SCROLL-POSITION-RESTORED':'FAILED',
+            'MOBILE-ENTRY-BACKGROUND-LOCK':'FAILED',
+            'MOBILE-FOREGROUND-SHEET-SCROLL':'FAILED',
+            'DESKTOP-BACKGROUND-LOCK':'FAILED',
+            'PAGE-JAVASCRIPT-ERRORS':'FAILED',
+            'PACKAGE-CLOSURE':'FAILED',
+            'VERIFIED-RUNTIME-COMMIT':'8573e0c0a3e542ad4a88883d9fdf957388b716fd'
+          };
+          const set=(k,v)=>g[k]=v?'VERIFIED':'FAILED';
+          (async()=>{let browser;const errors=[];try{
+            const executablePath=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'].find(fs.existsSync);
+            browser=await chromium.launch({headless:true,executablePath,args:['--no-sandbox']});
+            const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+            const p=await mobile.newPage();p.on('pageerror',e=>errors.push(e.message));
+            await p.goto('https://maloma.github.io/sandbox/?test=1&final-scroll-lock=1',{waitUntil:'domcontentloaded',timeout:60000});
+            await p.waitForFunction(()=>window.__FP_TEST__?.getState().schemaVersion===2,{timeout:30000});
+            await p.evaluate(()=>{document.body.style.minHeight='2800px';window.scrollTo(0,480)});
+            const initial=await p.evaluate(()=>window.scrollY);
+            await p.locator('[data-screen="operations"]').click();await p.locator('#filterToggleBtn').click();await p.locator('#categoryFilterBtn').click();
+            await p.waitForFunction(()=>document.body.classList.contains('background-locked'));
+            const lock=await p.evaluate(()=>({position:getComputedStyle(document.body).position,top:document.body.style.top,y:document.querySelector('.app').getBoundingClientRect().y}));
+            set('MOBILE-CATEGORY-BACKGROUND-LOCK',lock.position==='fixed'&&lock.top===`-${initial}px`);
+            await p.mouse.move(385,430);await p.mouse.wheel(0,1000);await p.waitForTimeout(120);
+            set('MOBILE-BACKGROUND-STABLE-DURING-GESTURE',Math.abs((await p.evaluate(()=>document.querySelector('.app').getBoundingClientRect().y))-lock.y)<1);
+            await p.locator('[data-close="categoryFilterModal"]').click();await p.waitForFunction(()=>!document.body.classList.contains('background-locked'));
+            set('MOBILE-SCROLL-POSITION-RESTORED',Math.abs((await p.evaluate(()=>window.scrollY))-initial)<2);
+            await p.locator('[data-screen="home"]').click();await p.locator('[data-open-entry="expense"]').click();await p.waitForFunction(()=>document.body.classList.contains('background-locked'));
+            set('MOBILE-ENTRY-BACKGROUND-LOCK',await p.evaluate(()=>getComputedStyle(document.body).position==='fixed'));
+            set('MOBILE-FOREGROUND-SHEET-SCROLL',await p.evaluate(()=>{const s=document.querySelector('#entryModal .sheet');const a=s.scrollTop;s.scrollTop=a+100;return s.scrollTop>a||s.scrollHeight<=s.clientHeight}));
+            await mobile.close();
+            const desktop=await browser.newContext({viewport:{width:1720,height:966}});const d=await desktop.newPage();d.on('pageerror',e=>errors.push(e.message));
+            await d.goto('https://maloma.github.io/sandbox/?test=1&final-scroll-lock-desktop=1',{waitUntil:'domcontentloaded',timeout:60000});await d.waitForFunction(()=>window.__FP_TEST__?.getState().schemaVersion===2);
+            await d.locator('[data-screen="operations"]').click();await d.locator('#filterToggleBtn').click();await d.locator('#categoryFilterBtn').click();await d.waitForFunction(()=>document.body.classList.contains('background-locked'));
+            set('DESKTOP-BACKGROUND-LOCK',await d.evaluate(()=>getComputedStyle(document.body).position==='fixed'));
+            await desktop.close();g['PAGE-JAVASCRIPT-ERRORS']=errors.length?`FAILED: ${errors.join(' | ')}`:'NONE';
+          }catch(e){g['BROWSER-ERROR']=e.stack||e.message;g['PAGE-JAVASCRIPT-ERRORS']=errors.length?`FAILED: ${errors.join(' | ')}`:'FAILED'}finally{
+            if(browser)await browser.close();const req=['PUBLIC-RUNTIME-MATCH','MOBILE-CATEGORY-BACKGROUND-LOCK','MOBILE-BACKGROUND-STABLE-DURING-GESTURE','MOBILE-SCROLL-POSITION-RESTORED','MOBILE-ENTRY-BACKGROUND-LOCK','MOBILE-FOREGROUND-SHEET-SCROLL','DESKTOP-BACKGROUND-LOCK'];
+            g['PACKAGE-CLOSURE']=req.every(k=>g[k]==='VERIFIED')&&g['PAGE-JAVASCRIPT-ERRORS']==='NONE'?'VERIFIED':'FAILED';
+            fs.writeFileSync('verification/global-modal-scroll-lock-final-gate.txt',Object.entries(g).map(([k,v])=>`${k}: ${v}`).join('\n')+'\n');
+          }})();
+          NODE
+          cat verification/global-modal-scroll-lock-final-gate.txt
+      - name: Record final gate
+        if: always()
+        run: |
+          cp verification/global-modal-scroll-lock-final-gate.txt /tmp/gate.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          mkdir -p verification
+          cp /tmp/gate.txt verification/global-modal-scroll-lock-final-gate.txt
+          git add verification/global-modal-scroll-lock-final-gate.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "Record final global modal scroll lock gate [skip ci]"
+          git push origin HEAD:main
