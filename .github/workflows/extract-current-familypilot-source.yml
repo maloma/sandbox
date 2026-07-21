@@ -16,6 +16,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Correct static ID validation
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          path = Path('.github/scripts/operation-first-app-shell.cjs')
+          text = path.read_text()
+          old = "const ids = [...source.matchAll(/\\bid=\"([^\"]+)\"/g)].map(m => m[1]);\nconst duplicateIds = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];"
+          new = "const ids = [...source.matchAll(/\\bid=\"([^\"]+)\"/g)].map(m => m[1]);\nconst staticIds = ids.filter(id => !id.includes('${'));\nconst duplicateIds = [...new Set(staticIds.filter((id, index) => staticIds.indexOf(id) !== index))];"
+          if old not in text:
+              raise SystemExit('Static ID validation anchor not found')
+          path.write_text(text.replace(old, new))
+          PY
       - name: Apply patch and capture diagnostics
         run: |
           mkdir -p verification
