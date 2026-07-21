@@ -1,0 +1,99 @@
+name: Unify modal scroll lock into one synchronous mechanism
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/fix-single-synchronous-modal-scroll-lock.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+      - name: Decode and correct runtime
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re,base64,gzip
+
+          wrapper=Path('index.html').read_text(encoding='utf-8')
+          m=re.search(r'const b="([A-Za-z0-9+/=]+)"',wrapper)
+          if not m: raise SystemExit('runtime payload not found')
+          s=gzip.decompress(base64.b64decode(m.group(1))).decode('utf-8')
+
+          old_css="html.modal-open,body.modal-open{overflow:hidden;overscroll-behavior:none}body.modal-open{position:fixed;width:100%}"
+          new_css="html.modal-open,body.modal-open{overflow:hidden!important;overscroll-behavior:none!important}body.modal-open{position:fixed!important;left:0!important;right:0!important;width:100%!important;touch-action:none!important}.overlay.open,.modal.open{overscroll-behavior:none!important;touch-action:none}.overlay.open .panel,.modal.open .sheet{overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch}"
+          if old_css not in s: raise SystemExit('canonical modal lock css marker missing')
+          s=s.replace(old_css,new_css,1)
+
+          duplicate_css='''
+          html.background-locked,body.background-locked{overflow:hidden!important;overscroll-behavior:none!important}
+          body.background-locked{position:fixed!important;left:0!important;right:0!important;width:100%!important;touch-action:none!important}
+          .overlay.open,.modal.open{overscroll-behavior:none!important;touch-action:none}
+          .overlay.open .panel,.modal.open .sheet{overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+          '''
+          if duplicate_css in s:s=s.replace(duplicate_css,'',1)
+
+          old_functions="function syncBodyLock(){const locked=!!document.querySelector('.overlay.open,.modal.open');if(locked&&!document.body.classList.contains('modal-open')){bodyLockY=window.scrollY;document.documentElement.classList.add('modal-open');document.body.classList.add('modal-open');document.body.style.top=`-${bodyLockY}px`}else if(!locked&&document.body.classList.contains('modal-open')){document.documentElement.classList.remove('modal-open');document.body.classList.remove('modal-open');document.body.style.top='';window.scrollTo(0,bodyLockY)}}\nfunction open(id){$(id).classList.add('open');queueMicrotask(syncBodyLock)}\nfunction close(id){$(id).classList.remove('open');queueMicrotask(syncBodyLock)}"
+          new_functions="function lockBodyNow(){if(document.body.classList.contains('modal-open'))return;bodyLockY=window.scrollY||document.documentElement.scrollTop||0;document.body.style.top=`-${bodyLockY}px`;document.documentElement.classList.add('modal-open');document.body.classList.add('modal-open')}\nfunction syncBodyLock(){const locked=!!document.querySelector('.overlay.open,.modal.open');if(locked){lockBodyNow()}else if(document.body.classList.contains('modal-open')){const restoreY=bodyLockY;document.documentElement.classList.remove('modal-open');document.body.classList.remove('modal-open');document.body.style.top='';window.scrollTo(0,restoreY);requestAnimationFrame(()=>window.scrollTo(0,restoreY));setTimeout(()=>window.scrollTo(0,restoreY),80)}}\nfunction open(id){if(!document.querySelector('.overlay.open,.modal.open'))lockBodyNow();$(id).classList.add('open')}\nfunction close(id){$(id).classList.remove('open');queueMicrotask(syncBodyLock)}"
+          if old_functions not in s: raise SystemExit('modal open close function marker missing')
+          s=s.replace(old_functions,new_functions,1)
+
+          pattern=r"\n          let backgroundScrollLocked=false;.*?\n          syncBackgroundScrollLock\(\);\n          "
+          s,n=re.subn(pattern,'\n',s,count=1,flags=re.S)
+          if n!=1: raise SystemExit(f'duplicate lock block count {n}')
+
+          backdrop_js="""
+          document.addEventListener('touchmove',event=>{const layer=event.target.closest?.('.overlay.open,.modal.open');if(layer&&event.target===layer)event.preventDefault()},{passive:false,capture:true});
+          """
+          marker="document.addEventListener('click',e=>{"
+          if marker not in s: raise SystemExit('click handler marker missing')
+          s=s.replace(marker,backdrop_js+marker,1)
+
+          Path('/tmp/runtime-source.html').write_text(s,encoding='utf-8')
+          PY
+      - name: Validate source and JavaScript
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('/tmp/runtime-source.html').read_text(encoding='utf-8')
+          required=['function lockBodyNow()','requestAnimationFrame(()=>window.scrollTo(0,restoreY))','function open(id){if(!document.querySelector','body.modal-open{position:fixed!important','touch-action:pan-y']
+          forbidden=['backgroundScrollLocked','background-locked','syncBackgroundScrollLock','foregroundLayerObserver']
+          for marker in required:
+            if marker not in s: raise SystemExit(f'missing {marker}')
+          for marker in forbidden:
+            if marker in s: raise SystemExit(f'forbidden duplicate remains: {marker}')
+          scripts=re.findall(r'<script>(.*?)</script>',s,re.S)
+          Path('/tmp/runtime.js').write_text(scripts[-1],encoding='utf-8')
+          PY
+          node --check /tmp/runtime.js
+      - name: Build deterministic runtime
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import gzip,base64,hashlib
+          html=Path('/tmp/runtime-source.html').read_bytes()
+          payload=base64.b64encode(gzip.compress(html,compresslevel=9,mtime=0)).decode('ascii')
+          wrapper=f'''<!doctype html>
+          <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta http-equiv="cache-control" content="no-store"><meta name="theme-color" content="#071824"><title>FamilyPilot</title><style>html,body{{margin:0;min-height:100%;background:#071824}}</style></head><body><script>
+          (async()=>{{const b="{payload}",a=Uint8Array.from(atob(b),c=>c.charCodeAt(0)),s=new Blob([a]).stream().pipeThrough(new DecompressionStream('gzip')),h=await new Response(s).text();document.open();document.write(h);document.close()}})().catch(e=>{{document.body.textContent='Ошибка загрузки FamilyPilot';console.error(e)}});
+          </script></body></html>'''
+          wrapper='\n'.join(line.strip() for line in wrapper.splitlines())
+          Path('index.html').write_text(wrapper,encoding='utf-8')
+          Path('verification/synchronous-modal-scroll-lock-sha.txt').write_text(f'SOURCE-SHA256: {hashlib.sha256(html).hexdigest()}\nINDEX-SHA256: {hashlib.sha256(wrapper.encode()).hexdigest()}\n',encoding='utf-8')
+          Path('.nojekyll').write_text('# FamilyPilot GitHub Pages direct publish trigger\n# Single synchronous modal background scroll lock\n# Build source: '+__import__('os').environ.get('GITHUB_SHA','unknown')+'\n',encoding='utf-8')
+          PY
+      - name: Commit runtime and clean workflow
+        run: |
+          rm -f .github/workflows/fix-single-synchronous-modal-scroll-lock.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html .nojekyll verification/synchronous-modal-scroll-lock-sha.txt .github/workflows/fix-single-synchronous-modal-scroll-lock.yml
+          git commit -m "Use one synchronous modal background scroll lock"
+          git push origin HEAD:main
