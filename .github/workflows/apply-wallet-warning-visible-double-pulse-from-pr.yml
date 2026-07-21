@@ -1,0 +1,96 @@
+name: Apply visibility-aware wallet warning pulse from PR
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    if: github.event.pull_request.head.ref == 'agent/wallet-warning-visible-double-pulse'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Trigger wallet warning only when visible
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re, gzip, base64, hashlib
+
+          source_path = Path('src/familypilot.html')
+          source = source_path.read_text()
+          assert 'analytics-period-entry-state-wallet-pulse-v1' in source
+          assert 'wallet-warning-visible-double-pulse-v1' not in source
+
+          source = source.replace(
+              '<meta name="familypilot-correction" content="analytics-period-entry-state-wallet-pulse-v1">',
+              '<meta name="familypilot-correction" content="analytics-period-entry-state-wallet-pulse-v1">\n<meta name="familypilot-correction" content="wallet-warning-visible-double-pulse-v1">',
+              1,
+          )
+
+          old_warning = "function renderEntryWalletWarning(w){const primary=defaultWallet(),warning=$('entryWalletWarning'),unusual=!!w&&!!primary&&w.id!==primary.id;warning.hidden=!unusual;warning.classList.remove('wallet-attention');if(unusual){$('entryWalletWarningName').textContent=w.name;requestAnimationFrame(()=>{warning.classList.add('wallet-attention');setTimeout(()=>warning.classList.remove('wallet-attention'),900)})}}"
+          new_warning = "function renderEntryWalletWarning(w){const primary=defaultWallet(),warning=$('entryWalletWarning'),unusual=!!w&&!!primary&&w.id!==primary.id;warning._attentionObserver?.disconnect();warning._attentionObserver=null;warning.hidden=!unusual;warning.classList.remove('wallet-attention');if(unusual){$('entryWalletWarningName').textContent=w.name;requestAnimationFrame(()=>{const root=warning.closest('.entry-sheet'),observer=new IntersectionObserver(entries=>{if(!entries.some(e=>e.isIntersecting&&e.intersectionRatio>=.6))return;observer.disconnect();warning._attentionObserver=null;warning.classList.remove('wallet-attention');void warning.offsetWidth;warning.classList.add('wallet-attention');setTimeout(()=>warning.classList.remove('wallet-attention'),1500)},{root,threshold:[.6]});warning._attentionObserver=observer;observer.observe(warning)})}}"
+          assert source.count(old_warning) == 1
+          source = source.replace(old_warning, new_warning, 1)
+
+          old_css = ".entry-wallet-warning.wallet-attention{animation:walletWarningAttention .72s ease-out 1}"
+          new_css = ".entry-wallet-warning.wallet-attention{animation:walletWarningAttention .55s ease-out 2}"
+          assert source.count(old_css) == 1
+          source = source.replace(old_css, new_css, 1)
+
+          checks = {
+              'PULSE-WAITS-FOR-VISIBILITY': "new IntersectionObserver" in source and "e.intersectionRatio>=.6" in source,
+              'PULSE-USES-FORM-SCROLL-ROOT': "warning.closest('.entry-sheet')" in source,
+              'PULSE-RUNS-TWICE': 'animation:walletWarningAttention .55s ease-out 2' in source,
+              'PULSE-ONLY-FOR-NONDEFAULT-WALLET': 'warning.hidden=!unusual' in source,
+              'PULSE-REARMS-PER-FORM-OPEN': 'warning._attentionObserver?.disconnect()' in source,
+              'WARNING-REMAINS-BEFORE-SAVE': source.index('id="entryWalletWarning"') < source.index('id="saveOperationBtn"'),
+              'ANALYTICS-PERIOD-COUNTS-PRESERVED': "categoryFilterContext==='analytics'?inPeriod(activeOps(),periods.analytics)" in source,
+              'CATEGORY-DRAFT-RESET-PRESERVED': "$('newCategoryInput').value=''" in source,
+              'CAPITAL-FIRST-PRESERVED': source.index('<section id="homeScreen"') < source.index('<section class="card capital">') < source.index('<section class="card balance">'),
+              'THUMB-DOCK-PRESERVED': "const dockVisible=['home','operations'].includes(name)" in source,
+              'SCROLL-LOCK-PRESERVED': source.count('function lockBodyNow()') == 1 and source.count('function syncBodyLock()') == 1,
+          }
+          failed = [k for k,v in checks.items() if not v]
+          assert not failed, 'failed gates: ' + ', '.join(failed)
+
+          script_match = re.search(r'<script>\s*([\s\S]*?)</script>', source)
+          assert script_match
+          Path('/tmp/familypilot-runtime.js').write_text(script_match.group(1))
+
+          index_path = Path('index.html')
+          index = index_path.read_text()
+          payload = base64.b64encode(gzip.compress(source.encode(), compresslevel=9, mtime=0)).decode()
+          index, count = re.subn(r'const b="[A-Za-z0-9+/=]+"', f'const b="{payload}"', index, count=1)
+          assert count == 1
+          source_path.write_text(source)
+          index_path.write_text(index)
+
+          sha = lambda v: hashlib.sha256(v.encode()).hexdigest()
+          Path('verification/wallet-warning-visible-double-pulse-source-gate.txt').write_text('\n'.join([
+              'FamilyPilot wallet warning visible double pulse source gate',
+              *[f'{k}: VERIFIED' for k in checks],
+              f'SOURCE-SHA256: {sha(source)}',
+              f'INDEX-SHA256: {sha(index)}',
+              'PACKAGE-CLOSURE: SOURCE-VERIFIED',
+              '',
+          ]))
+          Path('verification/wallet-warning-visible-double-pulse-sha.txt').write_text(
+              f'SOURCE-SHA256: {sha(source)}\nINDEX-SHA256: {sha(index)}\n'
+          )
+          PY
+          node --check /tmp/familypilot-runtime.js
+      - name: Commit correction to PR branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/familypilot.html index.html verification/wallet-warning-visible-double-pulse-source-gate.txt verification/wallet-warning-visible-double-pulse-sha.txt
+          git commit -m 'Trigger wallet warning pulse when it becomes visible'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
