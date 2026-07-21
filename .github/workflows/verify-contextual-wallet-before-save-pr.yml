@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   verify:
-    if: github.event.pull_request.head.ref == 'agent/verify-contextual-wallet-before-save'
+    if: startsWith(github.event.pull_request.head.ref, 'agent/verify-contextual-wallet-before-save')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
