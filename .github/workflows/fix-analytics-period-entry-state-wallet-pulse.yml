@@ -109,3 +109,5 @@ jobs:
           git add src/familypilot.html index.html verification/analytics-period-entry-state-wallet-pulse-source-gate.txt verification/analytics-period-entry-state-wallet-pulse-sha.txt
           git commit -m 'Fix period-aware category counts and operation entry state'
           git push
+
+# trigger: 2026-07-22T00:00:00+02:00
