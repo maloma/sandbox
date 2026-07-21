@@ -25,7 +25,11 @@ jobs:
           import re, gzip, base64, hashlib
 
           source_path = Path('src/familypilot.html')
-          source = source_path.read_text()
+          index_path = Path('index.html')
+          index = index_path.read_text()
+          embedded = re.search(r'const b="([A-Za-z0-9+/=]+)"', index)
+          assert embedded, 'embedded runtime not found'
+          source = gzip.decompress(base64.b64decode(embedded.group(1))).decode()
           assert 'analytics-period-entry-state-wallet-pulse-v1' in source
           assert 'wallet-warning-visible-double-pulse-v1' not in source
 
@@ -46,6 +50,7 @@ jobs:
           source = source.replace(old_css, new_css, 1)
 
           checks = {
+              'READABLE-SOURCE-RECONCILED-FROM-EMBEDDED-RUNTIME': 'analytics-period-entry-state-wallet-pulse-v1' in source,
               'PULSE-WAITS-FOR-VISIBILITY': "new IntersectionObserver" in source and "e.intersectionRatio>=.6" in source,
               'PULSE-USES-FORM-SCROLL-ROOT': "warning.closest('.entry-sheet')" in source,
               'PULSE-RUNS-TWICE': 'animation:walletWarningAttention .55s ease-out 2' in source,
@@ -65,8 +70,6 @@ jobs:
           assert script_match
           Path('/tmp/familypilot-runtime.js').write_text(script_match.group(1))
 
-          index_path = Path('index.html')
-          index = index_path.read_text()
           payload = base64.b64encode(gzip.compress(source.encode(), compresslevel=9, mtime=0)).decode()
           index, count = re.subn(r'const b="[A-Za-z0-9+/=]+"', f'const b="{payload}"', index, count=1)
           assert count == 1
