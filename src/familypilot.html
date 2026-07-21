@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#071824">
 <title>FamilyPilot</title>
 <meta name="familypilot-package" content="operation-first-app-shell-v1">
+<meta name="familypilot-correction" content="capital-first-thumb-actions-v1">
 <style>
 :root{color-scheme:light;--bg:#f4f7fb;--card:#fff;--card2:#f8fbfd;--ink:#10213b;--muted:#728197;--line:#e2e9f0;--green:#10a958;--green2:#078842;--red:#f03842;--red2:#ce202e;--blue:#3978d8;--purple:#7556d8;--shadow:0 8px 24px rgba(31,50,82,.08);--nav:62px;--dock:82px}
 :root[data-theme=dark],body[data-theme=dark]{color-scheme:dark;--bg:#071824;--card:#102532;--card2:#0c202c;--ink:#f4f8fb;--muted:#a6b5c0;--line:#263b47;--green:#28bd70;--green2:#118a4d;--red:#ff4b55;--red2:#ca2630;--blue:#5896ef;--purple:#9b7af2;--shadow:0 9px 26px rgba(0,0,0,.28)}
@@ -83,23 +84,22 @@ main{padding-top:10px}
 #categoryManager .category-item-head{min-width:0;overflow:hidden}
 @media(max-width:380px){#moreScreen .config-row{grid-template-columns:1fr;gap:7px}#moreScreen .settings-select{max-width:none}.home-actions .action{padding-left:9px;padding-right:9px}}
 
+
+/* capital-first-thumb-actions-v1 */
+.action-dock{padding:12px 12px 14px}
+#homeScreen>.capital:first-child{margin-top:0}
+#homeScreen>.wallet-notice{margin:0 0 10px}
+
 </style>
 </head>
 <body>
-<div class="app">
+<div class="app has-action-dock">
 <main>
 <section id="homeScreen" class="screen active">
-<section class="home-primary-actions" aria-label="Добавить операцию">
-  <div class="home-action-label">Добавить операцию</div>
-  <div class="actions home-actions">
-    <button class="action income" data-open-entry="income"><span class="sign">＋</span><span><strong>Приход</strong><small>Добавить доход</small></span></button>
-    <button class="action expense" data-open-entry="expense"><span class="sign">−</span><span><strong>Расход</strong><small>Добавить расход</small></span></button>
-  </div>
-  <button id="nonDefaultWalletNotice" class="wallet-notice" type="button" hidden>
-    <span class="wallet-dot"></span><span><small>Операции будут добавляться в</small><strong id="homeWalletNoticeName"></strong></span><i>Изменить ›</i>
-  </button>
-</section>
 <section class="card capital"><div class="capital-head"><div><h2>Капитал · <span style="color:var(--muted)">включённые кошельки</span></h2><div id="capitalValue" class="capital-value">0 €</div><div id="capitalChange" class="capital-change">0 €</div></div><button id="capitalInfoBtn" class="info">i</button></div><svg class="spark" viewBox="0 0 360 50"><path d="M4 39 L95 31 L184 35 L271 21 L356 9" fill="none" stroke="var(--green)" stroke-width="3" stroke-linecap="round"/><circle cx="356" cy="9" r="4" fill="var(--card)" stroke="var(--green)" stroke-width="3"/></svg><div class="dates"><span id="capitalStartDate"></span><span id="capitalEndDate"></span></div></section>
+<button id="nonDefaultWalletNotice" class="wallet-notice" type="button" hidden>
+  <span class="wallet-dot"></span><span><small>Операции будут добавляться в</small><strong id="homeWalletNoticeName"></strong></span><i>Изменить ›</i>
+</button>
 <section class="card balance"><div class="balance-head"><h2>Финансовый баланс</h2><button id="analyticsBtn" class="analytics-link">Аналитика ›</button></div><div id="homeRange" class="range"></div><div class="period-nav"><button data-prev="home">‹</button><button class="period-label" data-label="home"></button><button data-next="home">›</button></div><div class="metrics"><div class="metric" data-open-ops="expense"><span>Расход</span><strong id="homeExpense" class="negative">0 €</strong></div><div class="metric" data-open-ops="all"><span>Разница</span><strong id="homeDiff">0 €</strong></div><div class="metric" data-open-ops="income"><span>Приход</span><strong id="homeIncome" class="positive">0 €</strong></div></div></section>
 <div class="debts"><button class="debt"><b>Мне должны</b><strong class="positive">180 €</strong></button><button class="debt"><b>Я верну</b><strong class="negative">420 €</strong></button></div>
 <section class="card section"><div class="section-head"><h2>Самые затратные категории</h2><button id="categoriesAllBtn" class="link">Все</button></div><div id="topCategories"></div></section>
@@ -133,7 +133,7 @@ main{padding-top:10px}
   <section class="card section"><button id="resetBtn" class="btn danger" style="width:100%">Восстановить демоданные</button></section>
 </section>
 </main>
-<div id="actionDock" class="action-dock hidden"><div class="actions"><button class="action income" data-open-entry="income"><span class="sign">＋</span><span><strong>Приход</strong><small>Добавить доход</small></span></button><button class="action expense" data-open-entry="expense"><span class="sign">−</span><span><strong>Расход</strong><small>Добавить расход</small></span></button></div></div>
+<div id="actionDock" class="action-dock"><div class="actions"><button class="action income" data-open-entry="income"><span class="sign">＋</span><span><strong>Приход</strong><small>Добавить доход</small></span></button><button class="action expense" data-open-entry="expense"><span class="sign">−</span><span><strong>Расход</strong><small>Добавить расход</small></span></button></div></div>
 <nav class="bottom"><button class="nav active" data-screen="home"><i>⌂</i>Главная</button><button class="nav" data-screen="operations"><i>☷</i>Операции</button><button class="nav" data-screen="plans"><i>▣</i>План</button><button class="nav" data-screen="more"><i>⊞</i>Ещё</button></nav>
 </div>
 <div id="picker" class="overlay"><div class="panel"><div class="panel-head"><h2 id="pickerTitle">Выберите период</h2><button class="close" data-close="picker">Закрыть</button></div><input id="pickerInput" class="input" style="margin-top:12px"><div class="panel-actions"><button id="pickerCurrent" class="btn secondary">Текущий</button><button id="pickerApply" class="btn primary">Применить</button></div></div></div>
@@ -215,7 +215,7 @@ function applyTheme(){const preference=themePreference(),resolved=preference==='
 function renderWalletContext(){const current=wallet(state.activeWalletId),primary=state.wallets.find(w=>w.type==='household_default'&&!w.archivedAt)||state.wallets.find(w=>!w.archivedAt),notice=$('nonDefaultWalletNotice');const unusual=!!current&&!!primary&&current.id!==primary.id;notice.hidden=!unusual;if(unusual)$('homeWalletNoticeName').textContent=current.name}
 function renderMore(){let available=state.wallets.filter(w=>!w.archivedAt&&(!Array.isArray(w.allowedMemberIds)||w.allowedMemberIds.includes(state.currentMemberId)));if(!available.length)available=state.wallets.filter(w=>!w.archivedAt);if(available.length&&!available.some(w=>w.id===state.activeWalletId))state.activeWalletId=available[0].id;$('walletSelect').innerHTML=available.map(w=>`<option value="${esc(w.id)}"${w.id===state.activeWalletId?' selected':''}>${esc(w.name)} · ${esc(w.nativeCurrency)}</option>`).join('');$('themeSelect').value=themePreference();$('actorSelect').innerHTML=MEMBERS.map(m=>`<option value="${m.id}"${m.id===state.currentMemberId?' selected':''}>${m.name}</option>`).join('');$('trashFlagBtn').classList.toggle('on',state.config.trashRetentionEnabled);$('walletContracts').textContent=state.wallets.map(w=>{const rows=[w.name,`тип = ${w.type}`,`валюта = ${w.nativeCurrency}`,`в семейном капитале = ${w.includedInHouseholdCapital?'да':'нет'}`];if(w.ownerMemberId)rows.push(`владелец = ${memberName(w.ownerMemberId)}`);return rows.join(String.fromCharCode(10))}).join(String.fromCharCode(10,10))}
 function renderAll(){purgeExpiredTrash();applyTheme();renderPeriods();renderCapital();renderHome();renderOperations();renderAnalytics();renderMore();renderWalletContext();save()}
-function showScreen(name){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));$(name+'Screen').classList.add('active');document.querySelectorAll('nav [data-screen]').forEach(b=>b.classList.toggle('active',b.dataset.screen===name));const dockVisible=name==='operations';$('actionDock').classList.toggle('hidden',!dockVisible);document.querySelector('.app').classList.toggle('has-action-dock',dockVisible);window.scrollTo(0,0)}
+function showScreen(name){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));$(name+'Screen').classList.add('active');document.querySelectorAll('nav [data-screen]').forEach(b=>b.classList.toggle('active',b.dataset.screen===name));const dockVisible=['home','operations'].includes(name);$('actionDock').classList.toggle('hidden',!dockVisible);document.querySelector('.app').classList.toggle('has-action-dock',dockVisible);window.scrollTo(0,0)}
 function copyHomeToOperations(filter='all'){periods.operations={...periods.home};opsTypeFilter=filter;selectedCategoryIds.clear();amountMin=null;amountMax=null;filtersExpanded=false;showScreen('operations');renderAll()}
 function shift(context,dir){const p=periods[context],d=new Date(p.anchor);if(p.range==='day')d.setDate(d.getDate()+dir);if(p.range==='week')d.setDate(d.getDate()+7*dir);if(p.range==='month')d.setMonth(d.getMonth()+dir);if(p.range==='year')d.setFullYear(d.getFullYear()+dir);p.anchor=Math.min(d.getTime(),now());renderAll()}
 function openPicker(context){const p=periods[context];if(p.range==='all')return;pickerContext=context;const a=new Date(p.anchor),pad=n=>String(n).padStart(2,'0'),i=$('pickerInput');$('pickerTitle').textContent=context==='home'?'Период на главной':context==='analytics'?'Период аналитики':'Период операций';if(p.range==='month'){i.type='month';i.value=`${a.getFullYear()}-${pad(a.getMonth()+1)}`}else if(p.range==='year'){i.type='number';i.min='1900';i.max=String(new Date().getFullYear());i.value=String(a.getFullYear())}else{i.type='date';i.max=isoLocal(now()).slice(0,10);i.value=isoLocal(a).slice(0,10)}open('picker')}
