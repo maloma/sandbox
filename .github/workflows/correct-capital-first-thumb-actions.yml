@@ -19,7 +19,9 @@ jobs:
           node-version: '22'
       - name: Restore capital-first hierarchy and thumb-zone actions
         run: |
-          python3 <<'PY'
+          mkdir -p verification
+          set +e
+          python3 <<'PY' > verification/capital-first-thumb-actions-run.log 2>&1
           from pathlib import Path
           import re, gzip, base64, hashlib
 
@@ -58,7 +60,6 @@ jobs:
 #homeScreen>.wallet-notice{margin:0 0 10px}
 '''
           source = source.replace('</style>', correction_css + '\n</style>', 1)
-
           source_path.write_text(source)
 
           home_start = source.index('<section id="homeScreen"')
@@ -102,12 +103,31 @@ jobs:
           Path('verification/capital-first-thumb-actions-sha.txt').write_text(
               f'SOURCE-SHA256: {sha(source)}\nINDEX-SHA256: {sha(index)}\n'
           )
+          print('PYTHON-PATCH: VERIFIED')
           PY
-          node --check /tmp/familypilot-runtime.js
-      - name: Commit correction
+          py_status=$?
+          echo "PYTHON-EXIT-CODE: $py_status" >> verification/capital-first-thumb-actions-run.log
+          syntax_status=99
+          if [ $py_status -eq 0 ]; then
+            node --check /tmp/familypilot-runtime.js >> verification/capital-first-thumb-actions-run.log 2>&1
+            syntax_status=$?
+          fi
+          echo "RUNTIME-SYNTAX-EXIT-CODE: $syntax_status" >> verification/capital-first-thumb-actions-run.log
+          echo "$py_status:$syntax_status" > /tmp/capital-first-status
+          exit 0
+      - name: Commit correction or diagnostics
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add index.html src/familypilot.html verification/capital-first-thumb-actions-source-gate.txt verification/capital-first-thumb-actions-sha.txt
-          git commit -m 'Restore capital-first home and thumb-zone operation actions'
+          git add verification/capital-first-thumb-actions-run.log
+          status=$(cat /tmp/capital-first-status)
+          if [ "$status" = "0:0" ]; then
+            git add index.html src/familypilot.html verification/capital-first-thumb-actions-source-gate.txt verification/capital-first-thumb-actions-sha.txt
+            message='Restore capital-first home and thumb-zone operation actions'
+          else
+            message='Record capital-first thumb-action correction failure'
+          fi
+          git commit -m "$message" || exit 0
           git push
+      - name: Enforce success
+        run: test "$(cat /tmp/capital-first-status)" = "0:0"
