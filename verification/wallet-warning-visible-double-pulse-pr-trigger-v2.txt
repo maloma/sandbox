@@ -1,0 +1,1 @@
+Apply the visibility-triggered two-pulse warning correction directly to the readable FamilyPilot source.
