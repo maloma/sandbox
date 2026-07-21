@@ -1,4 +1,4 @@
 # FamilyPilot GitHub Pages direct publish trigger
-# Contextual non-default wallet warning before Save
-# Runtime commit: ffd546325f72c23870c1b2a9b5f6a44613487dd7
-# Package: contextual-wallet-before-save-v1
+# Period-aware category counts, clean category draft state, wallet warning pulse
+# Runtime commit: f0e40c9e88d8e9afd0879a053be94306128a19b0
+# Package: analytics-period-entry-state-wallet-pulse-v1
