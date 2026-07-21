@@ -1,0 +1,45 @@
+name: Extract current FamilyPilot source
+
+on:
+  push:
+    paths:
+      - '.github/workflows/extract-current-familypilot-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Decode embedded runtime
+        run: |
+          mkdir -p verification
+          node <<'NODE'
+          const fs = require('fs');
+          const zlib = require('zlib');
+          const index = fs.readFileSync('index.html', 'utf8');
+          const match = index.match(/const b="([A-Za-z0-9+/=]+)"/);
+          if (!match) throw new Error('Embedded runtime payload not found');
+          const source = zlib.gunzipSync(Buffer.from(match[1], 'base64')).toString('utf8');
+          fs.writeFileSync('verification/current-source.html', source);
+          fs.writeFileSync('verification/current-source-summary.txt', [
+            `SOURCE-BYTES: ${Buffer.byteLength(source)}`,
+            `HAS-FAMILYPILOT: ${source.includes('FamilyPilot') ? 'YES' : 'NO'}`,
+            `HAS-CATEGORY: ${source.includes('Категор') ? 'YES' : 'NO'}`,
+            `HAS-WALLET: ${source.includes('кошел') || source.includes('Кошел') ? 'YES' : 'NO'}`,
+            ''
+          ].join('\n'));
+          NODE
+      - name: Commit extracted source
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add verification/current-source.html verification/current-source-summary.txt
+          git commit -m 'Extract current FamilyPilot runtime source for implementation' || exit 0
+          git push
