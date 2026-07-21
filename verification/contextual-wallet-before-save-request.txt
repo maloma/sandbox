@@ -1,1 +1,0 @@
-Founder correction: the 80/20 rule describes action frequency, not visual order. The default wallet must be silent. A non-default wallet must appear only as a compact warning immediately above Save in the operation form.
