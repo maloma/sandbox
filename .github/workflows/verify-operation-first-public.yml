@@ -1,33 +1,44 @@
-name: Verify operation-first FamilyPilot public runtime
+name: Close operation-first FamilyPilot package
 
 on:
   push:
     paths:
       - '.github/workflows/verify-operation-first-public.yml'
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  verify:
+  close:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Install browser verifier
+      - name: Remove temporary package tooling
         run: |
-          npm install --no-save playwright
-          npx playwright install --with-deps chromium
-      - name: Verify public runtime
-        run: node .github/scripts/verify-operation-first-public.cjs
-      - name: Commit final public gate
+          git rm -f --ignore-unmatch \
+            .github/workflows/extract-current-familypilot-source.yml \
+            .github/workflows/implement-operation-first-app-shell.yml \
+            .github/workflows/run-operation-first-app-shell.yml \
+            .github/workflows/verify-operation-first-public.yml \
+            .github/scripts/operation-first-app-shell.cjs \
+            .github/scripts/correct-operation-first-runtime.py \
+            .github/scripts/verify-operation-first-public.cjs \
+            verification/current-source.html \
+            verification/current-source-summary.txt \
+            verification/actions-execution-probe.txt \
+            verification/operation-first-patch-run.log \
+            verification/operation-first-correction.log
+          cat > .nojekyll <<'EOF'
+          # FamilyPilot GitHub Pages direct publish trigger
+          # Operation-first app shell and safe category names
+          # Runtime commit: d8040e7db09901b0007261eafb7afdca0f339f71
+          # Public verification commit: 37b53d57522d41d70effa10307d6c12b821202b5
+          # Package: operation-first-app-shell-v1
+          EOF
+          git add .nojekyll
+      - name: Commit package closure
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add verification/operation-first-app-shell-final-gate.txt
-          git commit -m 'Verify operation-first app shell public runtime'
+          git commit -m 'Close operation-first app shell package'
           git push
