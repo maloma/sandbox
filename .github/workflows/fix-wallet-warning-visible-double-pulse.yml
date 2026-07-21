@@ -93,3 +93,5 @@ jobs:
           git add src/familypilot.html index.html verification/wallet-warning-visible-double-pulse-source-gate.txt verification/wallet-warning-visible-double-pulse-sha.txt
           git commit -m 'Trigger wallet warning pulse when it becomes visible'
           git push
+
+# retrigger after workflow registration
