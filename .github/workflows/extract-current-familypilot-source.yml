@@ -1,4 +1,4 @@
-name: Apply operation-first FamilyPilot package
+name: Correct and verify operation-first FamilyPilot package
 
 on:
   push:
@@ -9,52 +9,84 @@ permissions:
   contents: write
 
 jobs:
-  implement:
+  correct:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Correct static ID validation
+      - name: Correct runtime and rebuild loader
         run: |
           python3 <<'PY'
           from pathlib import Path
-          path = Path('.github/scripts/operation-first-app-shell.cjs')
-          text = path.read_text()
-          old = "const ids = [...source.matchAll(/\\bid=\"([^\"]+)\"/g)].map(m => m[1]);\nconst duplicateIds = [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];"
-          new = "const ids = [...source.matchAll(/\\bid=\"([^\"]+)\"/g)].map(m => m[1]);\nconst staticIds = ids.filter(id => !id.includes('${'));\nconst duplicateIds = [...new Set(staticIds.filter((id, index) => staticIds.indexOf(id) !== index))];"
-          if old not in text:
-              raise SystemExit('Static ID validation anchor not found')
-          path.write_text(text.replace(old, new))
+          import re, gzip, base64, hashlib
+
+          source_path = Path('src/familypilot.html')
+          source = source_path.read_text()
+
+          replacement = """function renderMore(){let available=state.wallets.filter(w=>!w.archivedAt&&(!Array.isArray(w.allowedMemberIds)||w.allowedMemberIds.includes(state.currentMemberId)));if(!available.length)available=state.wallets.filter(w=>!w.archivedAt);if(available.length&&!available.some(w=>w.id===state.activeWalletId))state.activeWalletId=available[0].id;$('walletSelect').innerHTML=available.map(w=>`<option value="${esc(w.id)}"${w.id===state.activeWalletId?' selected':''}>${esc(w.name)} · ${esc(w.nativeCurrency)}</option>`).join('');$('themeSelect').value=themePreference();$('actorSelect').innerHTML=MEMBERS.map(m=>`<option value="${m.id}"${m.id===state.currentMemberId?' selected':''}>${m.name}</option>`).join('');$('trashFlagBtn').classList.toggle('on',state.config.trashRetentionEnabled);$('walletContracts').textContent=state.wallets.map(w=>{const rows=[w.name,`тип = ${w.type}`,`валюта = ${w.nativeCurrency}`,`в семейном капитале = ${w.includedInHouseholdCapital?'да':'нет'}`];if(w.ownerMemberId)rows.push(`владелец = ${memberName(w.ownerMemberId)}`);return rows.join(String.fromCharCode(10))}).join(String.fromCharCode(10,10))}
+function renderAll()"""
+
+          source, count = re.subn(r"function renderMore\(\)\{[\s\S]*?\}\nfunction renderAll\(\)", replacement, source, count=1)
+          if count != 1:
+              raise SystemExit(f'renderMore correction count={count}')
+
+          source_path.write_text(source)
+
+          script = re.search(r'<script>\s*([\s\S]*?)</script>', source)
+          if not script:
+              raise SystemExit('Runtime script not found')
+          Path('/tmp/familypilot-runtime.js').write_text(script.group(1))
+
+          index_path = Path('index.html')
+          index = index_path.read_text()
+          payload = base64.b64encode(gzip.compress(source.encode(), compresslevel=9, mtime=0)).decode()
+          index, count = re.subn(r'const b="[A-Za-z0-9+/=]+"', f'const b="{payload}"', index, count=1)
+          if count != 1:
+              raise SystemExit('Loader payload replacement failed')
+          index_path.write_text(index)
+
+          def sha(value):
+              return hashlib.sha256(value.encode()).hexdigest()
+
+          checks = {
+              'PACKAGE-MARKER': 'operation-first-app-shell-v1' in source,
+              'PERSISTENT-TOP-BAR-REMOVED': '<header class="top">' not in source,
+              'HOME-OPERATIONS-FIRST': source.find('home-primary-actions') < source.find('card capital'),
+              'HOME-DOCK-DUPLICATION-REMOVED': 'action-dock hidden' in source and "const dockVisible=name==='operations'" in source,
+              'WALLET-MOVED-TO-MORE': 'id="walletSelect"' in source and 'Основной кошелёк' in source,
+              'THEME-MOVED-TO-MORE': 'id="themeSelect"' in source and 'id="themeBtn"' not in source,
+              'PROFILE-INITIAL-REMOVED': 'aria-label="Профиль"' not in source,
+              'NONDEFAULT-WALLET-CONTEXTUAL': 'id="nonDefaultWalletNotice"' in source and 'renderWalletContext' in source,
+              'CATEGORY-LIMIT-50': 'CATEGORY_NAME_MAX=50' in source and source.count('maxlength="50"') >= 2,
+              'CATEGORY-OVERFLOW-SAFE': '.cat-row b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' in source and '.quick-chip{max-width:min(78vw,280px);overflow:hidden;text-overflow:ellipsis}' in source,
+              'SINGLE-MODAL-SCROLL-LOCK-PRESERVED': source.count('function lockBodyNow()') == 1 and source.count('function syncBodyLock()') == 1,
+              'READABLE-SOURCE': source_path.exists(),
+          }
+          failed = [name for name, ok in checks.items() if not ok]
+          if failed:
+              raise SystemExit('Source gates failed: ' + ', '.join(failed))
+
+          verification = Path('verification')
+          verification.mkdir(exist_ok=True)
+          verification.joinpath('operation-first-app-shell-source-gate.txt').write_text('\n'.join([
+              'FamilyPilot operation-first app shell source gate',
+              *[f'{name}: VERIFIED' for name in checks],
+              f'SOURCE-SHA256: {sha(source)}',
+              f'INDEX-SHA256: {sha(index)}',
+              'PACKAGE-CLOSURE: SOURCE-VERIFIED',
+              ''
+          ]))
+          verification.joinpath('operation-first-app-shell-sha.txt').write_text(
+              f'SOURCE-SHA256: {sha(source)}\nINDEX-SHA256: {sha(index)}\n'
+          )
           PY
-      - name: Apply patch and capture diagnostics
-        run: |
-          mkdir -p verification
-          set +e
-          node .github/scripts/operation-first-app-shell.cjs > verification/operation-first-patch-run.log 2>&1
-          status=$?
-          echo "PATCH-EXIT-CODE: $status" >> verification/operation-first-patch-run.log
-          if [ -f /tmp/familypilot-runtime.js ]; then
-            node --check /tmp/familypilot-runtime.js >> verification/operation-first-patch-run.log 2>&1
-            syntax_status=$?
-            echo "RUNTIME-SYNTAX-EXIT-CODE: $syntax_status" >> verification/operation-first-patch-run.log
-            if [ $status -eq 0 ] && [ $syntax_status -ne 0 ]; then status=$syntax_status; fi
-          fi
-          echo "$status" > /tmp/package-status
-          exit 0
-      - name: Commit outputs and diagnostics
+          node --check /tmp/familypilot-runtime.js
+      - name: Commit corrected package
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add verification/operation-first-patch-run.log
-          [ -f src/familypilot.html ] && git add src/familypilot.html || true
-          [ -f verification/operation-first-app-shell-source-gate.txt ] && git add verification/operation-first-app-shell-source-gate.txt || true
-          [ -f verification/operation-first-app-shell-sha.txt ] && git add verification/operation-first-app-shell-sha.txt || true
-          git add index.html
-          git commit -m 'Run operation-first app shell package diagnostics' || exit 0
+          git add index.html src/familypilot.html verification/operation-first-app-shell-source-gate.txt verification/operation-first-app-shell-sha.txt
+          git commit -m 'Correct operation-first app shell runtime'
           git push
-      - name: Enforce package success
-        run: |
-          status=$(cat /tmp/package-status)
-          test "$status" = "0"
