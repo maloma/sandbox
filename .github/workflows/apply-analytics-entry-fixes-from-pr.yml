@@ -2,7 +2,7 @@ name: Apply analytics and entry fixes from PR
 
 on:
   pull_request:
-    types: [opened]
+    types: [opened, synchronize]
 
 permissions:
   contents: write
