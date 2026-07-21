@@ -1,0 +1,80 @@
+name: Apply capital-first thumb-zone correction from PR
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    if: github.event.pull_request.head.ref == 'agent/correct-capital-first-thumb-actions'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Patch runtime
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re, gzip, base64, hashlib
+          source_path=Path('src/familypilot.html')
+          source=source_path.read_text()
+          assert 'operation-first-app-shell-v1' in source
+          assert 'capital-first-thumb-actions-v1' not in source
+          source=source.replace('<meta name="familypilot-package" content="operation-first-app-shell-v1">','<meta name="familypilot-package" content="operation-first-app-shell-v1">\n<meta name="familypilot-correction" content="capital-first-thumb-actions-v1">',1)
+          source,count=re.subn(r'\n?<section class="home-primary-actions"[\s\S]*?</section>\n?','\n',source,count=1)
+          assert count==1
+          capital=re.search(r'(<section class="card capital">[\s\S]*?</section>)',source)
+          assert capital
+          notice='''\n<button id="nonDefaultWalletNotice" class="wallet-notice" type="button" hidden>\n  <span class="wallet-dot"></span><span><small>Операции будут добавляться в</small><strong id="homeWalletNoticeName"></strong></span><i>Изменить ›</i>\n</button>'''
+          source=source[:capital.end()]+notice+source[capital.end():]
+          source=source.replace('<div class="app">','<div class="app has-action-dock">',1)
+          source=source.replace('<div id="actionDock" class="action-dock hidden">','<div id="actionDock" class="action-dock">',1)
+          source=source.replace("const dockVisible=name==='operations'","const dockVisible=['home','operations'].includes(name)",1)
+          css='''\n/* capital-first-thumb-actions-v1 */\n.action-dock{padding:12px 12px 14px}\n#homeScreen>.capital:first-child{margin-top:0}\n#homeScreen>.wallet-notice{margin:0 0 10px}\n'''
+          source=source.replace('</style>',css+'\n</style>',1)
+          source_path.write_text(source)
+          home=source.index('<section id="homeScreen"')
+          cap=source.index('<section class="card capital">',home)
+          note=source.index('id="nonDefaultWalletNotice"',home)
+          bal=source.index('<section class="card balance">',home)
+          checks={
+            'CAPITAL-FIRST':home<cap<note<bal,
+            'INLINE-ACTIONS-REMOVED':'<section class="home-primary-actions"' not in source,
+            'DOCK-VISIBLE':'<div id="actionDock" class="action-dock">' in source,
+            'DOCK-HOME-AND-OPERATIONS':"const dockVisible=['home','operations'].includes(name)" in source,
+            'DOCK-SPACING':'.action-dock{padding:12px 12px 14px}' in source,
+            'TOP-BAR-REMOVED':'<header class="top">' not in source,
+            'SETTINGS-PRESERVED':'id="walletSelect"' in source and 'id="themeSelect"' in source,
+            'CATEGORY-50-PRESERVED':'CATEGORY_NAME_MAX=50' in source,
+            'SCROLL-LOCK-PRESERVED':source.count('function lockBodyNow()')==1 and source.count('function syncBodyLock()')==1,
+          }
+          failed=[k for k,v in checks.items() if not v]
+          assert not failed,failed
+          script=re.search(r'<script>\s*([\s\S]*?)</script>',source)
+          assert script
+          Path('/tmp/familypilot-runtime.js').write_text(script.group(1))
+          index_path=Path('index.html')
+          index=index_path.read_text()
+          payload=base64.b64encode(gzip.compress(source.encode(),compresslevel=9,mtime=0)).decode()
+          index,count=re.subn(r'const b="[A-Za-z0-9+/=]+"',f'const b="{payload}"',index,count=1)
+          assert count==1
+          index_path.write_text(index)
+          sha=lambda x:hashlib.sha256(x.encode()).hexdigest()
+          Path('verification/capital-first-thumb-actions-source-gate.txt').write_text('\n'.join(['FamilyPilot capital-first thumb actions source gate',*[f'{k}: VERIFIED' for k in checks],f'SOURCE-SHA256: {sha(source)}',f'INDEX-SHA256: {sha(index)}','PACKAGE-CLOSURE: SOURCE-VERIFIED','']))
+          Path('verification/capital-first-thumb-actions-sha.txt').write_text(f'SOURCE-SHA256: {sha(source)}\nINDEX-SHA256: {sha(index)}\n')
+          PY
+          node --check /tmp/familypilot-runtime.js
+      - name: Commit correction to PR branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html src/familypilot.html verification/capital-first-thumb-actions-source-gate.txt verification/capital-first-thumb-actions-sha.txt
+          git commit -m 'Restore capital-first home and thumb-zone operation actions'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
