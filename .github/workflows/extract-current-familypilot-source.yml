@@ -1,4 +1,4 @@
-name: Extract current FamilyPilot source
+name: Apply operation-first FamilyPilot package
 
 on:
   push:
@@ -10,36 +10,21 @@ permissions:
   contents: write
 
 jobs:
-  extract:
+  implement:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Decode embedded runtime
+      - name: Apply operation-first package
         run: |
-          mkdir -p verification
-          node <<'NODE'
-          const fs = require('fs');
-          const zlib = require('zlib');
-          const index = fs.readFileSync('index.html', 'utf8');
-          const match = index.match(/const b="([A-Za-z0-9+/=]+)"/);
-          if (!match) throw new Error('Embedded runtime payload not found');
-          const source = zlib.gunzipSync(Buffer.from(match[1], 'base64')).toString('utf8');
-          fs.writeFileSync('verification/current-source.html', source);
-          fs.writeFileSync('verification/current-source-summary.txt', [
-            `SOURCE-BYTES: ${Buffer.byteLength(source)}`,
-            `HAS-FAMILYPILOT: ${source.includes('FamilyPilot') ? 'YES' : 'NO'}`,
-            `HAS-CATEGORY: ${source.includes('Категор') ? 'YES' : 'NO'}`,
-            `HAS-WALLET: ${source.includes('кошел') || source.includes('Кошел') ? 'YES' : 'NO'}`,
-            ''
-          ].join('\n'));
-          NODE
-      - name: Commit extracted source
+          node .github/scripts/operation-first-app-shell.cjs
+          node --check /tmp/familypilot-runtime.js
+      - name: Commit package
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add verification/current-source.html verification/current-source-summary.txt
-          git commit -m 'Extract current FamilyPilot runtime source for implementation' || exit 0
+          git add index.html src/familypilot.html verification/operation-first-app-shell-source-gate.txt verification/operation-first-app-shell-sha.txt
+          git commit -m 'Implement operation-first app shell and safe category names'
           git push
