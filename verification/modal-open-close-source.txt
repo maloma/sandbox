@@ -1,0 +1,16 @@
+24: html.modal-open,body.modal-open{overflow:hidden;overscroll-behavior:none}body.modal-open{position:fixed;width:100%}
+168: function syncBodyLock(){const locked=!!document.querySelector('.overlay.open,.modal.open');if(locked&&!document.body.classList.contains('modal-open')){bodyLockY=window.scrollY;document.documentElement.classList.add('modal-open');document.body.classList.add('modal-open');document.body.style.top=`-${bodyLockY}px`}else if(!locked&&document.body.classList.contains('modal-open')){document.documentElement.classList.remove('modal-open');document.body.classList.remove('modal-open');document.body.style.top='';window.scrollTo(0,bodyLockY)}}
+169: function open(id){$(id).classList.add('open');queueMicrotask(syncBodyLock)}
+170: function close(id){$(id).classList.remove('open');queueMicrotask(syncBodyLock)}
+255: let backgroundScrollLocked=false;
+256: let backgroundScrollLockY=0;
+258: function syncBackgroundScrollLock(){
+260:   if(shouldLock&&!backgroundScrollLocked){
+261:     backgroundScrollLockY=window.scrollY||document.documentElement.scrollTop||0;
+264:     document.body.style.top=`-${backgroundScrollLockY}px`;
+265:     backgroundScrollLocked=true;
+266:   }else if(!shouldLock&&backgroundScrollLocked){
+267:     const restoreY=backgroundScrollLockY;
+271:     backgroundScrollLocked=false;
+275: const foregroundLayerObserver=new MutationObserver(syncBackgroundScrollLock);
+282: syncBackgroundScrollLock();
