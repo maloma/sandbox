@@ -1,11 +1,15 @@
 # Batch Manifest — PF-08A-IF-01-CANONICAL-RUNTIME-SOURCE
 
 **Document Type:** Runtime Execution Batch Manifest  
-**Status:** Ready for Pull Request Verification  
-**Version:** 1.1  
+**Status:** Completed  
+**Version:** 1.2  
 **Repository:** `maloma/sandbox`  
 **Starting Commit:** `32ddc846cdea4cafe8126e5a7fda9e320fe2c78a`  
-**Working Branch:** `agent/pf08a-if01-canonical-runtime-source`  
+**Implementation Branch:** `agent/pf08a-if01-canonical-runtime-source`  
+**Implementation Pull Request:** `#14`  
+**Implementation Head:** `e340d42acc79223439f800c243e6f4fc95cebf69`  
+**Implementation Merge Commit:** `078fff9a9a47b26fd6a4472fe107ba66e3cba926`  
+**Closure Branch:** `agent/pf08a-if01-public-verification`  
 **Authority:** FamilyPilot `docs/60_Current_Integrated_Development_Roadmap.md` and Project Operating State v1.5  
 **Depth Policy:** `SINGLE_DEPTH_HIGH`  
 **Created:** 2026-07-22
@@ -14,18 +18,22 @@
 
 Remove runtime source rewriting from the public FamilyPilot loader, move all currently accepted corrections into the readable canonical source, publish the exact canonical source at the root route, and prove no regression in the accepted M1 prototype behavior.
 
-## Included Scope
+## Completed Scope
 
-- patch `src/familypilot.html` idempotently with the corrections formerly injected by `index.html`;
-- make `index.html` an exact generated copy of the canonical source;
-- remove runtime `fetch`, string replacement and `document.write` behavior from the public entrypoint;
-- add an idempotent consolidation and verification script;
-- add a bounded branch-only workflow that runs the script, commits generated changes and re-verifies;
-- preserve current public behavior, data key, visual hierarchy and wallet-warning behavior;
-- open Draft PR, verify checks, merge and publish automatically after PASS;
-- preserve the previous public commit for rollback.
+- embedded the currently published analytics-period category-count correction directly in `src/familypilot.html`;
+- embedded transient category-draft reset directly in the source;
+- embedded the visibility-triggered two-pulse non-default-wallet warning directly in the source;
+- added `canonical-runtime-source-v1`;
+- generated `index.html` as a byte-identical copy of `src/familypilot.html`;
+- removed runtime `fetch`, string replacement and `document.write` behavior from the root entrypoint;
+- added an idempotent consolidation and verification script;
+- added a bounded branch-generation and PR-verification workflow;
+- verified exact PR scope and workflow success;
+- merged PR #14 with exact-head protection;
+- verified the public root contract with HTTP 200 and a cache-busted public smoke test;
+- preserved the previous public commit for rollback.
 
-## Excluded Scope
+## Excluded Scope Preserved
 
 - no product-semantic change;
 - no personal-wallet viewing-scope implementation;
@@ -35,79 +43,80 @@ Remove runtime source rewriting from the public FamilyPilot loader, move all cur
 - no dependency or paid-resource addition;
 - no destructive data migration.
 
-## Checkpoints
+## Checkpoint Results
 
 ### CP-01 — Establish Reproducible Consolidation
 
 - **Status:** COMPLETED
 - **Result:** PASS.
-- **Evidence:**
-  - `tools/pf08a-if01-consolidate-runtime.mjs` performs exact-match, idempotent generation and fail-closed verification;
-  - `.github/workflows/pf08a-if01-canonical-runtime-source.yml` is bounded to the exact branch and exact affected paths;
-  - workflow write permission is limited to repository contents on the branch-generation job;
-  - pull-request verification is read-only.
+- **Evidence:** `tools/pf08a-if01-consolidate-runtime.mjs` and `.github/workflows/pf08a-if01-canonical-runtime-source.yml`.
 
 ### CP-02 — Generate Canonical Source and Root Artifact
 
 - **Status:** COMPLETED
 - **Result:** PASS.
-- **Evidence:**
-  - `src/familypilot.html` blob SHA `90931925157a592d22a1d040efe97c13d0870e16`;
-  - `index.html` blob SHA `90931925157a592d22a1d040efe97c13d0870e16`;
-  - both files are byte-identical;
-  - both contain `canonical-runtime-source-v1`;
-  - accepted analytics-period count, transient category reset and visible double wallet-pulse corrections live directly in the source;
-  - the root entrypoint no longer contains the runtime fetch/string-replacement/document-write loader.
+- **Canonical Source Blob SHA:** `90931925157a592d22a1d040efe97c13d0870e16`.
+- **Root Artifact Blob SHA:** `90931925157a592d22a1d040efe97c13d0870e16`.
 
 ### CP-03 — Regression, PR, Merge and Public Verification
 
-- **Status:** READY
-- **Required Transition:**
-  - open Draft PR;
-  - enumerate exact changed paths;
-  - inspect exact PR head and mergeability;
-  - obtain pull-request workflow PASS;
-  - merge with exact-head protection;
-  - verify the public root serves `canonical-runtime-source-v1`;
-  - record rollback and terminal evidence.
+- **Status:** COMPLETED
+- **Result:** PASS.
+- **PR Workflow Run:** `29882255653`, conclusion `success` on exact merge head.
+- **Merge Commit:** `078fff9a9a47b26fd6a4472fe107ba66e3cba926`.
+- **Public Evidence:** `docs/execution-batches/PF-08A-IF-01-CANONICAL-RUNTIME-SOURCE/Public_Verification.md`.
+- **Public Result:** HTTP 200; canonical marker present; old loader absent.
 
-## Required Invariants
+## Preserved Invariants
 
-- `Capital` remains first on Main;
+- Capital remains first on Main;
 - Income and Expense remain in the lower thumb zone;
 - default wallet remains silent;
 - non-default wallet warning remains immediately above Save and pulses twice when visible;
 - category counts remain period-scoped;
 - unfinished category draft resets between forms;
 - category length and layout rules remain unchanged;
-- no localStorage key or data semantics change;
-- root `index.html` and `src/familypilot.html` remain byte-identical.
+- no localStorage key or data semantics changed;
+- root `index.html` and `src/familypilot.html` are byte-identical.
 
-## Verification Summary Before PR
+## Verification Summary
 
-- canonical marker present exactly once — PASS;
-- source and root artifact share one blob SHA — PASS;
-- old runtime loader absent from generated root — PASS;
-- one doctype and one closing HTML tag — PASS;
-- generation script is idempotent — PASS;
-- runtime product semantics unchanged by scope — PASS;
-- rollback source commit retained — PASS.
+- exact source anchors and idempotent generation — PASS;
+- source/root byte identity — PASS;
+- canonical marker — PASS;
+- old runtime loader absence — PASS;
+- exact six-file implementation PR scope — PASS;
+- PR workflow on final head — PASS;
+- exact-head protected merge — PASS;
+- public HTTP and marker smoke test — PASS;
+- rollback retained — PASS.
 
-## Recovery
+## Rollback
 
-- one bounded script/workflow correction is allowed;
-- automatic merge is prohibited if any invariant or workflow check fails;
-- rollback is restoration of main commit `32ddc846cdea4cafe8126e5a7fda9e320fe2c78a` or revert of the resulting merge commit.
+- preferred: Git revert of merge commit `078fff9a9a47b26fd6a4472fe107ba66e3cba926`;
+- preserved previous public state: `32ddc846cdea4cafe8126e5a7fda9e320fe2c78a`.
 
-## Terminal Conditions
+## Terminal State
 
-- `BATCH_COMPLETED`;
-- `CHECKPOINT_FAILED_AFTER_BOUNDED_RECOVERY`;
-- `REPOSITORY_STATE_CONFLICT`;
-- `WORKFLOW_PERMISSION_BLOCKER`;
-- `PUBLIC_VERIFICATION_FAILED`.
+```text
+BATCH_COMPLETED
+```
+
+## Next Authorized Runtime Batch
+
+```text
+PF-08A-IF-02 — Existing-Surface Personal Wallet Scope
+```
+
+This next batch implements the already accepted wallet-specific Main Capital, Operations and Analytics scope without starting the full Wallet Management package.
 
 ## Changelog
+
+### Version 1.2 — 2026-07-22
+
+- marked CP-03 and the batch completed;
+- recorded exact PR head, merge commit and public verification;
+- established personal-wallet scope as the next runtime batch.
 
 ### Version 1.1 — 2026-07-22
 

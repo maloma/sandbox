@@ -116,4 +116,34 @@ Append-only rule: preserve all existing records and append later transitions usi
 - **Next Authorized Transition:** Automatic merge after the new exact head passes the PR workflow.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 006 — CP-03 Merge and Public Verification Completed
+
+- **Ordering Marker:** 006
+- **Checkpoint ID:** CP-03
+- **Status:** COMPLETED
+- **Objective:** Record exact-head protected merge, public publication and terminal runtime evidence.
+- **Pull Request:** `#14`.
+- **Final Head:** `e340d42acc79223439f800c243e6f4fc95cebf69`.
+- **Final Head Workflow:** run `29882255653`, conclusion `success`.
+- **Mergeability Before Merge:** PASS.
+- **Merge Method:** merge commit with expected-head protection.
+- **Resulting Main Commit:** `078fff9a9a47b26fd6a4472fe107ba66e3cba926`.
+- **Main Root Blob SHA:** `90931925157a592d22a1d040efe97c13d0870e16`.
+- **Main Canonical Source Blob SHA:** `90931925157a592d22a1d040efe97c13d0870e16`.
+- **Public URL:** `https://maloma.github.io/sandbox/`.
+- **Public Verification:** PASS at `2026-07-22T01:12:01Z`.
+- **Public HTTP Status:** `200`.
+- **Public Attempts:** `1`.
+- **Public Response SHA-256:** `387db605445d76aa1839979f478196dbe794ffb4a6a23b4eda707545ab8b7ea1`.
+- **Public Assertions:** canonical marker present; old fetch loader absent; `document.write(source)` absent; old boot placeholder absent.
+- **Evidence Path:** `docs/execution-batches/PF-08A-IF-01-CANONICAL-RUNTIME-SOURCE/Public_Verification.md`.
+- **Verification Result:** PASS. The published root serves the consolidated canonical runtime contract.
+- **Rollback Method:** Revert `078fff9a9a47b26fd6a4472fe107ba66e3cba926` or restore `32ddc846cdea4cafe8126e5a7fda9e320fe2c78a`.
+- **Terminal State:** `BATCH_COMPLETED`.
+- **Next Authorized Transition:** `PF-08A-IF-02 — Existing-Surface Personal Wallet Scope`.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
