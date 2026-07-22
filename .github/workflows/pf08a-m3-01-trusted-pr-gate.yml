@@ -76,7 +76,24 @@ jobs:
         run: node tools/pf08a-priv01-browser-smoke.mjs
 
       - name: Run Plan and obligations browser regression
-        run: node tools/pf08a-m3-01-browser-smoke.mjs
+        id: m3_browser
+        shell: bash
+        run: |
+          set +e
+          node tools/pf08a-m3-01-browser-smoke.mjs > m3-browser.log 2>&1
+          status=$?
+          cat m3-browser.log
+          echo "exit_code=${status}" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Upload M3 browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pf08a-m3-01-browser-${{ github.event.pull_request.head.sha }}
+          path: m3-browser.log
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Persist verified generated artifacts through GitHub Contents API
         shell: bash
