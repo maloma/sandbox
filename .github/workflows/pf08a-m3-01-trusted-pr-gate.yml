@@ -10,6 +10,7 @@ on:
       - familypilot-obligations.js
       - tools/pf08a-m3-01-apply-plan-obligations.mjs
       - tools/pf08a-m3-01-correct-today-payment-time.mjs
+      - tools/pf08a-m3-01-correct-browser-test-api.mjs
       - tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
       - tools/pf08a-m3-01-verify-plan-obligations.mjs
       - tools/pf08a-m3-01-domain-test.cjs
@@ -43,6 +44,7 @@ jobs:
           node --check familypilot-obligations.js
           node --check tools/pf08a-m3-01-apply-plan-obligations.mjs
           node --check tools/pf08a-m3-01-correct-today-payment-time.mjs
+          node --check tools/pf08a-m3-01-correct-browser-test-api.mjs
           node --check tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
           node --check tools/pf08a-m3-01-verify-plan-obligations.mjs
           node --check tools/pf08a-m3-01-domain-test.cjs
@@ -62,6 +64,9 @@ jobs:
 
       - name: Correct same-day payment timestamp
         run: node tools/pf08a-m3-01-correct-today-payment-time.mjs
+
+      - name: Correct M3 browser test API route
+        run: node tools/pf08a-m3-01-correct-browser-test-api.mjs
 
       - name: Finalize root and source artifacts
         run: node tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
@@ -101,11 +106,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
-          if git diff --quiet -- src/familypilot.html index.html; then
+          if git diff --quiet -- src/familypilot.html index.html tools/pf08a-m3-01-browser-smoke.mjs; then
             echo "Verified M3 artifacts are already committed."
             exit 0
           fi
-          for path in src/familypilot.html index.html; do
+          for path in src/familypilot.html index.html tools/pf08a-m3-01-browser-smoke.mjs; do
             encoded_path=$(python -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe="/"))' "$path")
             current_sha=$(curl --fail-with-body -sS \
               -H "Authorization: Bearer ${GH_TOKEN}" \
@@ -114,7 +119,7 @@ jobs:
               "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/${encoded_path}?ref=${HEAD_BRANCH}" | jq -r '.sha')
             content=$(base64 -w0 "$path")
             payload=$(jq -n \
-              --arg message "Generate Plan and obligations runtime: ${path}" \
+              --arg message "Generate verified M3 artifact: ${path}" \
               --arg content "$content" \
               --arg sha "$current_sha" \
               --arg branch "$HEAD_BRANCH" \
