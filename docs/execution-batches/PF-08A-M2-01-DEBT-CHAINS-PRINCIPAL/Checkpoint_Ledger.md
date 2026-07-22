@@ -62,4 +62,63 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 004 — Bounded Gate Recovery Completed
+
+- **Ordering Marker:** 004
+- **Checkpoint ID:** CP-03
+- **Status:** COMPLETED
+- **Pull Request:** `#40` — `Integrate debt chains and principal movements`.
+- **Initial Failure Class:** verifier and compatibility failures before terminal product verification.
+- **Stable Home Mount Recovery:** generated HTML now owns permanent `homeDebtReceivableValue` and `homeDebtLiabilityValue` mount points with zero source placeholders; fabricated `180 € / 420 €` values removed.
+- **Static Verification Recovery:** dynamic Debts screen/editor contracts are verified from `familypilot-debts-ui.js`; generated HTML is verified for stable mount, marker, script and inline boundaries.
+- **Diagnostic Recovery:** self-referential selectors used to prove forbidden UI absence are no longer mistaken for actual controls.
+- **M3 Compatibility Recovery:** the existing M3 regression now expects Debts active and only Savings disabled; all M3 functional assertions remain in force.
+- **Product Semantics Changed:** No.
+- **Verification Coverage Reduced:** No.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
+---
+
+## Record 005 — Exact Trusted Gate Passed
+
+- **Ordering Marker:** 005
+- **Checkpoint ID:** CP-03
+- **Status:** TRUSTED_PASS
+- **Verified Source Head:** `2e70686f4bb010b34cd1d4ebab95c807b9d68784`.
+- **Workflow Run:** `29923429307`.
+- **Workflow Job:** `88934388190`.
+- **Syntax and Module Checks:** PASS.
+- **M3 Domain:** PASS.
+- **M2 Domain:** PASS.
+- **Deterministic Finalization:** PASS.
+- **M3 Static Contract:** PASS.
+- **M2 Static Contract:** PASS.
+- **A3 Analytics Chrome Regression:** PASS.
+- **Hidden Capital Chrome Regression:** PASS.
+- **M3 Chrome Regression:** PASS.
+- **M2 Chrome User Journey:** PASS.
+- **Atomic Artifact Persistence:** PASS.
+- **Runtime Exceptions:** NONE in verified browser journeys.
+- **Verification Result:** PASS.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
+---
+
+## Record 006 — Verified Generated Runtime Persisted
+
+- **Ordering Marker:** 006
+- **Checkpoint ID:** CP-03
+- **Status:** GENERATED_HEAD_COMMITTED
+- **Generated PR Head:** `4ebe5b6f6f675beeb8cebf91e4116561753abdd1`.
+- **Generated Artifacts:** `src/familypilot.html` and `index.html` persisted atomically only after the complete trusted PASS.
+- **Canonical Equality:** source/root generated from the same finalizer output.
+- **Bot-Generated Rerun State:** `action_required`; this is not a product failure and requires an owner checkpoint commit to trigger final exact-head suites.
+- **Next Authorized Transition:** owner checkpoint commit, final synchronized zero-diff gate, expected-head merge.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
