@@ -50,4 +50,27 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 003 — Bounded Verification and Persistence Recovery
+
+- **Ordering Marker:** 003
+- **Checkpoint ID:** CP-02-REC01
+- **Status:** COMPLETED / RETRY_READY
+- **Initial Trusted Run:** `PF-08A PRIV-01 Trusted PR Gate`, run `29889087661`.
+- **Initial Result:** patch, finalization, static verification and A3 regression PASS; privacy Chrome comparison failed because DOM whitespace normalization and expected currency formatting used different non-breaking-space characters.
+- **Correction:** canonicalize whitespace in expected and rendered currency strings.
+- **Corrected Trusted Run:** `PF-08A PRIV-01 Trusted PR Gate`, run `29889179227`.
+- **Corrected Result:** exact checkout, patch, finalization, no-leak verification, A3 browser regression and hidden-Capital browser regression all PASS.
+- **Remaining Failure:** only detached-head `git push` of already verified generated HTML failed; product and verification results were green.
+- **Persistence Recovery Pull Request:** `#23` — `Recover trusted hidden Capital artifact persistence`.
+- **Persistence Recovery Merge:** `f3c922e9c3a0effcd3f124a4de0350ff6b4f71cb`.
+- **Recovery Mechanism:** sequential GitHub Contents API updates of `src/familypilot.html` and `index.html` against their current blob SHAs after the same complete verification pipeline.
+- **Verification Result:** RETRY_READY. This record synchronizes PR #21 against the recovered trusted gate.
+- **Recovery Budget:** bounded recovery used for test normalization and artifact-persistence transport; no product-scope expansion occurred.
+- **Exact Stop Point:** trusted generation through Contents API pending.
+- **Next Authorized Transition:** inspect generated branch head, then require synchronized zero-diff PASS.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
