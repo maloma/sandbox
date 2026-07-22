@@ -1,0 +1,101 @@
+name: PF-08A A3-01 Compact Analytics States
+
+on:
+  push:
+    branches:
+      - agent/pf08a-a3-01-compact-analytics-states
+    paths:
+      - src/familypilot.html
+      - src/familypilot-scope.js
+      - src/familypilot-analytics-state.js
+      - familypilot-scope.js
+      - familypilot-analytics-state.js
+      - index.html
+      - tools/pf08a-a3-01-apply-compact-analytics-states.mjs
+      - tools/pf08a-a3-01-finalize-runtime-artifacts.mjs
+      - tools/pf08a-a3-01-verify-compact-analytics-states.mjs
+      - tools/pf08a-a3-01-browser-smoke.mjs
+      - .github/workflows/pf08a-a3-01-compact-analytics-states.yml
+      - docs/execution-batches/PF-08A-A3-01-COMPACT-ANALYTICS-STATES/**
+  pull_request:
+    branches:
+      - main
+    paths:
+      - src/familypilot.html
+      - src/familypilot-scope.js
+      - src/familypilot-analytics-state.js
+      - familypilot-scope.js
+      - familypilot-analytics-state.js
+      - index.html
+      - tools/pf08a-a3-01-apply-compact-analytics-states.mjs
+      - tools/pf08a-a3-01-finalize-runtime-artifacts.mjs
+      - tools/pf08a-a3-01-verify-compact-analytics-states.mjs
+      - tools/pf08a-a3-01-browser-smoke.mjs
+      - .github/workflows/pf08a-a3-01-compact-analytics-states.yml
+      - docs/execution-batches/PF-08A-A3-01-COMPACT-ANALYTICS-STATES/**
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pf08a-a3-01-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  implement:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Apply compact Analytics state patch once
+        shell: bash
+        run: |
+          if grep -Fq 'compact-analytics-states-v1' src/familypilot.html; then
+            echo "Compact Analytics state patch is already present."
+          else
+            node tools/pf08a-a3-01-apply-compact-analytics-states.mjs
+          fi
+
+      - name: Finalize root and source artifacts
+        run: node tools/pf08a-a3-01-finalize-runtime-artifacts.mjs
+
+      - name: Verify classifier, artifacts and syntax
+        run: node tools/pf08a-a3-01-verify-compact-analytics-states.mjs
+
+      - name: Run headless Chrome Analytics regression
+        run: node tools/pf08a-a3-01-browser-smoke.mjs
+
+      - name: Commit generated Analytics runtime artifacts
+        shell: bash
+        run: |
+          if git diff --quiet -- src/familypilot.html index.html familypilot-analytics-state.js; then
+            echo "Compact Analytics runtime artifacts are already generated."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/familypilot.html index.html familypilot-analytics-state.js
+          git commit -m "Generate compact Analytics states"
+          git push origin HEAD:${{ github.ref_name }}
+
+  verify:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require generated compact Analytics marker
+        run: grep -Fq 'compact-analytics-states-v1' src/familypilot.html
+      - name: Recreate final Analytics artifacts
+        run: node tools/pf08a-a3-01-finalize-runtime-artifacts.mjs
+      - name: Require generated artifacts to be committed
+        run: git diff --exit-code -- src/familypilot.html index.html familypilot-analytics-state.js
+      - name: Verify classifier, artifacts and syntax
+        run: node tools/pf08a-a3-01-verify-compact-analytics-states.mjs
+      - name: Run headless Chrome Analytics regression
+        run: node tools/pf08a-a3-01-browser-smoke.mjs
