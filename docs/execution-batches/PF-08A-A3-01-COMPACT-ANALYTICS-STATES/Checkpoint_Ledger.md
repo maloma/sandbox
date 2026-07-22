@@ -52,4 +52,51 @@ Append-only rule: preserve all existing records and append later transitions usi
 - **Next Authorized Transition:** CP-02 implementation, artifact generation and browser regression.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 003 — CP-02 Runtime Package Generated
+
+- **Ordering Marker:** 003
+- **Checkpoint ID:** CP-02
+- **Status:** COMPLETED_PENDING_TRUSTED_RERUN
+- **Objective:** Implement compact Analytics states while preserving the existing financial result set and source explainability.
+- **Completed Changes:**
+  - created pure `FamilyPilotAnalyticsState` classifier;
+  - added `scope_empty`, `period_empty`, `income_only`, `expense_only`, `mixed` and `filtered_empty` UI states;
+  - added the honest basis label `На основе записанных операций`;
+  - retained missing-category operations in totals and source rows;
+  - made missing-category kind use the operation kind;
+  - preserved wallet scope, independent periods, Reset semantics, Trash exclusion and operation drill-down;
+  - committed deterministic classifier, syntax/static and headless-Chrome verification scripts;
+  - retired the completed IF-02 workflow from automatic future PR gating.
+- **Generated HTML Blob:** `32d309bdbca5eecd84f2aaaad1ef2d28837b0a22` for both `src/familypilot.html` and `index.html`.
+- **Generated Analytics Module Blob:** `9d727a7ae18c8bfdb9a06adcd46b6e54f43c1aea` for both module locations.
+- **Expected Changed Paths:** exactly twelve paths enumerated by PR #18.
+- **Verification Boundary:** branch-generated artifacts exist, but terminal PASS requires independent re-execution by workflow code already present on the default branch.
+- **Exact Stop Point:** trusted PR gate pending on a synchronized exact head.
+- **Next Authorized Transition:** install and invoke trusted default-branch gate.
+- **Record Integrity State:** VALID.
+
+---
+
+## Record 004 — CP-03 Trusted Gate Installed and PR Synchronized
+
+- **Ordering Marker:** 004
+- **Checkpoint ID:** CP-03
+- **Status:** READY_FOR_TRUSTED_GATE
+- **Objective:** Eliminate the earlier CI-trigger ambiguity and verify PR #18 from trusted default-branch workflow code.
+- **Trusted Gate Pull Request:** `#19` — `Add trusted A3 pull-request gate`.
+- **Trusted Gate Head:** `a57b04af56fea55ade981970f042abea3d3be2f5`.
+- **Trusted Gate Merge:** `4e0e8cc1cf2451318ccb4e03e3b5b613c40dacd1`.
+- **Gate Contract:** exact PR-head checkout; marker check; artifact regeneration; zero-diff assertion; classifier and syntax verification; full headless-Chrome Analytics regression.
+- **Current A3 Pull Request:** `#18` — `Implement compact Analytics states and source consistency`.
+- **Manifest Version:** 1.1.
+- **Founder Decision Recorded Separately:** Capital values must be hidden on Main by default and opened only after pressing a `Капитал` button. This is a follow-on privacy batch and is not mixed into A3 calculations.
+- **Verification Result:** READY. This record commit synchronizes PR #18 and must trigger the trusted gate from `sandbox/main`.
+- **Recovery Action:** do not merge if no exact-head trusted workflow PASS exists.
+- **Exact Stop Point:** fetch the new PR head and trusted workflow result.
+- **Next Authorized Transition:** exact-head PASS → merge → public Chrome verification → terminal evidence.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
