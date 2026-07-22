@@ -19,12 +19,10 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Canonical FamilyPilot Head:** `5b96881312f8cb9702117a2867d754547611d991`.
 - **Sandbox Starting Head:** `4891ea40ff8e73dfb6c0fc3a9ab1a237a31131b8`.
 - **Branch Search:** no pre-existing `pf08a-m3-02` branch.
-- **Repository Reconciliation:** `sandbox@4891ea40...` is 46 commits ahead of M3-01 terminal evidence, but those later changes are confined to unrelated `crmos-questionnaire` paths; FamilyPilot runtime blobs remain the accepted M3-01 blobs.
-- **Current M3 Conflict:** visible `Сегодня / Просрочено / Впереди` summary cards remain and must be removed.
-- **Current Domain Limits:** one-time/monthly only; next occurrence generated on payment/skip; no arbitrary interval, finite ending, amount version, quick-pay list action, actual correction or archive.
-- **Current Mounting Strategy:** retain canonical HTML/root equality and load an additive UI completion module from the obligations domain bootstrap.
+- **Repository Reconciliation:** later commits after M3-01 are confined to unrelated `crmos-questionnaire` paths; FamilyPilot runtime blobs remained accepted M3-01 blobs.
+- **Current M3 Conflict:** visible `Сегодня / Просрочено / Впереди` summary cards remained and required removal.
 - **Usage Constraint:** reuse existing trusted M3 workflow/test paths; do not create a new workflow family.
-- **Verification Result:** PASS. Runtime completion can proceed without touching unrelated repository content.
+- **Verification Result:** PASS.
 - **Next Authorized Transition:** CP-02 domain and UI implementation.
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
@@ -36,23 +34,11 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Ordering Marker:** 002
 - **Checkpoint ID:** CP-02
 - **Status:** PARTIAL / ACTIVE
-- **Environment Finding:** direct `git clone` from the execution container is unavailable because outbound DNS to GitHub is blocked.
-- **Recovery:** inspect exact source through the GitHub connector and construct/test replacement files locally without a repository checkout.
-- **Domain Artifact:** schema-v4 obligations module constructed locally.
-- **Local Syntax:** `node --check` PASS.
-- **Local Domain Tests:** PASS for:
-  - every 3 months with exact count 11;
-  - idempotent regeneration;
-  - month-end clamping from the 31st;
-  - `starting with next` and `only this` amount changes;
-  - one linked Expense and duplicate rejection;
-  - actual-payment correction with stable operation id;
-  - moving one occurrence without changing adjacent occurrences;
-  - archive stopping further generation;
-  - M3-01 monthly-state normalization to schema v4.
-- **UI Artifact:** additive post-bootstrap completion module constructed locally; syntax PASS.
-- **Exact Stop Point:** persist verified domain/UI files and upgrade the existing M3 trusted tests.
-- **Next Authorized Transition:** create repository artifacts on the current branch, then open one bounded PR.
+- **Environment Finding:** direct `git clone` was unavailable because outbound DNS to GitHub was blocked.
+- **Recovery:** exact source inspected through GitHub connector; replacement files constructed and syntax/domain tested locally.
+- **Local Domain Tests:** PASS for recurrence, finite count, idempotence, month-end clamping, amount scopes, stable payment correction, one-occurrence move, archive and legacy normalization.
+- **UI Artifact:** additive calendar/completion module constructed; syntax PASS.
+- **Next Authorized Transition:** persist package and open one bounded PR.
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
@@ -68,15 +54,36 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Domain Test Commit:** `329afaeec661f396500e42dfb7cbbbbfe7bb1d23`.
 - **Static Verifier Commit:** `a8778e1e0d050966b2aedb718d8da9d580d233e8`.
 - **Browser Scenario Commit:** `23987a4ac2cc5c2ace481c4790f749aa521e8fc2`.
-- **Implemented Domain:** additive schema v4; arbitrary interval; count/date/unlimited ending; deterministic sequence; legacy monthly normalization; amount versions; one-occurrence move; archive/restore; one linked Expense; stable-operation correction.
-- **Implemented UI:** forbidden summary removal; month navigation; date grouping and native-currency totals; quick pay; expanded recurrence editor; payment correction; amount-scope editor; archive/restore.
-- **Verification Reuse:** existing M3-01 domain/static/browser filenames were upgraded so existing trusted workflows execute the M3-02 contract without adding another workflow family.
-- **Preserved Invariants:** Option A navigation; byte-identical source/root HTML; hidden Capital; A3 Analytics; M1 operations; household/personal isolation; honest unavailable Debts/Savings entries.
-- **Local Verification:** domain syntax PASS; UI syntax PASS; complete deterministic domain suite PASS.
-- **Browser Verification State:** pending authoritative GitHub Chrome gate; no local browser PASS is claimed.
-- **Expected Changed Paths:** seven bounded files — two runtime modules, three existing verification files, Manifest and Ledger.
-- **Verification Result:** PASS for package construction. One Draft PR and one existing workflow gate are authorized.
-- **Next Authorized Transition:** open PR, enumerate actual paths, inspect exact workflow results and correct only exact failures.
+- **Implemented Domain:** schema v4, arbitrary recurrence, three ending modes, deterministic sequence, legacy normalization, amount versions, one-occurrence move, archive/restore, linked payment and stable correction.
+- **Implemented UI:** summary removal, month calendar, date groups, quick pay, recurrence editor, actual correction, amount scopes and archive/restore.
+- **Verification Reuse:** existing M3 verification filenames upgraded; no new workflow family.
+- **Verification Result:** PASS for package construction.
+- **Next Authorized Transition:** exact PR gate.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
+---
+
+## Record 004 — CP-03 Trusted Generation and Browser Gate Passed
+
+- **Ordering Marker:** 004
+- **Checkpoint ID:** CP-03
+- **Status:** READY_FOR_FINAL_SYNCHRONIZED_GATE
+- **Pull Request:** `#38` — `Complete obligation schedules and calendar`.
+- **Original PR Head:** `c14ab98565935c29a1d9808fcef9a4adc2576e65`.
+- **Bounded Recovery 1:** domain test fixture added normalized obligation arrays after exact `undefined.push` diagnostic.
+- **Bounded Recovery 2:** legacy browser API correction became M3-02 aware.
+- **Bounded Recovery 3:** finalizer inlined M3-02 UI inside the closed canonical app IIFE after exact `test API did not become ready` diagnostic.
+- **Trusted Verified Head:** `77c2f91349dbb7ee6ab19f573cc2f6cc43890882`.
+- **Trusted Workflow:** `29916154117`, conclusion `success`.
+- **Generated Durable Head:** `123b6a783695120cdd3483dcce277a5944be847d`.
+- **Exact Passed Steps:** syntax; domain tests; deterministic legacy recovery; finalization; static contract; A3 Chrome; Hidden Capital Chrome; full M3-02 Chrome; atomic persistence.
+- **M3-02 Browser Assertions:** summary cards absent; every three months/count eleven; no duplicates; month grouping; quick pay; one linked Expense; stable-operation correction; Trash/restore; starting-next amount version; one-occurrence move; overdue/future coexistence; archive; personal scope isolation; runtime exceptions NONE.
+- **Actual Changed Paths:** 11 expected paths, including generated `src/familypilot.html` and `index.html` plus two legacy recovery/finalization paths required by the reused gate.
+- **Mergeability:** PASS.
+- **Usage Result:** no new workflow family introduced.
+- **Verification Result:** PASS. This owner evidence commit triggers the required zero-diff exact-head rerun.
+- **Next Authorized Transition:** require synchronized PASS on the new evidence head, then expected-head protected merge.
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
