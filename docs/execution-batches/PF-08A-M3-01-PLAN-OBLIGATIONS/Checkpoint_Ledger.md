@@ -145,4 +145,24 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 007 — Large Blob Transport Corrected
+
+- **Ordering Marker:** 007
+- **Checkpoint ID:** CP-03-REC04
+- **Status:** COMPLETED / RETRY_READY
+- **Trusted Run:** `29906983703`.
+- **Verification Result Before Transport:** every product, domain, source and browser step PASS, including M3 Chrome.
+- **Exact Transport Cause:** generated HTML JSON was supplied to `curl -d` as one command-line argument and exceeded the operating-system maximum length for a single argument.
+- **Classification:** payload transport size limit; Git API, token permissions and verified content remain valid.
+- **Correction Pull Request:** `#32` — `Stream large M3 blob payloads`.
+- **Correction Merge:** `47d7c400cd2e7ba011d40a83ffdca086d4ac4e56`.
+- **Correction:** pipe `jq` output directly into `curl --data-binary @-`; keep the atomic tree, commit and fast-forward ref update unchanged.
+- **Scope:** no runtime content, financial semantics, test assertions or generated artifact changed.
+- **Verification Result:** RETRY_READY. The next run must persist the already verified artifacts atomically.
+- **Next Authorized Transition:** inspect resulting branch commit and run zero-diff synchronized verification.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
