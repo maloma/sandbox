@@ -41,9 +41,9 @@ const harness=`<!doctype html>
     const expenseCategory=initial.categories.find(category=>category.kind==='expense'&&!category.archivedAt)?.id;
     assert(expenseCategory,'Expense category fixture missing');
 
-    // Accepted navigation remains stable.
+    // Accepted navigation remains stable. Icons and labels are adjacent in the DOM.
     const nav=[...doc.querySelectorAll('nav.bottom [data-screen]')].map(node=>text(node));
-    assert(JSON.stringify(nav)===JSON.stringify(['⌂ Главная','☷ Операции','▣ План','⊞ Ещё']),'Bottom navigation labels/order changed');
+    assert(JSON.stringify(nav)===JSON.stringify(['⌂Главная','☷Операции','▣План','⊞Ещё']),'Bottom navigation labels/order changed: '+JSON.stringify(nav));
     assert(text(doc.getElementById('capitalRevealBtn'))==='Капитал','Hidden Capital control regressed');
     assert(!doc.getElementById('capitalInfo').classList.contains('open'),'Capital overlay must remain closed by default');
 
