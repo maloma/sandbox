@@ -35,4 +35,25 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 002 — CP-02 Implementation Package and Trusted Gate Activated
+
+- **Ordering Marker:** 002
+- **Checkpoint ID:** CP-02 / CP-03
+- **Status:** READY_FOR_TRUSTED_GENERATION
+- **Implementation Pull Request:** `#26` — `Mount Plan hub and obligations foundation`.
+- **Completed Package Files:** obligations domain module, deterministic HTML patch, finalizer, static verifier, domain tests, M3 Chrome scenario and branch workflow.
+- **Trusted Gate Pull Request:** `#27` — `Add trusted M3 Plan and obligations gate`.
+- **Trusted Gate Merge:** `cdfc36c5c6aa4440960b8237cd7b1f72163f0e38`.
+- **Gate Order:** exact head → syntax → domain tests → deterministic patch → source/root finalization → static contract → A3 Chrome → hidden Capital Chrome → M3 Chrome → generated HTML persistence.
+- **Persistence Rule:** `src/familypilot.html` and `index.html` are written to the PR branch only after every verification step passes.
+- **Expected Runtime Result:** unchanged bottom navigation; real Plan hub; Obligations mounted; Debts/Savings honest; schema v3 additive state; one linked Expense per payment; Trash/restore recalculation; scope isolation.
+- **Verification Result:** READY. This record synchronizes PR #26 against trusted default-branch workflow code.
+- **Recovery Action:** reject merge and correct the first exact failed assertion; no partial runtime artifact is accepted.
+- **Exact Stop Point:** trusted generation run pending.
+- **Next Authorized Transition:** inspect exact workflow steps and generated branch state.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
