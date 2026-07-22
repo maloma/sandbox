@@ -1,65 +1,13 @@
-name: PF-08A IF-01 Canonical Runtime Source
+name: PF-08A IF-01 Canonical Runtime Source (Completed Audit)
 
 on:
-  push:
-    branches:
-      - agent/pf08a-if01-canonical-runtime-source
-    paths:
-      - src/familypilot.html
-      - index.html
-      - tools/pf08a-if01-consolidate-runtime.mjs
-      - .github/workflows/pf08a-if01-canonical-runtime-source.yml
-      - docs/execution-batches/PF-08A-IF-01-CANONICAL-RUNTIME-SOURCE/**
-  pull_request:
-    branches:
-      - main
-    paths:
-      - src/familypilot.html
-      - index.html
-      - tools/pf08a-if01-consolidate-runtime.mjs
-      - .github/workflows/pf08a-if01-canonical-runtime-source.yml
-      - docs/execution-batches/PF-08A-IF-01-CANONICAL-RUNTIME-SOURCE/**
+  workflow_dispatch:
 
 permissions:
-  contents: write
-
-concurrency:
-  group: pf08a-if01-${{ github.ref }}
-  cancel-in-progress: false
+  contents: read
 
 jobs:
-  consolidate:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref_name }}
-          fetch-depth: 0
-
-      - name: Generate canonical source and root artifact
-        run: node tools/pf08a-if01-consolidate-runtime.mjs
-
-      - name: Verify generated runtime
-        run: node tools/pf08a-if01-consolidate-runtime.mjs --verify
-
-      - name: Commit generated runtime when changed
-        shell: bash
-        run: |
-          if git diff --quiet -- src/familypilot.html index.html; then
-            echo "Canonical runtime already generated."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/familypilot.html index.html
-          git commit -m "Generate canonical FamilyPilot runtime source"
-          git push origin HEAD:${{ github.ref_name }}
-
-  verify:
-    if: github.event_name == 'pull_request'
-    permissions:
-      contents: read
+  verify-completed-migration:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
