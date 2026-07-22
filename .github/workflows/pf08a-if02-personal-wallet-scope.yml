@@ -7,9 +7,12 @@ on:
     paths:
       - src/familypilot.html
       - src/familypilot-scope.js
+      - familypilot-scope.js
       - index.html
       - tools/pf08a-if02-apply-personal-wallet-scope.mjs
+      - tools/pf08a-if02-finalize-runtime-artifacts.mjs
       - tools/pf08a-if02-verify-personal-wallet-scope.mjs
+      - tools/pf08a-if02-browser-smoke.mjs
       - .github/workflows/pf08a-if02-personal-wallet-scope.yml
       - docs/execution-batches/PF-08A-IF-02-PERSONAL-WALLET-SCOPE/**
   pull_request:
@@ -18,9 +21,12 @@ on:
     paths:
       - src/familypilot.html
       - src/familypilot-scope.js
+      - familypilot-scope.js
       - index.html
       - tools/pf08a-if02-apply-personal-wallet-scope.mjs
+      - tools/pf08a-if02-finalize-runtime-artifacts.mjs
       - tools/pf08a-if02-verify-personal-wallet-scope.mjs
+      - tools/pf08a-if02-browser-smoke.mjs
       - .github/workflows/pf08a-if02-personal-wallet-scope.yml
       - docs/execution-batches/PF-08A-IF-02-PERSONAL-WALLET-SCOPE/**
 
@@ -41,23 +47,35 @@ jobs:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
 
-      - name: Apply personal wallet scope
-        run: node tools/pf08a-if02-apply-personal-wallet-scope.mjs
+      - name: Apply personal wallet scope once
+        shell: bash
+        run: |
+          if grep -Fq 'personal-wallet-scope-v1' src/familypilot.html; then
+            echo "Personal wallet source patch is already present."
+          else
+            node tools/pf08a-if02-apply-personal-wallet-scope.mjs
+          fi
 
-      - name: Verify personal wallet scope
+      - name: Finalize root and source runtime artifacts
+        run: node tools/pf08a-if02-finalize-runtime-artifacts.mjs
+
+      - name: Verify personal wallet scope model and syntax
         run: node tools/pf08a-if02-verify-personal-wallet-scope.mjs
+
+      - name: Run headless browser wallet-scope regression
+        run: node tools/pf08a-if02-browser-smoke.mjs
 
       - name: Commit generated canonical runtime
         shell: bash
         run: |
-          if git diff --quiet -- src/familypilot.html index.html; then
-            echo "Personal wallet scope is already generated."
+          if git diff --quiet -- src/familypilot.html index.html familypilot-scope.js; then
+            echo "Personal wallet runtime artifacts are already generated."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/familypilot.html index.html
-          git commit -m "Generate personal wallet viewing scope"
+          git add src/familypilot.html index.html familypilot-scope.js
+          git commit -m "Finalize personal wallet viewing scope"
           git push origin HEAD:${{ github.ref_name }}
 
   verify:
@@ -67,9 +85,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Re-run deterministic source patch
-        run: node tools/pf08a-if02-apply-personal-wallet-scope.mjs
-      - name: Require generated source to be committed
-        run: git diff --exit-code -- src/familypilot.html index.html
-      - name: Verify generated personal wallet scope
+      - name: Require generated personal-wallet marker
+        run: grep -Fq 'personal-wallet-scope-v1' src/familypilot.html
+      - name: Recreate final runtime artifacts
+        run: node tools/pf08a-if02-finalize-runtime-artifacts.mjs
+      - name: Require generated artifacts to be committed
+        run: git diff --exit-code -- src/familypilot.html index.html familypilot-scope.js
+      - name: Verify personal wallet scope model and syntax
         run: node tools/pf08a-if02-verify-personal-wallet-scope.mjs
+      - name: Run headless browser wallet-scope regression
+        run: node tools/pf08a-if02-browser-smoke.mjs
