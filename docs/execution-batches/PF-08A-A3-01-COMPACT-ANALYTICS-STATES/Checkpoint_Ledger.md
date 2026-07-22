@@ -1,7 +1,7 @@
 # Checkpoint Ledger — PF-08A-A3-01-COMPACT-ANALYTICS-STATES
 
 **Document Type:** Append-Only Runtime Checkpoint Ledger  
-**Status:** Active  
+**Status:** Closed  
 **Repository:** `maloma/sandbox`  
 **Branch:** `agent/pf08a-a3-01-compact-analytics-states`  
 **Created:** 2026-07-22
@@ -119,6 +119,35 @@ Append-only rule: preserve all existing records and append later transitions usi
 - **Exact Stop Point:** this append-only evidence commit.
 - **Next Authorized Transition:** final trusted evidence-head gate and automatic merge.
 - **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
+---
+
+## Record 006 — CP-03 Merge, Publication and Public Verification Completed
+
+- **Ordering Marker:** 006
+- **Checkpoint ID:** CP-03
+- **Status:** COMPLETED
+- **Objective:** Record final exact-head verification, merge, publication and public browser evidence.
+- **Pull Request:** `#18` — `Implement compact Analytics states and source consistency`.
+- **Final Head:** `7f3c09be988d9546606a1c6503508239c8a1fd37`.
+- **Final Trusted Workflow:** `PF-08A A3-01 Trusted PR Gate`, run `29888340292`, conclusion `success`.
+- **Final Branch Workflow:** `PF-08A A3-01 Compact Analytics States`, run `29888340290`, conclusion `success`.
+- **Merge Method:** merge commit with expected-head protection.
+- **Resulting Main Commit:** `a42d3add5160f3a95dab7392ac17ef9b28bbdecf`.
+- **Public URL:** `https://maloma.github.io/sandbox/`.
+- **Public Verification Time:** `2026-07-22T03:26:34.002Z`.
+- **Public HTML Status:** `200`.
+- **Public Scope Module Status:** `200`.
+- **Public Analytics Module Status:** `200`.
+- **Publication Attempts:** `1`.
+- **Public Assertions:** all required empty/one-sided/mixed/filter states PASS; missing-category values preserved; totals and source rows consistent; Reset preserves period and scope; personal-wallet isolation preserved; runtime exceptions none.
+- **Evidence Path:** `docs/execution-batches/PF-08A-A3-01-COMPACT-ANALYTICS-STATES/Public_Verification.md`.
+- **Verification Result:** PASS. Published runtime satisfies the accepted compact Analytics contract.
+- **Rollback Method:** revert `a42d3add5160f3a95dab7392ac17ef9b28bbdecf` or restore `667ee9980a584f55fd5de9191df15230d796a438`.
+- **Terminal State:** `BATCH_COMPLETED`.
+- **Next Authorized Transition:** `PF-08A-PRIV-01 — Hidden Capital Disclosure`.
+- **Founder Intervention Required:** No; the Founder already supplied the disclosure decision.
 - **Record Integrity State:** VALID.
 
 # END OF CURRENT LEDGER PREFIX
