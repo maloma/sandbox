@@ -1,12 +1,16 @@
 # Batch Manifest — PF-08A-M3-02-OBLIGATION-SCHEDULE-CALENDAR
 
 **Document Type:** Runtime Execution Batch Manifest  
-**Status:** Ready for Final Exact-Head Gate  
-**Version:** 1.1  
+**Status:** Completed  
+**Version:** 1.2  
 **Repository:** `maloma/sandbox`  
 **Starting Commit:** `4891ea40ff8e73dfb6c0fc3a9ab1a237a31131b8`  
-**Working Branch:** `agent/pf08a-m3-02-obligation-schedule-calendar`  
-**Pull Request:** `#38`  
+**Implementation Branch:** `agent/pf08a-m3-02-obligation-schedule-calendar`  
+**Implementation Pull Request:** `#38`  
+**Implementation Head:** `4f037ec38410245bb06d32e7eba647a826eb99eb`  
+**Implementation Merge:** `7fd7fa09f9b4908053aa0fec27fe691f1b878705`  
+**Closure / Public Gate Branch:** `agent/pf08a-m3-02-public-gate-upgrade`  
+**Closure Pull Request:** `#39`  
 **Authority:** `maloma/FamilyPilot@5b96881312f8cb9702117a2867d754547611d991`, documents 31, 60, 65 and 66  
 **Depth Policy:** `SINGLE_DEPTH_HIGH`  
 **Created:** 2026-07-22
@@ -15,23 +19,23 @@
 
 Complete the accepted current M3 boundary without changing Option A navigation or duplicating financial facts.
 
-## Completed Implementation Scope
+## Completed Runtime Scope
 
 - removed the visible `Сегодня / Просрочено / Впереди` summary cards;
-- supported arbitrary day, week, month and year intervals;
-- supported unlimited, exact-count and until-date endings;
+- implemented arbitrary day, week, month and year intervals;
+- implemented unlimited, exact-count and until-date endings;
 - generated deterministic idempotent occurrence sequences;
 - preserved overdue and later occurrences simultaneously;
-- added month navigation and per-date grouping with native-currency totals;
-- added quick payment from an occurrence row;
-- corrected actual amount/date through the same linked Expense operation;
+- added month navigation and per-date native-currency grouping;
+- added quick payment directly from occurrence rows;
+- corrected actual amount/date through the same linked Expense operation id;
 - moved one occurrence without rewriting adjacent occurrences or the rule;
 - implemented `only this`, `this and following` and `starting with next` expected-amount scopes;
 - archived/restored rules while preserving history and linked operations;
 - normalized M3-01 state additively to schema v4;
 - preserved M1, A3, hidden Capital, personal scope and Option A;
-- inlined the M3-02 UI completion module deterministically inside the canonical app IIFE;
-- preserved byte-identical `src/familypilot.html` and `index.html`.
+- inlined the UI completion module deterministically inside the canonical app IIFE;
+- preserved byte-identical source/root HTML.
 
 ## Excluded Scope Preserved
 
@@ -43,100 +47,101 @@ Complete the accepted current M3 boundary without changing Option A navigation o
 - paid dependencies;
 - Safe-to-Spend, plan-vs-actual and M5.
 
-## Verification Strategy
-
-No new GitHub Actions workflow family was introduced. Existing trusted M3 gates were reused by upgrading existing domain, static and browser test paths.
-
 ## Checkpoint Results
 
 ### CP-01 — Exact Runtime Inspection
 
 - **Status:** COMPLETED
-- FamilyPilot runtime at `4891ea40...` was unchanged from accepted M3-01;
+- FamilyPilot runtime was unchanged from accepted M3-01;
 - unrelated `crmos-questionnaire` history remained untouched;
 - no pre-existing M3-02 branch existed.
 
 ### CP-02 — Domain and UI Completion
 
 - **Status:** COMPLETED
-- schema-v4 domain implemented;
-- calendar and correction UI implemented;
+- schema-v4 domain, calendar UI and correction flows implemented;
 - existing M3 verification suite upgraded;
-- deterministic finalizer integrated the UI inside the app closure.
+- no new workflow family introduced.
 
 ### CP-03 — Exact PR Gate
 
-- **Status:** READY_FOR_FINAL_GATE
-- **Draft PR:** `#38`;
-- **Trusted Generation Head:** `77c2f91349dbb7ee6ab19f573cc2f6cc43890882`;
-- **Trusted Workflow:** `29916154117`, conclusion `success`;
-- **Generated Durable Head:** `123b6a783695120cdd3483dcce277a5944be847d`;
-- domain syntax and behavior — PASS;
-- deterministic finalization — PASS;
-- static contract — PASS;
-- A3 Chrome regression — PASS;
-- Hidden Capital Chrome regression — PASS;
-- complete M3-02 Chrome regression — PASS;
-- atomic generated-artifact persistence — PASS;
-- mergeability — PASS;
-- actual changed paths — 11 expected runtime, verification and evidence paths.
-
-Required remaining gate:
-
-- owner evidence head;
-- synchronized zero-diff rerun of the same trusted suite;
-- expected-head protected merge.
+- **Status:** COMPLETED
+- **Implementation PR:** `#38`;
+- **Final Exact Head:** `4f037ec38410245bb06d32e7eba647a826eb99eb`;
+- **Implementation Merge:** `7fd7fa09f9b4908053aa0fec27fe691f1b878705`;
+- all six existing suites on final head — SUCCESS;
+- domain, static, A3 Chrome, Hidden Capital Chrome and M3-02 Chrome — PASS;
+- generated runtime zero-diff — PASS;
+- expected-head merge — PASS.
 
 ### CP-04 — Publication and Closure
 
-- **Status:** PLANNED
-- verify actual GitHub Pages HTML and four runtime modules;
-- run complete public M3-02 Chrome scenario;
-- store hashes and terminal evidence;
-- close batch and synchronize FamilyPilot;
-- proceed to M2 only after PASS.
+- **Status:** COMPLETED
+- **Public URL:** `https://maloma.github.io/sandbox/`;
+- **Public Verification Time:** `2026-07-22T11:40:28.030Z`;
+- **Publication Attempts:** `1`;
+- HTML, Scope, Analytics, Obligations and Obligations UI — HTTP 200;
+- full downloaded-package M3-02 Chrome scenario — PASS;
+- runtime exceptions — NONE;
+- evidence: `docs/execution-batches/PF-08A-M3-02-OBLIGATION-SCHEDULE-CALENDAR/Public_Verification.md`.
+
+## Public Hashes
+
+- **HTML:** `4a34dd3674888e38e31e7aaa422db2f94ae7fdcbf2cde6ce2d1d15c46b3c4388`;
+- **Scope:** `800ae1d9b8d8ad68ae6f0215e5b94978890e7a87d9f012fd5448e6e39de0899b`;
+- **Analytics:** `9f934f1ecd3c87e747cd9f99a2cb9b83abc07040eacc67ddaf1808fe3ab77c9f`;
+- **Obligations:** `539f0d44868478a51b07da63f58dc3ab28ae46ac96d2e203fbe6f94381b0f61b`;
+- **Obligations UI:** `00f3660eb7d5458c5a12ab051d59704f725e1dcb3d2a090543189e71cf5ea86f`.
 
 ## Verified Invariants
 
-- Option A navigation unchanged;
-- hidden Capital remains closed by default;
-- A3 Analytics remains consistent;
-- one payment creates one linked Expense;
-- payment correction preserves operation id;
-- no duplicate occurrences after normalization;
-- no forbidden summary cards in the runtime DOM;
-- personal obligations do not leak into household scope;
-- Debts and Savings remain honest unavailable entries;
-- rollback remains available.
+- Option A navigation unchanged — PASS;
+- separate summary cards absent — PASS;
+- every three months / exact count eleven — PASS;
+- idempotent generation — PASS;
+- overdue and later occurrences coexist — PASS;
+- month navigation and per-date grouping — PASS;
+- quick pay creates one linked Expense — PASS;
+- actual correction preserves operation id — PASS;
+- Trash/restore recalculation — PASS;
+- starting-next amount version — PASS;
+- one-occurrence move — PASS;
+- archive preserves history — PASS;
+- personal scope isolation — PASS;
+- hidden Capital and A3 Analytics — PASS;
+- runtime exceptions — NONE.
 
 ## Recovery Record
 
 Bounded recovery corrected:
 
-- isolated domain fixtures missing normalized obligation arrays;
-- legacy M3-01 browser API correction not recognizing the M3-02 contract;
+- isolated test fixtures missing normalized obligation arrays;
+- legacy M3-01 browser correction not recognizing M3-02;
 - external UI module lacking access to the closed app IIFE.
 
-No correction expanded product scope or introduced a new workflow family.
+No correction expanded product scope or created a new workflow family.
 
 ## Rollback
 
-Revert the eventual M3-02 implementation merge. The accepted pre-batch FamilyPilot runtime remains recoverable while unrelated later `sandbox` history is preserved.
+Revert implementation merge `7fd7fa09f9b4908053aa0fec27fe691f1b878705`. Unrelated later `sandbox` history remains preserved.
 
-## Terminal Conditions
+## Terminal State
 
-- `BATCH_COMPLETED`;
-- `CHECKPOINT_FAILED_AFTER_BOUNDED_RECOVERY`;
-- `REPOSITORY_STATE_CONFLICT`;
-- `PUBLIC_VERIFICATION_FAILED`.
+```text
+BATCH_COMPLETED
+```
 
 ## Changelog
 
+### Version 1.2 — 2026-07-22
+
+- recorded implementation merge and public verification;
+- completed CP-03 and CP-04;
+- closed M3-02 terminally.
+
 ### Version 1.1 — 2026-07-22
 
-- recorded completed implementation and trusted Chrome PASS;
-- recorded generated durable head;
-- advanced CP-03 to final synchronized gate.
+- recorded trusted generation and final exact-head gate.
 
 ### Version 1.0 — 2026-07-22
 

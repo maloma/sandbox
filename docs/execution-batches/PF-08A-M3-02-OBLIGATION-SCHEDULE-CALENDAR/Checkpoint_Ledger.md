@@ -1,7 +1,7 @@
 # Checkpoint Ledger — PF-08A-M3-02-OBLIGATION-SCHEDULE-CALENDAR
 
 **Document Type:** Append-Only Runtime Checkpoint Ledger  
-**Status:** Active  
+**Status:** Closed  
 **Repository:** `maloma/sandbox`  
 **Branch:** `agent/pf08a-m3-02-obligation-schedule-calendar`  
 **Created:** 2026-07-22
@@ -19,7 +19,7 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Canonical FamilyPilot Head:** `5b96881312f8cb9702117a2867d754547611d991`.
 - **Sandbox Starting Head:** `4891ea40ff8e73dfb6c0fc3a9ab1a237a31131b8`.
 - **Branch Search:** no pre-existing `pf08a-m3-02` branch.
-- **Repository Reconciliation:** later commits after M3-01 are confined to unrelated `crmos-questionnaire` paths; FamilyPilot runtime blobs remained accepted M3-01 blobs.
+- **Repository Reconciliation:** later commits after M3-01 were confined to unrelated `crmos-questionnaire` paths; FamilyPilot runtime blobs remained accepted M3-01 blobs.
 - **Current M3 Conflict:** visible `Сегодня / Просрочено / Впереди` summary cards remained and required removal.
 - **Usage Constraint:** reuse existing trusted M3 workflow/test paths; do not create a new workflow family.
 - **Verification Result:** PASS.
@@ -68,22 +68,49 @@ Append-only rule: preserve all records and append later transitions using monoto
 
 - **Ordering Marker:** 004
 - **Checkpoint ID:** CP-03
-- **Status:** READY_FOR_FINAL_SYNCHRONIZED_GATE
+- **Status:** COMPLETED
 - **Pull Request:** `#38` — `Complete obligation schedules and calendar`.
 - **Original PR Head:** `c14ab98565935c29a1d9808fcef9a4adc2576e65`.
 - **Bounded Recovery 1:** domain test fixture added normalized obligation arrays after exact `undefined.push` diagnostic.
 - **Bounded Recovery 2:** legacy browser API correction became M3-02 aware.
 - **Bounded Recovery 3:** finalizer inlined M3-02 UI inside the closed canonical app IIFE after exact `test API did not become ready` diagnostic.
-- **Trusted Verified Head:** `77c2f91349dbb7ee6ab19f573cc2f6cc43890882`.
-- **Trusted Workflow:** `29916154117`, conclusion `success`.
+- **Trusted Generated Head:** `77c2f91349dbb7ee6ab19f573cc2f6cc43890882`.
 - **Generated Durable Head:** `123b6a783695120cdd3483dcce277a5944be847d`.
-- **Exact Passed Steps:** syntax; domain tests; deterministic legacy recovery; finalization; static contract; A3 Chrome; Hidden Capital Chrome; full M3-02 Chrome; atomic persistence.
+- **Final Exact Head:** `4f037ec38410245bb06d32e7eba647a826eb99eb`.
+- **Final Workflows:** M3 trusted/branch, A3 trusted/branch and Hidden Capital trusted/branch all `success`.
+- **Exact Passed Steps:** syntax; domain tests; deterministic legacy recovery; finalization; static contract; A3 Chrome; Hidden Capital Chrome; full M3-02 Chrome; zero-diff persistence.
 - **M3-02 Browser Assertions:** summary cards absent; every three months/count eleven; no duplicates; month grouping; quick pay; one linked Expense; stable-operation correction; Trash/restore; starting-next amount version; one-occurrence move; overdue/future coexistence; archive; personal scope isolation; runtime exceptions NONE.
-- **Actual Changed Paths:** 11 expected paths, including generated `src/familypilot.html` and `index.html` plus two legacy recovery/finalization paths required by the reused gate.
-- **Mergeability:** PASS.
-- **Usage Result:** no new workflow family introduced.
-- **Verification Result:** PASS. This owner evidence commit triggers the required zero-diff exact-head rerun.
-- **Next Authorized Transition:** require synchronized PASS on the new evidence head, then expected-head protected merge.
+- **Implementation Merge:** `7fd7fa09f9b4908053aa0fec27fe691f1b878705`.
+- **Verification Result:** PASS.
+- **Next Authorized Transition:** public downloaded-package verification and terminal closure.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
+---
+
+## Record 005 — CP-04 Publication and Terminal Closure Completed
+
+- **Ordering Marker:** 005
+- **Checkpoint ID:** CP-04
+- **Status:** COMPLETED
+- **Public Gate / Closure Pull Request:** `#39` — `Upgrade trusted public obligations gate to M3-02`.
+- **Public Verification Head:** `b008dc384be6a1be23227667bf03679f7cc57ed7`.
+- **Trusted Public Workflow:** `29916582447`, conclusion `success`.
+- **Public Verification Time:** `2026-07-22T11:40:28.030Z`.
+- **Public URL:** `https://maloma.github.io/sandbox/`.
+- **Publication Attempts:** `1`.
+- **HTTP Results:** HTML 200; Scope 200; Analytics 200; Obligations 200; Obligations UI 200.
+- **HTML SHA-256:** `4a34dd3674888e38e31e7aaa422db2f94ae7fdcbf2cde6ce2d1d15c46b3c4388`.
+- **Scope SHA-256:** `800ae1d9b8d8ad68ae6f0215e5b94978890e7a87d9f012fd5448e6e39de0899b`.
+- **Analytics SHA-256:** `9f934f1ecd3c87e747cd9f99a2cb9b83abc07040eacc67ddaf1808fe3ab77c9f`.
+- **Obligations SHA-256:** `539f0d44868478a51b07da63f58dc3ab28ae46ac96d2e203fbe6f94381b0f61b`.
+- **Obligations UI SHA-256:** `00f3660eb7d5458c5a12ab051d59704f725e1dcb3d2a090543189e71cf5ea86f`.
+- **Public Assertions:** Option A unchanged; summary cards absent; arbitrary recurrence/count eleven; idempotence; calendar/date grouping; quick pay; one linked Expense; stable-operation correction; Trash/restore; amount versions; one-occurrence move; overdue coexistence; archive; personal isolation; Hidden Capital/A3 preserved; runtime exceptions NONE.
+- **Evidence Path:** `docs/execution-batches/PF-08A-M3-02-OBLIGATION-SCHEDULE-CALENDAR/Public_Verification.md`.
+- **Rollback:** revert implementation merge `7fd7fa09f9b4908053aa0fec27fe691f1b878705`.
+- **Verification Result:** PASS. M3 is complete for the currently accepted boundary.
+- **Terminal State:** `BATCH_COMPLETED`.
+- **Next Authorized Transition:** merge closure evidence, synchronize `maloma/FamilyPilot`, then start M2 Debts according to the accepted roadmap.
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
