@@ -1,8 +1,8 @@
 # Batch Manifest — PF-08A-IF-01-CANONICAL-RUNTIME-SOURCE
 
 **Document Type:** Runtime Execution Batch Manifest  
-**Status:** Active  
-**Version:** 1.0  
+**Status:** Ready for Pull Request Verification  
+**Version:** 1.1  
 **Repository:** `maloma/sandbox`  
 **Starting Commit:** `32ddc846cdea4cafe8126e5a7fda9e320fe2c78a`  
 **Working Branch:** `agent/pf08a-if01-canonical-runtime-source`  
@@ -16,7 +16,7 @@ Remove runtime source rewriting from the public FamilyPilot loader, move all cur
 
 ## Included Scope
 
-- patch `src/familypilot.html` idempotently with the corrections currently injected by `index.html`;
+- patch `src/familypilot.html` idempotently with the corrections formerly injected by `index.html`;
 - make `index.html` an exact generated copy of the canonical source;
 - remove runtime `fetch`, string replacement and `document.write` behavior from the public entrypoint;
 - add an idempotent consolidation and verification script;
@@ -39,27 +39,37 @@ Remove runtime source rewriting from the public FamilyPilot loader, move all cur
 
 ### CP-01 — Establish Reproducible Consolidation
 
-- **Status:** READY
-- create idempotent patch/verification script;
-- add branch-only workflow;
-- ensure exact-match assertions fail closed.
+- **Status:** COMPLETED
+- **Result:** PASS.
+- **Evidence:**
+  - `tools/pf08a-if01-consolidate-runtime.mjs` performs exact-match, idempotent generation and fail-closed verification;
+  - `.github/workflows/pf08a-if01-canonical-runtime-source.yml` is bounded to the exact branch and exact affected paths;
+  - workflow write permission is limited to repository contents on the branch-generation job;
+  - pull-request verification is read-only.
 
 ### CP-02 — Generate Canonical Source and Root Artifact
 
-- **Status:** PLANNED
-- apply current runtime corrections to `src/familypilot.html`;
-- generate `index.html` as an exact copy;
-- prove old runtime patch loader is absent.
+- **Status:** COMPLETED
+- **Result:** PASS.
+- **Evidence:**
+  - `src/familypilot.html` blob SHA `90931925157a592d22a1d040efe97c13d0870e16`;
+  - `index.html` blob SHA `90931925157a592d22a1d040efe97c13d0870e16`;
+  - both files are byte-identical;
+  - both contain `canonical-runtime-source-v1`;
+  - accepted analytics-period count, transient category reset and visible double wallet-pulse corrections live directly in the source;
+  - the root entrypoint no longer contains the runtime fetch/string-replacement/document-write loader.
 
 ### CP-03 — Regression, PR, Merge and Public Verification
 
-- **Status:** PLANNED
-- verify source/index equality and required markers;
-- verify no forbidden loader constructs;
-- verify PR scope and workflow result;
-- merge with exact-head protection;
-- verify public root serves the canonical marker;
-- record rollback and terminal evidence.
+- **Status:** READY
+- **Required Transition:**
+  - open Draft PR;
+  - enumerate exact changed paths;
+  - inspect exact PR head and mergeability;
+  - obtain pull-request workflow PASS;
+  - merge with exact-head protection;
+  - verify the public root serves `canonical-runtime-source-v1`;
+  - record rollback and terminal evidence.
 
 ## Required Invariants
 
@@ -71,7 +81,17 @@ Remove runtime source rewriting from the public FamilyPilot loader, move all cur
 - unfinished category draft resets between forms;
 - category length and layout rules remain unchanged;
 - no localStorage key or data semantics change;
-- root `index.html` and `src/familypilot.html` are byte-identical after generation.
+- root `index.html` and `src/familypilot.html` remain byte-identical.
+
+## Verification Summary Before PR
+
+- canonical marker present exactly once — PASS;
+- source and root artifact share one blob SHA — PASS;
+- old runtime loader absent from generated root — PASS;
+- one doctype and one closing HTML tag — PASS;
+- generation script is idempotent — PASS;
+- runtime product semantics unchanged by scope — PASS;
+- rollback source commit retained — PASS.
 
 ## Recovery
 
@@ -86,5 +106,17 @@ Remove runtime source rewriting from the public FamilyPilot loader, move all cur
 - `REPOSITORY_STATE_CONFLICT`;
 - `WORKFLOW_PERMISSION_BLOCKER`;
 - `PUBLIC_VERIFICATION_FAILED`.
+
+## Changelog
+
+### Version 1.1 — 2026-07-22
+
+- marked CP-01 and CP-02 completed after branch generation;
+- recorded byte-identical source and root blob SHA;
+- marked CP-03 ready for PR verification.
+
+### Version 1.0 — 2026-07-22
+
+- established the bounded runtime source consolidation batch.
 
 # END OF FILE
