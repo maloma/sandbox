@@ -100,34 +100,46 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Persist verified generated artifacts through GitHub Contents API
+      - name: Persist verified artifacts in one atomic Git commit
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          if git diff --quiet -- src/familypilot.html index.html tools/pf08a-m3-01-browser-smoke.mjs; then
+          set -euo pipefail
+          paths=(src/familypilot.html index.html tools/pf08a-m3-01-browser-smoke.mjs)
+          if git diff --quiet -- "${paths[@]}"; then
             echo "Verified M3 artifacts are already committed."
             exit 0
           fi
-          for path in src/familypilot.html index.html tools/pf08a-m3-01-browser-smoke.mjs; do
-            encoded_path=$(python -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe="/"))' "$path")
-            current_sha=$(curl --fail-with-body -sS \
-              -H "Authorization: Bearer ${GH_TOKEN}" \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/${encoded_path}?ref=${HEAD_BRANCH}" | jq -r '.sha')
-            content=$(base64 -w0 "$path")
-            payload=$(jq -n \
-              --arg message "Generate verified M3 artifact: ${path}" \
-              --arg content "$content" \
-              --arg sha "$current_sha" \
-              --arg branch "$HEAD_BRANCH" \
-              '{message:$message,content:$content,sha:$sha,branch:$branch}')
-            curl --fail-with-body -sS -X PUT \
-              -H "Authorization: Bearer ${GH_TOKEN}" \
-              -H "Accept: application/vnd.github+json" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/${encoded_path}" \
-              -d "$payload"
+
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+
+          base_sha=$(curl --fail-with-body -sS "${auth[@]}" "${api}/git/ref/heads/${HEAD_BRANCH}" | jq -r '.object.sha')
+          if test "${base_sha}" != "${EXPECTED_HEAD}"; then
+            echo "PR branch moved during trusted verification: expected ${EXPECTED_HEAD}, found ${base_sha}" >&2
+            exit 1
+          fi
+          base_tree=$(curl --fail-with-body -sS "${auth[@]}" "${api}/git/commits/${base_sha}" | jq -r '.tree.sha')
+
+          entries='[]'
+          for path in "${paths[@]}"; do
+            blob_payload=$(jq -Rs '{content:.,encoding:"utf-8"}' < "${path}")
+            blob_sha=$(curl --fail-with-body -sS -X POST "${auth[@]}" "${api}/git/blobs" -d "${blob_payload}" | jq -r '.sha')
+            test -n "${blob_sha}" -a "${blob_sha}" != "null"
+            entries=$(jq --arg path "${path}" --arg sha "${blob_sha}" '. + [{path:$path,mode:"100644",type:"blob",sha:$sha}]' <<< "${entries}")
           done
+
+          tree_payload=$(jq -n --arg base_tree "${base_tree}" --argjson tree "${entries}" '{base_tree:$base_tree,tree:$tree}')
+          tree_sha=$(curl --fail-with-body -sS -X POST "${auth[@]}" "${api}/git/trees" -d "${tree_payload}" | jq -r '.sha')
+          test -n "${tree_sha}" -a "${tree_sha}" != "null"
+
+          commit_payload=$(jq -n --arg message "Generate verified Plan and obligations artifacts" --arg tree "${tree_sha}" --arg parent "${base_sha}" '{message:$message,tree:$tree,parents:[$parent]}')
+          commit_sha=$(curl --fail-with-body -sS -X POST "${auth[@]}" "${api}/git/commits" -d "${commit_payload}" | jq -r '.sha')
+          test -n "${commit_sha}" -a "${commit_sha}" != "null"
+
+          ref_payload=$(jq -n --arg sha "${commit_sha}" '{sha:$sha,force:false}')
+          curl --fail-with-body -sS -X PATCH "${auth[@]}" "${api}/git/refs/heads/${HEAD_BRANCH}" -d "${ref_payload}"
+          echo "Persisted verified M3 artifacts at ${commit_sha}."
