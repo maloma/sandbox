@@ -1,4 +1,4 @@
-name: PF-08A M3-01 Trusted Public Gate
+name: PF-08A M3-02 Trusted Public Gate
 
 on:
   pull_request:
@@ -6,15 +6,15 @@ on:
       - main
     paths:
       - tools/pf08a-m3-01-public-browser-smoke.mjs
-      - docs/execution-batches/PF-08A-M3-01-PLAN-OBLIGATIONS/Public_Verification.md
-      - docs/execution-batches/PF-08A-M3-01-PLAN-OBLIGATIONS/Batch_Manifest.md
-      - docs/execution-batches/PF-08A-M3-01-PLAN-OBLIGATIONS/Checkpoint_Ledger.md
+      - docs/execution-batches/PF-08A-M3-02-OBLIGATION-SCHEDULE-CALENDAR/Public_Verification.md
+      - docs/execution-batches/PF-08A-M3-02-OBLIGATION-SCHEDULE-CALENDAR/Batch_Manifest.md
+      - docs/execution-batches/PF-08A-M3-02-OBLIGATION-SCHEDULE-CALENDAR/Checkpoint_Ledger.md
 
 permissions:
   contents: write
 
 concurrency:
-  group: pf08a-m3-01-public-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  group: pf08a-m3-02-public-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -31,17 +31,17 @@ jobs:
         shell: bash
         run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
 
-      - name: Verify published Plan and obligations package
+      - name: Verify published M3-02 obligations package
         shell: bash
         env:
           PUBLIC_URL: https://maloma.github.io/sandbox/
-          EXPECTED_MAIN: d2be5fe98dc44d635f30c857659fcad562fe54c4
+          EXPECTED_MAIN_M3_02: 7fd7fa09f9b4908053aa0fec27fe691f1b878705
         run: |
-          evidence=docs/execution-batches/PF-08A-M3-01-PLAN-OBLIGATIONS/Public_Verification.md
+          evidence=docs/execution-batches/PF-08A-M3-02-OBLIGATION-SCHEDULE-CALENDAR/Public_Verification.md
           if test -f "$evidence"; then
             node tools/pf08a-m3-01-public-browser-smoke.mjs
             grep -Fq '**Status:** PASS' "$evidence"
-            grep -Fq 'd2be5fe98dc44d635f30c857659fcad562fe54c4' "$evidence"
+            grep -Fq '7fd7fa09f9b4908053aa0fec27fe691f1b878705' "$evidence"
           else
             mkdir -p "$(dirname "$evidence")"
             node tools/pf08a-m3-01-public-browser-smoke.mjs --evidence="$evidence"
@@ -54,14 +54,14 @@ jobs:
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
-          evidence=docs/execution-batches/PF-08A-M3-01-PLAN-OBLIGATIONS/Public_Verification.md
+          evidence=docs/execution-batches/PF-08A-M3-02-OBLIGATION-SCHEDULE-CALENDAR/Public_Verification.md
           if git ls-files --error-unmatch "$evidence" >/dev/null 2>&1 && git diff --quiet -- "$evidence"; then
-            echo "Public M3 evidence is already committed."
+            echo "Public M3-02 evidence is already committed."
             exit 0
           fi
           encoded_path=$(python -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe="/"))' "$evidence")
           content=$(base64 -w0 "$evidence")
-          payload=$(jq -n --arg message "Record M3 public verification" --arg content "$content" --arg branch "$HEAD_BRANCH" '{message:$message,content:$content,branch:$branch}')
+          payload=$(jq -n --arg message "Record M3-02 public verification" --arg content "$content" --arg branch "$HEAD_BRANCH" '{message:$message,content:$content,branch:$branch}')
           curl --fail-with-body -sS -X PUT \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
