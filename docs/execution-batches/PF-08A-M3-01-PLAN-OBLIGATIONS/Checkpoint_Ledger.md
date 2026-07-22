@@ -186,4 +186,30 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 009 — Implementation Merge and Public Evidence Persistence Recovery
+
+- **Ordering Marker:** 009
+- **Checkpoint ID:** CP-04
+- **Status:** RETRY_READY
+- **Implementation Pull Request:** `#26`.
+- **Final Implementation Head:** `bc6c5024e572fed6c2cf4eb2cf0dcf9b60b41d30`.
+- **Final Exact-Head Workflows:** all M3, A3 and Hidden Capital trusted/branch suites concluded `success`.
+- **Implementation Merge Commit:** `d2be5fe98dc44d635f30c857659fcad562fe54c4`.
+- **Trusted Public Gate Pull Request:** `#33`.
+- **Trusted Public Gate Merge:** `b20e66e6055ff76ff11f7b9c827c752077756ac8`.
+- **Closure Pull Request:** `#34` — `Close Plan and obligations foundation batch`.
+- **First Public Workflow:** `29907978864`, conclusion `success`.
+- **Public Result:** published HTML, Scope, Analytics and Obligations modules loaded; full M3 Chrome scenario PASS.
+- **Evidence Persistence Finding:** the generated evidence was new and untracked; `git diff --quiet` returned clean and incorrectly skipped the Contents API write.
+- **Persistence Correction Pull Request:** `#35` — `Persist new M3 public evidence correctly`.
+- **Persistence Correction Merge:** `981e8ff38dc569d21daa6003a2602eda87c2ccaa`.
+- **Correction:** skip persistence only when the evidence path is already tracked and unchanged.
+- **Scope:** workflow transport only; public product result unchanged.
+- **Verification Result:** RETRY_READY. This owner commit retriggers trusted public verification and durable evidence creation.
+- **Next Authorized Transition:** verify committed `Public_Verification.md`, then close Manifest/Ledger and rerun public gate on the terminal head.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
