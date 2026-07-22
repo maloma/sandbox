@@ -56,17 +56,34 @@ jobs:
       - name: Run hidden Capital browser regression
         run: node tools/pf08a-priv01-browser-smoke.mjs
 
-      - name: Commit verified generated artifacts to the PR branch
+      - name: Persist verified generated artifacts through GitHub Contents API
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
           if git diff --quiet -- src/familypilot.html index.html; then
             echo "Verified generated artifacts are already committed."
             exit 0
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/familypilot.html index.html
-          git commit -m "Generate hidden Capital disclosure"
-          git push origin HEAD:${HEAD_BRANCH}
+          for path in src/familypilot.html index.html; do
+            encoded_path=$(python -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe="/"))' "$path")
+            current_sha=$(curl --fail-with-body -sS \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/${encoded_path}?ref=${HEAD_BRANCH}" | jq -r '.sha')
+            content=$(base64 -w0 "$path")
+            payload=$(jq -n \
+              --arg message "Generate hidden Capital disclosure: ${path}" \
+              --arg content "$content" \
+              --arg sha "$current_sha" \
+              --arg branch "$HEAD_BRANCH" \
+              '{message:$message,content:$content,sha:$sha,branch:$branch}')
+            curl --fail-with-body -sS -X PUT \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/${encoded_path}" \
+              -d "$payload"
+          done
