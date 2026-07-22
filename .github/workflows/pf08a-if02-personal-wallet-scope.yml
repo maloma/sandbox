@@ -67,5 +67,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Re-run deterministic source patch
+        run: node tools/pf08a-if02-apply-personal-wallet-scope.mjs
+      - name: Require generated source to be committed
+        run: git diff --exit-code -- src/familypilot.html index.html
       - name: Verify generated personal wallet scope
         run: node tools/pf08a-if02-verify-personal-wallet-scope.mjs
