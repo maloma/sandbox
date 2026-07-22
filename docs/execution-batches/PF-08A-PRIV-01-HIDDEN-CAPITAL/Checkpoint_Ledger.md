@@ -1,7 +1,7 @@
 # Checkpoint Ledger — PF-08A-PRIV-01-HIDDEN-CAPITAL
 
 **Document Type:** Append-Only Runtime Checkpoint Ledger  
-**Status:** Active  
+**Status:** Closed  
 **Repository:** `maloma/sandbox`  
 **Branch:** `agent/pf08a-priv01-hidden-capital`  
 **Created:** 2026-07-22
@@ -97,6 +97,44 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Exact Stop Point:** append-only evidence committed.
 - **Next Authorized Transition:** final evidence-head gate and automatic merge.
 - **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
+---
+
+## Record 005 — Merge, Publication and Public Verification Completed
+
+- **Ordering Marker:** 005
+- **Checkpoint ID:** CP-03
+- **Status:** COMPLETED
+- **Objective:** Record final exact-head verification, implementation merge, publication and public browser evidence.
+- **Implementation Pull Request:** `#21` — `Hide Capital values behind explicit disclosure`.
+- **Final Implementation Head:** `8e8822e2993372abde160060b2d86fa3ac500c21`.
+- **Final Privacy Trusted Workflow:** `PF-08A PRIV-01 Trusted PR Gate`, run `29889523597`, conclusion `success`.
+- **Final Privacy Branch Workflow:** `PF-08A PRIV-01 Hidden Capital Disclosure`, run `29889523566`, conclusion `success`.
+- **Final A3 Trusted Regression:** `PF-08A A3-01 Trusted PR Gate`, run `29889523559`, conclusion `success`.
+- **Final A3 Branch Regression:** `PF-08A A3-01 Compact Analytics States`, run `29889523568`, conclusion `success`.
+- **Merge Method:** merge commit with expected-head protection.
+- **Implementation Merge Commit:** `3b62f927d7728d5c05bb3dd3e3e649974a9cb441`.
+- **Trusted Public Gate Pull Request:** `#24`.
+- **Trusted Public Gate Merge:** `b64e7dab2083d5b343e1a3646ee50462264fa78c`.
+- **Closure Pull Request:** `#25` — `Close hidden Capital disclosure batch`.
+- **Trusted Public Workflow:** `PF-08A PRIV-01 Trusted Public Gate`, run `29889733305`, conclusion `success`.
+- **Public URL:** `https://maloma.github.io/sandbox/`.
+- **Public Verification Time:** `2026-07-22T03:53:57.035Z`.
+- **Public HTML Status:** `200`.
+- **Public Scope Module Status:** `200`.
+- **Public Analytics Module Status:** `200`.
+- **Publication Attempts:** `1`.
+- **Public HTML SHA-256:** `a8b2ce6a1f09f01c0a10a83a117a8f7a3455ba7f92cd279d7fd9c3292fee2e0b`.
+- **Public Scope Module SHA-256:** `800ae1d9b8d8ad68ae6f0215e5b94978890e7a87d9f012fd5448e6e39de0899b`.
+- **Public Analytics Module SHA-256:** `9f934f1ecd3c87e747cd9f99a2cb9b83abc07040eacc67ddaf1808fe3ab77c9f`.
+- **Public Assertions:** first Main control visible text exactly `Капитал`; no Capital amount/change/graph/dates/visible wallet label on Main; overlay closed on load and dismiss; family and personal Capital appear only after explicit press; contexts remain isolated; compact Analytics and wallet scope remain operational; runtime exceptions none.
+- **Evidence Path:** `docs/execution-batches/PF-08A-PRIV-01-HIDDEN-CAPITAL/Public_Verification.md`.
+- **Verification Result:** PASS. The published development prototype implements the Founder’s Capital-disclosure privacy decision.
+- **Rollback Method:** revert `3b62f927d7728d5c05bb3dd3e3e649974a9cb441` or restore `6289b1188cab01ca53c30fd07ef48453bf97425c`.
+- **Terminal State:** `BATCH_COMPLETED`.
+- **Next Authorized Transition:** synchronize FamilyPilot canonical state and prepare `PF-08A-A4 — Final Secondary Navigation Decision Package`.
+- **Founder Intervention Required:** only when the materially different final navigation structures are ready for selection.
 - **Record Integrity State:** VALID.
 
 # END OF CURRENT LEDGER PREFIX
