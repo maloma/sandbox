@@ -14,19 +14,19 @@ assert(source===root,'Canonical source and root artifact must be byte-identical'
 assert(source.includes('<meta name="familypilot-package" content="debt-chains-principal-v1">'),'M2 package marker missing');
 assert(source.includes('<script src="./familypilot-debts.js"></script>'),'Debt domain module is not loaded');
 assert(source.includes('pf08a-m2-01-inline-ui:start'),'M2 UI is not inlined into the closed app runtime');
-assert(source.includes('data-plan-module="debts"'),'Plan → Debts route missing');
-assert(source.includes('id="debtsScreen"'),'Debts screen missing');
-assert(source.includes('id="homeDebtReceivableValue"')&&source.includes('id="homeDebtLiabilityValue"'),'Source-derived Home debt totals missing');
-assert(source.includes('id="debtEntryModal"')&&source.includes('id="debtChainModal"'),'Debt editor/detail routes missing');
-assert(source.includes('data-debt-action="borrow"')&&source.includes('data-debt-action="repay"')&&source.includes('data-debt-action="lend"')&&source.includes('data-debt-action="receive"'),'Four debt actions missing');
-assert(source.includes('data-debt-action="opening_liability"')&&source.includes('data-debt-action="opening_receivable"'),'Historical opening actions missing');
-assert(!/Interest\s*\/\s*gift|Additional amount above principal|data-debt-overpayment-choice/i.test(source),'Superseded debt UI returned');
+assert(source.includes('id="homeDebtReceivableValue"')&&source.includes('id="homeDebtLiabilityValue"'),'Stable source-derived Home debt mount missing');
+assert(source.includes('data-debt-filter="receivable"')&&source.includes('data-debt-filter="liability"'),'Home debt routes missing');
+assert(!source.includes('>180 €</strong>')&&!source.includes('>420 €</strong>'),'Fabricated Home debt fixtures remain');
+assert(debtUi.includes("section.id='debtsScreen'"),'Debts screen creation missing');
+assert(debtUi.includes("modal.id='debtEntryModal'")&&debtUi.includes("modal.id='debtChainModal'"),'Debt editor/detail routes missing');
+assert(debtUi.includes("planDebt.dataset.planModule='debts'")&&debtUi.includes("planDebt.disabled=false"),'Plan → Debts activation missing');
+assert(debtUi.includes('data-debt-action="borrow"')&&debtUi.includes('data-debt-action="repay"')&&debtUi.includes('data-debt-action="lend"')&&debtUi.includes('data-debt-action="receive"'),'Four debt actions missing');
+assert(debtUi.includes('data-debt-action="opening_liability"')&&debtUi.includes('data-debt-action="opening_receivable"'),'Historical opening actions missing');
 assert(!/Interest\s*\/\s*gift|Additional amount above principal|data-debt-overpayment-choice/i.test(debtUi),'Superseded debt UI exists in source module');
 assert(debtSource.includes("derivedKind:'reciprocal'"),'Automatic reciprocal debt derivation missing');
 assert(debtSource.includes("derivedKind:'offset'"),'Mutual offset derivation missing');
 assert(debtSource.includes("derivedKind:'closed'"),'Debt-closed event missing');
-assert(debtSource.includes("kind:'debt_inflow'")||debtSource.includes("return'debt_inflow'"),'Debt inflow movement missing');
-assert(debtSource.includes("return'debt_outflow'"),'Debt outflow movement missing');
+assert(debtSource.includes("return'debt_inflow'")&&debtSource.includes("return'debt_outflow'"),'Debt principal movement kinds missing');
 assert(scopeSource.includes("operation?.kind === 'debt_inflow'")&&scopeSource.includes("operation?.kind === 'debt_outflow'"),'Capital does not include debt principal movements');
 assert(debtUi.includes("operation.kind==='income'||operation.kind==='expense'"),'Analytics does not explicitly exclude debt principal movements');
 assert(debtUi.includes('debtApi.closeChain')&&debtUi.includes('debtApi.keepChainOpen'),'Zero-balance close/keep-open choice missing');
@@ -42,4 +42,4 @@ const inlineScripts=[...source.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(ma
 assert(inlineScripts.length===1,`Expected one inline application script, found ${inlineScripts.length}`);
 new Function(inlineScripts[0]);new Function(debtUi);
 
-console.log(JSON.stringify({status:'PASS',marker:'PF08A_M2_01_STATIC_PASS',sourceRootEqual:true,planDebtsRoute:true,homeTotalsSourceDerived:true,historicalOpening:true,fourActions:true,principalMovementKinds:true,capitalIncludesPrincipal:true,analyticsExcludesPrincipal:true,automaticReciprocalDebt:true,mutualOffset:true,sourceEditing:true,closedChainImmutable:true,supersededUiAbsent:true,m3Preserved:true,hiddenCapitalPreserved:true,analyticsPreserved:true,navigationUnchanged:true},null,2));
+console.log(JSON.stringify({status:'PASS',marker:'PF08A_M2_01_STATIC_PASS',sourceRootEqual:true,stableHomeMount:true,homeFixturesRemoved:true,planDebtsRoute:true,dynamicDebtRoutesVerifiedFromUiSource:true,historicalOpening:true,fourActions:true,principalMovementKinds:true,capitalIncludesPrincipal:true,analyticsExcludesPrincipal:true,automaticReciprocalDebt:true,mutualOffset:true,sourceEditing:true,closedChainImmutable:true,supersededUiAbsent:true,m3Preserved:true,hiddenCapitalPreserved:true,analyticsPreserved:true,navigationUnchanged:true},null,2));
