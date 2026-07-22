@@ -1,7 +1,7 @@
 # Checkpoint Ledger — PF-08A-M3-01-PLAN-OBLIGATIONS
 
 **Document Type:** Append-Only Runtime Checkpoint Ledger  
-**Status:** Active  
+**Status:** Closed  
 **Repository:** `maloma/sandbox`  
 **Branch:** `agent/pf08a-m3-01-plan-obligations`  
 **Created:** 2026-07-22
@@ -209,6 +209,34 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Scope:** workflow transport only; public product result unchanged.
 - **Verification Result:** RETRY_READY. This owner commit retriggers trusted public verification and durable evidence creation.
 - **Next Authorized Transition:** verify committed `Public_Verification.md`, then close Manifest/Ledger and rerun public gate on the terminal head.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
+---
+
+## Record 010 — Merge, Publication and Public Verification Completed
+
+- **Ordering Marker:** 010
+- **Checkpoint ID:** CP-04
+- **Status:** COMPLETED
+- **Implementation Pull Request:** `#26` — `Mount Plan hub and obligations foundation`.
+- **Final Implementation Head:** `bc6c5024e572fed6c2cf4eb2cf0dcf9b60b41d30`.
+- **Implementation Merge Commit:** `d2be5fe98dc44d635f30c857659fcad562fe54c4`.
+- **Closure Pull Request:** `#34` — `Close Plan and obligations foundation batch`.
+- **Trusted Public Workflow:** `29908251736`, conclusion `success`.
+- **Public URL:** `https://maloma.github.io/sandbox/`.
+- **Public Verification Time:** `2026-07-22T09:31:00.793Z`.
+- **Public HTTP Results:** HTML 200; Scope 200; Analytics 200; Obligations 200.
+- **Public HTML SHA-256:** `d0fe53d33385aa5748ca693792018337dd82d1303fb2959f128d4fa7e8aaa2a7`.
+- **Public Scope SHA-256:** `800ae1d9b8d8ad68ae6f0215e5b94978890e7a87d9f012fd5448e6e39de0899b`.
+- **Public Analytics SHA-256:** `9f934f1ecd3c87e747cd9f99a2cb9b83abc07040eacc67ddaf1808fe3ab77c9f`.
+- **Public Obligations SHA-256:** `0e6123cb1712f4f8d369a160087cc5f89b72445d94fb62b46907ec241953ea42`.
+- **Public Assertions:** accepted navigation unchanged; Plan hub active; honest Debts/Savings states; obligation creation PASS; one linked Expense PASS; duplicate rejection PASS; Analytics linkage PASS; Trash/restore recalculation PASS; personal scope isolation PASS; hidden Capital PASS; compact Analytics PASS; runtime exceptions NONE.
+- **Evidence Path:** `docs/execution-batches/PF-08A-M3-01-PLAN-OBLIGATIONS/Public_Verification.md`.
+- **Verification Result:** PASS. The published development prototype implements the bounded Plan and Obligations foundation.
+- **Rollback Method:** revert `d2be5fe98dc44d635f30c857659fcad562fe54c4` or restore `ba7b4cae5f28c4a39bc80a251a2b43d7bb3ce194`.
+- **Terminal State:** `BATCH_COMPLETED`.
+- **Next Authorized Transition:** merge closure evidence, synchronize FamilyPilot canonical state, and define the next bounded obligations/debts integration step from the accepted roadmap.
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
