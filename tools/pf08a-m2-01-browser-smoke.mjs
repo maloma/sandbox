@@ -1,0 +1,69 @@
+import { createServer } from 'node:http';
+import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync, unlinkSync } from 'node:fs';
+import { extname, join, normalize, resolve, sep } from 'node:path';
+import { tmpdir } from 'node:os';
+import { spawn } from 'node:child_process';
+
+const root=process.cwd();
+const harnessName='.pf08a-m2-01-browser-harness.html';
+const harnessPath=join(root,harnessName);
+const profilePath=mkdtempSync(join(tmpdir(),'pf08a-m2-01-chrome-'));
+const marker='PF08A_M2_01_BROWSER_PASS';
+
+const harness=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>M2 browser smoke</title></head><body data-status="PENDING"><iframe id="app" src="/?test=1&pf08a-m2-01=1" style="width:390px;height:844px;border:0"></iframe><pre id="result">PENDING</pre><script>
+(()=>{
+  const frame=document.getElementById('app'),result=document.getElementById('result');
+  const assert=(condition,message)=>{if(!condition)throw new Error(message)};
+  const text=node=>(node?.textContent||'').replace(/\\s+/g,' ').trim();
+  const click=node=>{assert(node,'Clickable node missing');node.click()};
+  const runtimeErrors=[];
+  const dateTimeValue=value=>{const d=new Date(value),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes())};
+  async function waitApi(){const deadline=Date.now()+25000;while(Date.now()<deadline){const api=frame.contentWindow&&frame.contentWindow.__FP_TEST__;if(api?.debts&&api?.obligations)return api;await new Promise(resolve=>setTimeout(resolve,100))}throw new Error('FamilyPilot M2 test API did not become ready')}
+  async function run(){
+    const win=frame.contentWindow;win.addEventListener('error',event=>runtimeErrors.push(String(event.error||event.message||'error')));win.addEventListener('unhandledrejection',event=>runtimeErrors.push(String(event.reason||'unhandled rejection')));win.confirm=()=>false;
+    const api=await waitApi(),doc=frame.contentDocument,initial=api.getState(),household='wallet-household-main',personal='wallet-personal-anna';
+    assert(doc.querySelector('meta[content="debt-chains-principal-v1"]'),'M2 package marker missing');
+    assert(text(doc.getElementById('capitalRevealBtn'))==='Капитал','Hidden Capital control regressed');assert(!doc.getElementById('capitalInfo').classList.contains('open'),'Capital overlay must remain closed');
+    assert(text(doc.getElementById('homeDebtReceivableValue')).includes('0'),'Home receivable fixture was not replaced');assert(text(doc.getElementById('homeDebtLiabilityValue')).includes('0'),'Home liability fixture was not replaced');
+    const nav=[...doc.querySelectorAll('nav.bottom [data-screen]')].map(node=>text(node));assert(JSON.stringify(nav)===JSON.stringify(['⌂Главная','☷Операции','▣План','⊞Ещё']),'Bottom navigation changed: '+JSON.stringify(nav));
+
+    click(doc.querySelector('[data-screen="plans"]'));const debtPlan=doc.querySelector('[data-plan-module="debts"]');assert(debtPlan&&!debtPlan.disabled,'Plan → Debts is not active');click(debtPlan);assert(doc.getElementById('debtsScreen').classList.contains('active'),'Debts screen did not open');
+    click(doc.getElementById('debtAddBtn'));click(doc.querySelector('[data-debt-action="opening_liability"]'));doc.getElementById('debtCounterpartyName').value='Банк';doc.getElementById('debtCounterpartyKind').value='organization';doc.getElementById('debtAmount').value='500';doc.getElementById('debtWallet').value=household;doc.getElementById('debtOccurredAt').value=dateTimeValue(Date.now()-10*86400000);doc.getElementById('debtComment').value='Исторический остаток';click(doc.getElementById('debtEntrySave'));
+    let state=api.getState();assert(state.schemaVersion>=5,'State was not normalized to schema v5');assert(state.debtChains.length===1,'Opening debt chain was not created');const bank=state.debtCounterparties.find(item=>item.name==='Банк'),bankChain=state.debtChains[0];assert(bank&&bankChain.currentBalance===-500,'Historical liability is incorrect');assert(state.operations.filter(operation=>operation.links?.sourceModule==='debts').length===0,'Historical opening invented a wallet movement');closeIfOpen(doc,'debtChainModal');
+
+    const analyticsBefore=api.analyticsFilteredOperations().slice();const capitalBefore=api.debts.capital().capital;
+    const repay=api.debts.create({counterpartyId:bank.id,action:'repay',amount:120,walletId:household,currency:'EUR',occurredAt:Date.now()-86400000,comment:'Частичный возврат'});assert(repay.ok===true,'Repayment creation failed');state=api.getState();assert(state.debtChains.find(item=>item.id===bankChain.id).currentBalance===-380,'Liability did not become 380');const repayOperation=state.operations.find(operation=>operation.links?.debtEventId===repay.event.id);assert(repayOperation?.kind==='debt_outflow','Repayment movement kind is not debt_outflow');assert(api.debts.capital().capital===capitalBefore-120,'Debt repayment did not reduce Capital');assert(JSON.stringify(api.analyticsFilteredOperations())===JSON.stringify(analyticsBefore),'Debt principal leaked into Analytics');
+    assert(text(doc.getElementById('homeDebtLiabilityValue')).includes('380'),'Home liability total is not source-derived');
+
+    const over=api.debts.create({counterpartyId:bank.id,action:'repay',amount:400,walletId:household,currency:'EUR',occurredAt:Date.now(),comment:'Переплата'});assert(over.ok===true,'Overpayment creation failed');state=api.getState();assert(state.debtChains.find(item=>item.id===bankChain.id).currentBalance===20,'Overpayment did not produce reciprocal receivable 20');let history=api.debts.history(bankChain.id);assert(history.some(item=>item.derivedKind==='reciprocal'&&item.amount===20),'Derived reciprocal event missing');assert(history.some(item=>item.derivedKind==='offset'),'Derived offset event missing');assert(api.debts.hasSupersededUi()===false,'Superseded interest/gift or overpayment dialog returned');
+
+    const overOperationId=state.operations.find(operation=>operation.links?.debtEventId===over.event.id).id;
+    const edit=api.debts.update(over.event.id,{counterpartyId:bank.id,action:'repay',amount:380,walletId:household,currency:'EUR',occurredAt:Date.now(),comment:'Исправлено'});assert(edit.ok===true,'Source edit failed');state=api.getState();assert(state.debtChains.find(item=>item.id===bankChain.id).currentBalance===0,'Edited chain did not recalculate to zero');assert(state.operations.find(operation=>operation.links?.debtEventId===over.event.id).id===overOperationId,'Source edit changed linked operation id');assert(api.debts.history(bankChain.id).filter(item=>item.derivedKind==='reciprocal').length===0,'Stale reciprocal event remained after edit');
+
+    assert(api.debts.keep(bankChain.id).ok===true,'Keep-open decision failed');const borrowSame=api.debts.create({counterpartyId:bank.id,action:'borrow',amount:50,walletId:household,currency:'EUR',occurredAt:Date.now()+1000,comment:'Новая операция в активной цепочке'});assert(borrowSame.chain.id===bankChain.id,'Keep-open zero chain did not continue');
+    const settle=api.debts.create({counterpartyId:bank.id,action:'repay',amount:50,walletId:household,currency:'EUR',occurredAt:Date.now()+2000,comment:'Закрытие'});assert(settle.zero===true,'Chain did not return to zero');assert(api.debts.close(bankChain.id).ok===true,'Explicit close failed');state=api.getState();assert(state.debtChains.find(item=>item.id===bankChain.id).status==='closed','Chain is not immutable closed');const immutable=api.debts.update(repay.event.id,{counterpartyId:bank.id,action:'repay',amount:100,walletId:household,currency:'EUR',occurredAt:Date.now(),comment:''});assert(immutable.ok===false,'Closed-chain source remained editable');const later=api.debts.create({counterpartyId:bank.id,action:'borrow',amount:60,walletId:household,currency:'EUR',occurredAt:Date.now()+3000,comment:'После закрытия'});assert(later.chain.id!==bankChain.id,'Later dealing did not start a new chain');
+
+    const debtCapitalBefore=api.debts.capital().capital;const lend=api.debts.create({counterpartyName:'Друг',counterpartyKind:'person',action:'lend',amount:250,walletId:household,currency:'EUR',occurredAt:Date.now()+4000,comment:'Одолжил'});assert(lend.ok===true&&lend.operation.kind==='debt_outflow','Lending source or movement invalid');assert(api.debts.capital().capital===debtCapitalBefore-250,'Lending did not reduce Capital');const receive=api.debts.create({counterpartyId:lend.counterparty.id,action:'receive',amount:50,walletId:household,currency:'EUR',occurredAt:Date.now()+5000,comment:'Частичный возврат'});assert(receive.operation.kind==='debt_inflow','Received repayment is not debt_inflow');
+
+    api.trashOperation(receive.operation.id);state=api.getState();assert(state.debtChains.find(item=>item.id===lend.chain.id).currentBalance===250,'Trash did not recalculate receivable');api.restoreOperation(receive.operation.id);state=api.getState();assert(state.debtChains.find(item=>item.id===lend.chain.id).currentBalance===200,'Restore did not recalculate receivable');
+
+    api.setActiveWallet(personal);const personalDebt=api.debts.create({counterpartyName:'Личный контакт',action:'lend',amount:30,walletId:personal,currency:'EUR',occurredAt:Date.now(),comment:''});assert(personalDebt.ok===true,'Personal debt creation failed');assert(api.debts.visible().includes(personalDebt.chain.id),'Personal chain not visible in personal scope');api.setActiveWallet(household);assert(!api.debts.visible().includes(personalDebt.chain.id),'Personal debt leaked into household scope');
+
+    api.debts.openList();assert(doc.getElementById('debtsScreen').classList.contains('active'),'Debt list route failed');assert(doc.querySelector('.debt-chain-card'),'Debt chain cards missing');api.debts.openChain(lend.chain.id);assert(doc.getElementById('debtChainModal').classList.contains('open'),'Debt chain detail failed');assert(doc.querySelector('.debt-history-row.neutral'),'Derived neutral history row missing');closeIfOpen(doc,'debtChainModal');
+    click(doc.querySelector('[data-screen="operations"]'));assert(doc.querySelector('.operation.debt-principal'),'Debt principal movement missing from Operations');assert(!doc.querySelector('#analyticsScreen .debt-principal'),'Debt principal rendered as Analytics operation');
+    assert(api.obligations&&doc.querySelector('[data-plan-module="obligations"]'),'M3 obligations regressed');assert(runtimeErrors.length===0,'Runtime exceptions: '+runtimeErrors.join(' | '));
+
+    const output={status:'PASS',marker:'${marker}',navigation:'Главная · Операции · План · Ещё',historicalOpening:true,principalAffectsCapital:true,principalExcludedFromIncomeExpenseAnalytics:true,homeTotalsSourceDerived:true,mutualOffset:true,automaticReciprocalDebt:true,noOverpaymentDialog:true,noNonPrincipalField:true,sourceEditStableOperation:true,keepOpenAndClose:true,closedChainImmutable:true,newChainAfterClosure:true,trashRestoreRecalculated:true,personalScopeIsolated:true,m3Preserved:true,hiddenCapitalPreserved:true,runtimeExceptions:[]};result.textContent=JSON.stringify(output,null,2);document.body.dataset.status='PASS';
+  }
+  function closeIfOpen(doc,id){const node=doc.getElementById(id);if(node?.classList.contains('open'))node.classList.remove('open')}
+  frame.addEventListener('load',()=>run().catch(error=>{result.textContent=String(error&&error.stack||error);document.body.dataset.status='FAIL'}),{once:true});
+})();
+</script></body></html>`;
+
+writeFileSync(harnessPath,harness);
+const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.css':'text/css; charset=utf-8'};
+const server=createServer((req,res)=>{try{const url=new URL(req.url,'http://127.0.0.1'),raw=url.pathname==='/'?'index.html':url.pathname.replace(/^\//,''),target=normalize(resolve(root,raw));if(target!==root&&!target.startsWith(root+sep))throw new Error('Forbidden path');const body=readFileSync(target);res.writeHead(200,{'content-type':mime[extname(target)]||'application/octet-stream','cache-control':'no-store'});res.end(body)}catch{res.writeHead(404,{'content-type':'text/plain'});res.end('Not found')}});
+const chromeCandidates=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'],chrome=chromeCandidates.find(existsSync);if(!chrome)throw new Error('Chrome/Chromium is not installed');
+function runChrome(url){return new Promise((resolveRun,reject)=>{const child=spawn(chrome,['--headless=new','--no-sandbox','--disable-dev-shm-usage','--disable-gpu',`--user-data-dir=${profilePath}`,'--virtual-time-budget=45000','--dump-dom',url],{stdio:['ignore','pipe','pipe']});let stdout='',stderr='';child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);child.on('error',reject);child.on('close',code=>code===0?resolveRun({stdout,stderr}):reject(new Error(`Chrome exited ${code}\n${stderr}`)))})}
+await new Promise((resolveRun,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolveRun)});
+try{const address=server.address(),{stdout}=await runChrome(`http://127.0.0.1:${address.port}/${harnessName}`),match=stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/),decoded=(match?.[1]||'').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');if(!stdout.includes('data-status="PASS"')||!stdout.includes(marker))throw new Error(`M2 browser smoke did not pass\n${decoded||stdout.slice(-8000)}`);console.log(decoded||JSON.stringify({status:'PASS',marker},null,2))}finally{await new Promise(resolveRun=>server.close(resolveRun));if(existsSync(harnessPath))unlinkSync(harnessPath);rmSync(profilePath,{recursive:true,force:true})}
