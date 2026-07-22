@@ -12,6 +12,8 @@ on:
       - familypilot-obligations-ui-v2.js
       - familypilot-debts.js
       - familypilot-debts-ui.js
+      - familypilot-savings.js
+      - familypilot-savings-ui.js
       - tools/pf08a-m3-01-apply-plan-obligations.mjs
       - tools/pf08a-m3-01-correct-today-payment-time.mjs
       - tools/pf08a-m3-01-correct-browser-test-api.mjs
@@ -22,10 +24,14 @@ on:
       - tools/pf08a-m2-01-domain-test.cjs
       - tools/pf08a-m2-01-verify-debt-integration.mjs
       - tools/pf08a-m2-01-browser-smoke.mjs
+      - tools/pf08a-m4-01-domain-test.cjs
+      - tools/pf08a-m4-01-verify-savings-integration.mjs
+      - tools/pf08a-m4-01-browser-smoke.mjs
       - .github/workflows/pf08a-m3-01-plan-obligations.yml
       - .github/workflows/pf08a-m3-01-trusted-pr-gate.yml
       - docs/execution-batches/PF-08A-M3-01-PLAN-OBLIGATIONS/**
       - docs/execution-batches/PF-08A-M2-01-DEBT-CHAINS-PRINCIPAL/**
+      - docs/execution-batches/PF-08A-M4-01-SAVINGS-GOALS/**
 
 permissions:
   contents: write
@@ -54,6 +60,8 @@ jobs:
           node --check familypilot-obligations-ui-v2.js
           node --check familypilot-debts.js
           node --check familypilot-debts-ui.js
+          node --check familypilot-savings.js
+          node --check familypilot-savings-ui.js
           node --check tools/pf08a-m3-01-apply-plan-obligations.mjs
           node --check tools/pf08a-m3-01-correct-today-payment-time.mjs
           node --check tools/pf08a-m3-01-correct-browser-test-api.mjs
@@ -64,12 +72,18 @@ jobs:
           node --check tools/pf08a-m2-01-domain-test.cjs
           node --check tools/pf08a-m2-01-verify-debt-integration.mjs
           node --check tools/pf08a-m2-01-browser-smoke.mjs
+          node --check tools/pf08a-m4-01-domain-test.cjs
+          node --check tools/pf08a-m4-01-verify-savings-integration.mjs
+          node --check tools/pf08a-m4-01-browser-smoke.mjs
 
       - name: Run obligations domain tests
         run: node tools/pf08a-m3-01-domain-test.cjs
 
       - name: Run debt domain tests
         run: node tools/pf08a-m2-01-domain-test.cjs
+
+      - name: Run savings goal domain tests
+        run: node tools/pf08a-m4-01-domain-test.cjs
 
       - name: Apply Plan and obligations patch once
         shell: bash
@@ -83,7 +97,7 @@ jobs:
       - name: Correct same-day payment timestamp
         run: node tools/pf08a-m3-01-correct-today-payment-time.mjs
 
-      - name: Correct legacy M3 browser test API route
+      - name: Reconcile legacy Plan regression with integrated navigation
         run: node tools/pf08a-m3-01-correct-browser-test-api.mjs
 
       - name: Finalize root and source artifacts
@@ -95,6 +109,9 @@ jobs:
       - name: Verify debt integration contract
         run: node tools/pf08a-m2-01-verify-debt-integration.mjs
 
+      - name: Verify savings goal integration contract
+        run: node tools/pf08a-m4-01-verify-savings-integration.mjs
+
       - name: Run compact Analytics regression
         run: node tools/pf08a-a3-01-browser-smoke.mjs
 
@@ -105,22 +122,25 @@ jobs:
         run: node tools/pf08a-m3-01-browser-smoke.mjs
 
       - name: Run debt chains browser regression
-        id: m2_browser
+        run: node tools/pf08a-m2-01-browser-smoke.mjs
+
+      - name: Run savings goals browser regression
+        id: m4_browser
         shell: bash
         run: |
           set +e
-          node tools/pf08a-m2-01-browser-smoke.mjs > m2-browser.log 2>&1
+          node tools/pf08a-m4-01-browser-smoke.mjs > m4-browser.log 2>&1
           status=$?
-          cat m2-browser.log
+          cat m4-browser.log
           echo "exit_code=${status}" >> "$GITHUB_OUTPUT"
           exit "$status"
 
-      - name: Upload debt browser diagnostics
+      - name: Upload savings browser diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pf08a-m2-01-browser-${{ github.event.pull_request.head.sha }}
-          path: m2-browser.log
+          name: pf08a-m4-01-browser-${{ github.event.pull_request.head.sha }}
+          path: m4-browser.log
           if-no-files-found: error
           retention-days: 7
 
