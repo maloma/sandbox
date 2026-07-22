@@ -8,7 +8,6 @@ on:
       - src/familypilot.html
       - src/familypilot-scope.js
       - src/familypilot-analytics-state.js
-      - familypilot-scope.js
       - familypilot-analytics-state.js
       - index.html
       - tools/pf08a-a3-01-apply-compact-analytics-states.mjs
@@ -24,7 +23,6 @@ on:
       - src/familypilot.html
       - src/familypilot-scope.js
       - src/familypilot-analytics-state.js
-      - familypilot-scope.js
       - familypilot-analytics-state.js
       - index.html
       - tools/pf08a-a3-01-apply-compact-analytics-states.mjs
