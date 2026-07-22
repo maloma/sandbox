@@ -1,11 +1,12 @@
 # Batch Manifest — PF-08A-M2-01-DEBT-CHAINS-PRINCIPAL
 
 **Document Type:** Runtime Execution Batch Manifest  
-**Status:** Active  
-**Version:** 1.0  
+**Status:** Trusted PASS / Final Zero-Diff Gate Pending  
+**Version:** 1.1  
 **Repository:** `maloma/sandbox`  
 **Starting Commit:** `6cf4b74c9cc648d9f7e17815b918a809f309e48e`  
 **Working Branch:** `agent/pf08a-m2-01-debt-chains-principal`  
+**Pull Request:** `#40`  
 **Authority:** `maloma/FamilyPilot@7eaaa3323d42328f512382e4a7d98990740077f6`, documents 31 Debt, 34, 60, 65 and 67  
 **Created:** 2026-07-22
 
@@ -75,30 +76,45 @@ Required suites:
 
 ### CP-02 — Domain, Scope and UI Integration
 
-- **Status:** COMPLETED / READY_FOR_GATE
+- **Status:** COMPLETED
 - schema-v5 debt domain added;
 - scope Capital extended with principal inflow/outflow;
 - debt UI constructed and attached through deterministic finalization;
+- stable source-derived Home debt mount replaces fabricated values;
 - domain/static/browser tests added;
 - existing workflow family extended.
 
 ### CP-03 — Exact PR Gate
 
-- **Status:** PLANNED
-- finalize canonical source/root;
-- run all module/regression suites;
-- persist generated artifacts only after PASS;
-- require synchronized zero-diff exact head;
-- merge with expected-head protection.
+- **Status:** TRUSTED_PASS / GENERATED_HEAD_COMMITTED / FINAL_ZERO_DIFF_PENDING
+- Draft PR `#40` opened from the exact batch branch;
+- authoritative trusted run `29923429307`, job `88934388190`: PASS;
+- M2 domain/static/Chrome: PASS;
+- M3 domain/static/Chrome: PASS;
+- A3 Analytics Chrome: PASS;
+- Hidden Capital Chrome: PASS;
+- verified generated runtime atomically committed at `4ebe5b6f6f675beeb8cebf91e4116561753abdd1`;
+- owner checkpoint commit is required only to trigger the final zero-diff suites after bot-generated head protection.
 
 ### CP-04 — Publication and Closure
 
 - **Status:** PLANNED
+- merge PR `#40` only after final exact-head zero-diff PASS;
 - verify published HTML and runtime modules;
-- run M2 Chrome against downloaded package;
+- run M2 Chrome against the downloaded public package;
 - save hashes and terminal evidence;
 - synchronize FamilyPilot;
 - activate M4 only after PASS.
+
+## Bounded Recovery Record
+
+Recovered without changing accepted M2 semantics:
+
+- made Home debt elements stable generated mount points and removed fabricated `180 € / 420 €` values;
+- aligned static verification with dynamic UI mounting;
+- removed self-referential forbidden-control assertions;
+- reconciled the existing M3 regression with the newly active Debts route while leaving Savings disabled;
+- preserved all prior M3, A3 and Hidden Capital checks.
 
 ## Rollback
 
@@ -110,5 +126,17 @@ Revert the eventual M2 implementation merge. Pre-batch accepted runtime remains 
 - `CHECKPOINT_FAILED_AFTER_BOUNDED_RECOVERY`;
 - `REPOSITORY_STATE_CONFLICT`;
 - `PUBLIC_VERIFICATION_FAILED`.
+
+## Changelog
+
+### Version 1.1 — 2026-07-22
+
+- recorded exact trusted PASS;
+- recorded generated runtime head;
+- advanced CP-03 to final owner-triggered zero-diff gate.
+
+### Version 1.0 — 2026-07-22
+
+- established M2 runtime integration batch.
 
 # END OF FILE
