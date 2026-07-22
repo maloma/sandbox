@@ -55,7 +55,7 @@ jobs:
         run: |
           set -euo pipefail
           evidence=docs/execution-batches/PF-08A-M3-01-PLAN-OBLIGATIONS/Public_Verification.md
-          if git diff --quiet -- "$evidence"; then
+          if git ls-files --error-unmatch "$evidence" >/dev/null 2>&1 && git diff --quiet -- "$evidence"; then
             echo "Public M3 evidence is already committed."
             exit 0
           fi
