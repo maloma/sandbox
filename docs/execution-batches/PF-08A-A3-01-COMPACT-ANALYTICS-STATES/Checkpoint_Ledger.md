@@ -99,4 +99,26 @@ Append-only rule: preserve all existing records and append later transitions usi
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 005 — CP-03 Trusted Pull Request Gate Passed
+
+- **Ordering Marker:** 005
+- **Checkpoint ID:** CP-03
+- **Status:** READY_FOR_MERGE
+- **Objective:** Prove that PR #18 is eligible for automatic development-prototype merge.
+- **Verified Head Before This Evidence Record:** `9e22554e36eab23c673fa40c3387a1af60cd363f`.
+- **Actual Changed Paths:** exactly twelve expected paths.
+- **Mergeability:** PASS.
+- **Trusted Workflow:** `PF-08A A3-01 Trusted PR Gate`, run `29888240647`, conclusion `success`.
+- **Branch Workflow:** `PF-08A A3-01 Compact Analytics States`, run `29888240634`, conclusion `success`.
+- **Trusted Steps:** exact head checkout; marker check; artifact recreation; zero generated diff; classifier/artifact/syntax verification; headless Chrome regression — all PASS.
+- **Verification Result:** PASS. No value/source mismatch, wallet-scope leak, period mutation, missing-category value loss, unexpected path, storage migration, dependency or unrelated product change exists.
+- **Rollback Method:** revert the eventual implementation merge or restore `667ee9980a584f55fd5de9191df15230d796a438`.
+- **Remaining Work:** obtain the same trusted PASS on the new evidence head, mark PR Ready, merge with expected-head protection, and verify the public route in Chrome.
+- **Exact Stop Point:** this append-only evidence commit.
+- **Next Authorized Transition:** final trusted evidence-head gate and automatic merge.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
