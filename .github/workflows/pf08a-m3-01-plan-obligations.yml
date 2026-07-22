@@ -1,0 +1,140 @@
+name: PF-08A M3-01 Plan and Obligations
+
+on:
+  push:
+    branches:
+      - agent/pf08a-m3-01-plan-obligations
+    paths:
+      - src/familypilot.html
+      - index.html
+      - familypilot-obligations.js
+      - tools/pf08a-m3-01-apply-plan-obligations.mjs
+      - tools/pf08a-m3-01-correct-today-payment-time.mjs
+      - tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
+      - tools/pf08a-m3-01-verify-plan-obligations.mjs
+      - tools/pf08a-m3-01-domain-test.cjs
+      - tools/pf08a-m3-01-browser-smoke.mjs
+      - .github/workflows/pf08a-m3-01-plan-obligations.yml
+      - docs/execution-batches/PF-08A-M3-01-PLAN-OBLIGATIONS/**
+  pull_request:
+    branches:
+      - main
+    paths:
+      - src/familypilot.html
+      - index.html
+      - familypilot-obligations.js
+      - tools/pf08a-m3-01-apply-plan-obligations.mjs
+      - tools/pf08a-m3-01-correct-today-payment-time.mjs
+      - tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
+      - tools/pf08a-m3-01-verify-plan-obligations.mjs
+      - tools/pf08a-m3-01-domain-test.cjs
+      - tools/pf08a-m3-01-browser-smoke.mjs
+      - .github/workflows/pf08a-m3-01-plan-obligations.yml
+      - docs/execution-batches/PF-08A-M3-01-PLAN-OBLIGATIONS/**
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pf08a-m3-01-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  implement:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Check M3 tools and module syntax
+        run: |
+          node --check familypilot-obligations.js
+          node --check tools/pf08a-m3-01-apply-plan-obligations.mjs
+          node --check tools/pf08a-m3-01-correct-today-payment-time.mjs
+          node --check tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
+          node --check tools/pf08a-m3-01-verify-plan-obligations.mjs
+          node --check tools/pf08a-m3-01-domain-test.cjs
+          node --check tools/pf08a-m3-01-browser-smoke.mjs
+
+      - name: Run obligations domain tests
+        run: node tools/pf08a-m3-01-domain-test.cjs
+
+      - name: Apply Plan and obligations patch once
+        shell: bash
+        run: |
+          if grep -Fq 'plan-obligations-foundation-v1' src/familypilot.html; then
+            echo "M3 Plan and obligations patch is already present."
+          else
+            node tools/pf08a-m3-01-apply-plan-obligations.mjs
+          fi
+
+      - name: Correct same-day payment timestamp
+        run: node tools/pf08a-m3-01-correct-today-payment-time.mjs
+
+      - name: Finalize root and source artifacts
+        run: node tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
+
+      - name: Verify M3 source contract
+        run: node tools/pf08a-m3-01-verify-plan-obligations.mjs
+
+      - name: Run compact Analytics regression
+        run: node tools/pf08a-a3-01-browser-smoke.mjs
+
+      - name: Run hidden Capital regression
+        run: node tools/pf08a-priv01-browser-smoke.mjs
+
+      - name: Run Plan and obligations browser regression
+        run: node tools/pf08a-m3-01-browser-smoke.mjs
+
+      - name: Commit verified generated runtime artifacts
+        shell: bash
+        run: |
+          if git diff --quiet -- src/familypilot.html index.html; then
+            echo "Verified M3 runtime artifacts are already committed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/familypilot.html index.html
+          git commit -m "Generate Plan and obligations runtime"
+          git push origin HEAD:${{ github.ref_name }}
+
+  verify:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require generated M3 marker
+        run: grep -Fq 'plan-obligations-foundation-v1' src/familypilot.html
+
+      - name: Check syntax and domain behavior
+        run: |
+          node --check familypilot-obligations.js
+          node --check tools/pf08a-m3-01-apply-plan-obligations.mjs
+          node --check tools/pf08a-m3-01-correct-today-payment-time.mjs
+          node --check tools/pf08a-m3-01-browser-smoke.mjs
+          node tools/pf08a-m3-01-domain-test.cjs
+
+      - name: Recreate final runtime artifacts
+        run: node tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
+
+      - name: Require generated artifacts to be committed
+        run: git diff --exit-code -- src/familypilot.html index.html
+
+      - name: Verify M3 source contract
+        run: node tools/pf08a-m3-01-verify-plan-obligations.mjs
+
+      - name: Run compact Analytics regression
+        run: node tools/pf08a-a3-01-browser-smoke.mjs
+
+      - name: Run hidden Capital regression
+        run: node tools/pf08a-priv01-browser-smoke.mjs
+
+      - name: Run Plan and obligations browser regression
+        run: node tools/pf08a-m3-01-browser-smoke.mjs
