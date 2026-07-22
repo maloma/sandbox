@@ -1,0 +1,36 @@
+name: PF-08A IF-02 Public Personal Wallet Smoke
+
+on:
+  push:
+    branches:
+      - agent/pf08a-if02-public-verification
+    paths:
+      - tools/pf08a-if02-public-browser-smoke.mjs
+      - .github/workflows/pf08a-if02-public-smoke.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify-public-personal-wallet-scope:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Verify public personal wallet scope in Chrome
+        env:
+          PUBLIC_URL: https://maloma.github.io/sandbox/
+          EXPECTED_MAIN: 98ce13bf2ef73dbda3e7806f4c368016b46796cc
+        run: node tools/pf08a-if02-public-browser-smoke.mjs --evidence=docs/execution-batches/PF-08A-IF-02-PERSONAL-WALLET-SCOPE/Public_Verification.md
+
+      - name: Commit public verification evidence
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/execution-batches/PF-08A-IF-02-PERSONAL-WALLET-SCOPE/Public_Verification.md
+          git commit -m "Record personal wallet public verification"
+          git push origin HEAD:${{ github.ref_name }}
