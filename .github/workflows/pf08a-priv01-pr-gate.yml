@@ -1,0 +1,72 @@
+name: PF-08A PRIV-01 Trusted PR Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - src/familypilot.html
+      - index.html
+      - tools/pf08a-priv01-apply-hidden-capital.mjs
+      - tools/pf08a-priv01-finalize-runtime-artifacts.mjs
+      - tools/pf08a-priv01-verify-hidden-capital.mjs
+      - tools/pf08a-priv01-browser-smoke.mjs
+      - .github/workflows/pf08a-priv01-hidden-capital.yml
+      - docs/execution-batches/PF-08A-PRIV-01-HIDDEN-CAPITAL/**
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pf08a-priv01-trusted-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: false
+
+jobs:
+  generate-and-verify-exact-head:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out head
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Apply hidden Capital disclosure once
+        shell: bash
+        run: |
+          if grep -Fq 'hidden-capital-disclosure-v1' src/familypilot.html; then
+            echo "Hidden Capital disclosure is already present."
+          else
+            node tools/pf08a-priv01-apply-hidden-capital.mjs
+          fi
+
+      - name: Finalize root and source artifacts
+        run: node tools/pf08a-priv01-finalize-runtime-artifacts.mjs
+
+      - name: Verify hidden Capital source contract
+        run: node tools/pf08a-priv01-verify-hidden-capital.mjs
+
+      - name: Run compact Analytics regression
+        run: node tools/pf08a-a3-01-browser-smoke.mjs
+
+      - name: Run hidden Capital browser regression
+        run: node tools/pf08a-priv01-browser-smoke.mjs
+
+      - name: Commit verified generated artifacts to the PR branch
+        shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          if git diff --quiet -- src/familypilot.html index.html; then
+            echo "Verified generated artifacts are already committed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/familypilot.html index.html
+          git commit -m "Generate hidden Capital disclosure"
+          git push origin HEAD:${HEAD_BRANCH}
