@@ -1,0 +1,55 @@
+name: PF-08A A3-01 Trusted PR Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - src/familypilot.html
+      - src/familypilot-scope.js
+      - src/familypilot-analytics-state.js
+      - familypilot-scope.js
+      - familypilot-analytics-state.js
+      - index.html
+      - tools/pf08a-a3-01-apply-compact-analytics-states.mjs
+      - tools/pf08a-a3-01-finalize-runtime-artifacts.mjs
+      - tools/pf08a-a3-01-verify-compact-analytics-states.mjs
+      - tools/pf08a-a3-01-browser-smoke.mjs
+      - .github/workflows/pf08a-a3-01-compact-analytics-states.yml
+      - docs/execution-batches/PF-08A-A3-01-COMPACT-ANALYTICS-STATES/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pf08a-a3-01-trusted-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: false
+
+jobs:
+  verify-exact-pr-head:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Require generated compact Analytics marker
+        run: grep -Fq 'compact-analytics-states-v1' src/familypilot.html
+
+      - name: Recreate final Analytics artifacts
+        run: node tools/pf08a-a3-01-finalize-runtime-artifacts.mjs
+
+      - name: Require generated artifacts to be committed
+        run: git diff --exit-code -- src/familypilot.html index.html familypilot-analytics-state.js familypilot-scope.js
+
+      - name: Verify classifier, artifacts and syntax
+        run: node tools/pf08a-a3-01-verify-compact-analytics-states.mjs
+
+      - name: Run headless Chrome Analytics regression
+        run: node tools/pf08a-a3-01-browser-smoke.mjs
