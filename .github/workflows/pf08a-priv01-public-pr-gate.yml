@@ -1,0 +1,70 @@
+name: PF-08A PRIV-01 Trusted Public Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - tools/pf08a-priv01-public-browser-smoke.mjs
+      - docs/execution-batches/PF-08A-PRIV-01-HIDDEN-CAPITAL/Public_Verification.md
+      - docs/execution-batches/PF-08A-PRIV-01-HIDDEN-CAPITAL/Batch_Manifest.md
+      - docs/execution-batches/PF-08A-PRIV-01-HIDDEN-CAPITAL/Checkpoint_Ledger.md
+      - .github/workflows/pf08a-priv01-public-smoke.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pf08a-priv01-public-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: false
+
+jobs:
+  verify-public-package:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out head
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Verify published hidden Capital package
+        shell: bash
+        run: |
+          evidence=docs/execution-batches/PF-08A-PRIV-01-HIDDEN-CAPITAL/Public_Verification.md
+          if test -f "$evidence"; then
+            node tools/pf08a-priv01-public-browser-smoke.mjs
+            grep -Fq '**Status:** PASS' "$evidence"
+            grep -Fq '3b62f927d7728d5c05bb3dd3e3e649974a9cb441' "$evidence"
+          else
+            node tools/pf08a-priv01-public-browser-smoke.mjs --evidence="$evidence"
+          fi
+
+      - name: Persist public verification evidence through GitHub Contents API
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          evidence=docs/execution-batches/PF-08A-PRIV-01-HIDDEN-CAPITAL/Public_Verification.md
+          if git diff --quiet -- "$evidence"; then
+            echo "Public evidence is already committed."
+            exit 0
+          fi
+          encoded_path=$(python -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe="/"))' "$evidence")
+          content=$(base64 -w0 "$evidence")
+          payload=$(jq -n \
+            --arg message "Record hidden Capital public verification" \
+            --arg content "$content" \
+            --arg branch "$HEAD_BRANCH" \
+            '{message:$message,content:$content,branch:$branch}')
+          curl --fail-with-body -sS -X PUT \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/${encoded_path}" \
+            -d "$payload"
