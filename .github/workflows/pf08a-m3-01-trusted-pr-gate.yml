@@ -128,33 +128,58 @@ jobs:
           status=${PIPESTATUS[0]}
           exit "$status"
 
-      - name: WF-02 failure stage — bootstrap and fixtures
+      - name: WF-02 bootstrap assertion — test API readiness
         if: failure()
         run: |
-          if grep -Eq 'test API did not become ready|marker missing|Transfer action missing|Navigation changed|Baseline wallets missing|Shared wallet fixture failed' /tmp/pf08a-wf02-browser.log; then exit 1; fi
+          if grep -Fq 'WF-02 test API did not become ready' /tmp/pf08a-wf02-browser.log; then exit 1; fi
 
-      - name: WF-02 failure stage — creation and access validation
+      - name: WF-02 bootstrap assertion — package marker
+        if: failure()
+        run: |
+          if grep -Fq 'WF-02 marker missing' /tmp/pf08a-wf02-browser.log; then exit 1; fi
+
+      - name: WF-02 bootstrap assertion — transfer action
+        if: failure()
+        run: |
+          if grep -Fq 'Transfer action missing' /tmp/pf08a-wf02-browser.log; then exit 1; fi
+
+      - name: WF-02 fixture assertion — navigation
+        if: failure()
+        run: |
+          if grep -Fq 'Navigation changed' /tmp/pf08a-wf02-browser.log; then exit 1; fi
+
+      - name: WF-02 fixture assertion — baseline wallets
+        if: failure()
+        run: |
+          if grep -Fq 'Baseline wallets missing' /tmp/pf08a-wf02-browser.log; then exit 1; fi
+
+      - name: WF-02 fixture assertion — shared wallet creation
+        if: failure()
+        run: |
+          if grep -Fq 'Shared wallet fixture failed' /tmp/pf08a-wf02-browser.log; then exit 1; fi
+
+      - name: WF-02 assertion — creation and access validation
         if: failure()
         run: |
           if grep -Eq 'Included-to-included|Canonical TransferEvent|Linked movement|Operations projection|Movement roles|Same wallet accepted|Zero amount accepted|Martin private wallet fixture|Inaccessible personal wallet accepted|Transfer modal did not open|Inaccessible wallet leaked' /tmp/pf08a-wf02-browser.log; then exit 1; fi
 
-      - name: WF-02 failure stage — Capital and correction
+      - name: WF-02 assertion — Capital and correction
         if: failure()
         run: |
           if grep -Eq 'Included-to-excluded|Personal transfer inflow|Transfer correction|Stable transfer ID|Movement IDs changed|Operation projection ID changed|Correction history missing|Correction left stale|Reload normalization' /tmp/pf08a-wf02-browser.log; then exit 1; fi
 
-      - name: WF-02 failure stage — Operations and detail UI
+      - name: WF-02 assertion — Operations and detail UI
         if: failure()
         run: |
           if grep -Eq 'Transfer rows missing|Corrected route not explained|Transfer detail did not open|Transfer detail route incorrect|Correction history not visible' /tmp/pf08a-wf02-browser.log; then exit 1; fi
 
-      - name: WF-02 failure stage — privacy and regressions
+      - name: WF-02 assertion — privacy and regressions
         if: failure()
         run: |
           if grep -Eq 'Private Anna route leaked|Income/Expense totals changed|Prior module API regressed|Runtime exceptions' /tmp/pf08a-wf02-browser.log; then exit 1; fi
 
-      - name: WF-02 failure stage — unknown
+      - name: WF-02 assertion — unknown
         if: failure()
         run: |
-          if grep -Eq 'test API did not become ready|marker missing|Transfer action missing|Navigation changed|Baseline wallets missing|Shared wallet fixture failed|Included-to-included|Canonical TransferEvent|Linked movement|Operations projection|Movement roles|Same wallet accepted|Zero amount accepted|Martin private wallet fixture|Inaccessible personal wallet accepted|Transfer modal did not open|Inaccessible wallet leaked|Included-to-excluded|Personal transfer inflow|Transfer correction|Stable transfer ID|Movement IDs changed|Operation projection ID changed|Correction history missing|Correction left stale|Reload normalization|Transfer rows missing|Corrected route not explained|Transfer detail did not open|Transfer detail route incorrect|Correction history not visible|Private Anna route leaked|Income/Expense totals changed|Prior module API regressed|Runtime exceptions' /tmp/pf08a-wf02-browser.log; then exit 0; fi
+          if grep -Eq 'WF-02 test API did not become ready|WF-02 marker missing|Transfer action missing|Navigation changed|Baseline wallets missing|Shared wallet fixture failed|Included-to-included|Canonical TransferEvent|Linked movement|Operations projection|Movement roles|Same wallet accepted|Zero amount accepted|Martin private wallet fixture|Inaccessible personal wallet accepted|Transfer modal did not open|Inaccessible wallet leaked|Included-to-excluded|Personal transfer inflow|Transfer correction|Stable transfer ID|Movement IDs changed|Operation projection ID changed|Correction history missing|Correction left stale|Reload normalization|Transfer rows missing|Corrected route not explained|Transfer detail did not open|Transfer detail route incorrect|Correction history not visible|Private Anna route leaked|Income/Expense totals changed|Prior module API regressed|Runtime exceptions' /tmp/pf08a-wf02-browser.log; then exit 0; fi
           exit 1
