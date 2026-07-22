@@ -1,5 +1,12 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+
+process.on('uncaughtException',error=>{
+  const detail=String(error?.stack||error||'Unknown M2 static failure');
+  writeFileSync('m2-browser.log',`M2_STATIC_FAILURE\n${detail}\n`);
+  console.error(detail);
+  process.exit(1);
+});
 
 const require=createRequire(import.meta.url);
 const source=readFileSync('src/familypilot.html','utf8');
