@@ -1,3 +1,6 @@
+// Public questionnaire policy: configure only pseudonymous work-account logins.
+// Personal employee names and personal GitHub accounts are prohibited.
+export const RESPONDENT_ACCOUNT_POLICY = "PSEUDONYMOUS_WORK_ACCOUNTS_ONLY";
 export const AUTHORIZED_RESPONDENTS = Object.freeze([]);
 
 export function validateRespondents(respondents = AUTHORIZED_RESPONDENTS) {
