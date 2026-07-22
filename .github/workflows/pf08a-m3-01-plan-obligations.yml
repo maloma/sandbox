@@ -15,6 +15,7 @@ on:
       - familypilot-debts-ui.js
       - tools/pf08a-m3-01-apply-plan-obligations.mjs
       - tools/pf08a-m3-01-correct-today-payment-time.mjs
+      - tools/pf08a-m3-01-correct-browser-test-api.mjs
       - tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
       - tools/pf08a-m3-01-verify-plan-obligations.mjs
       - tools/pf08a-m3-01-domain-test.cjs
@@ -38,6 +39,7 @@ on:
       - familypilot-debts-ui.js
       - tools/pf08a-m3-01-apply-plan-obligations.mjs
       - tools/pf08a-m3-01-correct-today-payment-time.mjs
+      - tools/pf08a-m3-01-correct-browser-test-api.mjs
       - tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
       - tools/pf08a-m3-01-verify-plan-obligations.mjs
       - tools/pf08a-m3-01-domain-test.cjs
@@ -74,6 +76,7 @@ jobs:
           node --check familypilot-debts-ui.js
           node --check tools/pf08a-m3-01-apply-plan-obligations.mjs
           node --check tools/pf08a-m3-01-correct-today-payment-time.mjs
+          node --check tools/pf08a-m3-01-correct-browser-test-api.mjs
           node --check tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
           node --check tools/pf08a-m3-01-verify-plan-obligations.mjs
           node --check tools/pf08a-m3-01-domain-test.cjs
@@ -99,6 +102,9 @@ jobs:
 
       - name: Correct same-day payment timestamp
         run: node tools/pf08a-m3-01-correct-today-payment-time.mjs
+
+      - name: Reconcile M3 regression with integrated navigation
+        run: node tools/pf08a-m3-01-correct-browser-test-api.mjs
 
       - name: Finalize root and source artifacts
         run: node tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
@@ -155,10 +161,14 @@ jobs:
           node --check familypilot-debts-ui.js
           node --check tools/pf08a-m3-01-apply-plan-obligations.mjs
           node --check tools/pf08a-m3-01-correct-today-payment-time.mjs
+          node --check tools/pf08a-m3-01-correct-browser-test-api.mjs
           node --check tools/pf08a-m3-01-browser-smoke.mjs
           node --check tools/pf08a-m2-01-browser-smoke.mjs
           node tools/pf08a-m3-01-domain-test.cjs
           node tools/pf08a-m2-01-domain-test.cjs
+
+      - name: Reconcile M3 regression with integrated navigation
+        run: node tools/pf08a-m3-01-correct-browser-test-api.mjs
 
       - name: Recreate final runtime artifacts
         run: node tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
