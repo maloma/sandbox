@@ -2,20 +2,19 @@ name: PF-08A FamilyPilot Trusted Public Gate
 
 on:
   pull_request:
-    branches:
-      - main
+    branches: [main]
     paths:
-      - tools/pf08a-m4-01-public-browser-smoke.mjs
-      - docs/execution-batches/PF-08A-M4-01-SAVINGS-GOALS/Public_Verification.md
-      - docs/execution-batches/PF-08A-M4-01-SAVINGS-GOALS/Batch_Manifest.md
-      - docs/execution-batches/PF-08A-M4-01-SAVINGS-GOALS/Checkpoint_Ledger.md
+      - tools/pf08a-wf01-public-browser-smoke.mjs
+      - docs/execution-batches/PF-08A-WF01-BASE-CURRENCY-WALLET-MANAGEMENT/Public_Verification.md
+      - docs/execution-batches/PF-08A-WF01-BASE-CURRENCY-WALLET-MANAGEMENT/Batch_Manifest.md
+      - docs/execution-batches/PF-08A-WF01-BASE-CURRENCY-WALLET-MANAGEMENT/Checkpoint_Ledger.md
       - .github/workflows/pf08a-m3-01-trusted-public-gate.yml
 
 permissions:
   contents: write
 
 concurrency:
-  group: pf08a-m4-01-public-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  group: pf08a-wf01-public-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -29,40 +28,34 @@ jobs:
           fetch-depth: 0
 
       - name: Verify exact checked-out head
-        shell: bash
         run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
 
-      - name: Verify published M4-01 FamilyPilot package
-        shell: bash
+      - name: Verify published WF-01 FamilyPilot package
         env:
           PUBLIC_URL: https://maloma.github.io/sandbox/
-          EXPECTED_MAIN_M4_01: f7366c0229fdc5115e38b5ea34e4c498a09e73f3
+          EXPECTED_MAIN_WF01: 85339932958f58cd416eb966a67e1bb35f56383c
         run: |
-          evidence=docs/execution-batches/PF-08A-M4-01-SAVINGS-GOALS/Public_Verification.md
+          evidence=docs/execution-batches/PF-08A-WF01-BASE-CURRENCY-WALLET-MANAGEMENT/Public_Verification.md
           if test -f "$evidence"; then
-            node tools/pf08a-m4-01-public-browser-smoke.mjs
+            node tools/pf08a-wf01-public-browser-smoke.mjs
             grep -Fq '**Status:** PASS' "$evidence"
-            grep -Fq 'f7366c0229fdc5115e38b5ea34e4c498a09e73f3' "$evidence"
+            grep -Fq '85339932958f58cd416eb966a67e1bb35f56383c' "$evidence"
           else
             mkdir -p "$(dirname "$evidence")"
-            node tools/pf08a-m4-01-public-browser-smoke.mjs --evidence="$evidence"
+            node tools/pf08a-wf01-public-browser-smoke.mjs --evidence="$evidence"
           fi
 
       - name: Persist public verification evidence
-        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
-          evidence=docs/execution-batches/PF-08A-M4-01-SAVINGS-GOALS/Public_Verification.md
-          if git ls-files --error-unmatch "$evidence" >/dev/null 2>&1 && git diff --quiet -- "$evidence"; then
-            echo "Public M4-01 evidence is already committed."
-            exit 0
-          fi
+          evidence=docs/execution-batches/PF-08A-WF01-BASE-CURRENCY-WALLET-MANAGEMENT/Public_Verification.md
+          if git ls-files --error-unmatch "$evidence" >/dev/null 2>&1 && git diff --quiet -- "$evidence"; then echo "Public WF-01 evidence already committed."; exit 0; fi
           encoded_path=$(python -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe="/"))' "$evidence")
           content=$(base64 -w0 "$evidence")
-          payload=$(jq -n --arg message "Record M4-01 public verification" --arg content "$content" --arg branch "$HEAD_BRANCH" '{message:$message,content:$content,branch:$branch}')
+          payload=$(jq -n --arg message "Record WF-01 public verification" --arg content "$content" --arg branch "$HEAD_BRANCH" '{message:$message,content:$content,branch:$branch}')
           curl --fail-with-body -sS -X PUT \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
