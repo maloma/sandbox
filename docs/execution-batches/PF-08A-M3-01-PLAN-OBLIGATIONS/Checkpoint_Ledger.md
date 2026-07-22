@@ -81,4 +81,23 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 004 — Full Browser Diagnostic Capture Activated
+
+- **Ordering Marker:** 004
+- **Checkpoint ID:** CP-03-DIAG01
+- **Status:** READY
+- **Latest Trusted Run Before Diagnostic Gate:** `29905657851`.
+- **Passed Before Failure:** exact checkout, syntax, domain tests, patch, same-day correction, source/root finalization, static contract, A3 Chrome and Hidden Capital Chrome.
+- **Unresolved Result:** one M3 browser assertion still failed; generated HTML remained uncommitted.
+- **Diagnostic Pull Request:** `#29` — `Capture full M3 browser diagnostics`.
+- **Diagnostic Gate Merge:** `e280631e8111ec565e2503812703b3be57325fd1`.
+- **Diagnostic Contract:** capture complete `m3-browser.log`, upload it as a seven-day workflow artifact on both PASS and FAIL, and make no product mutation.
+- **Verification Result:** READY. The next trusted run must yield the exact failing assertion before any further correction.
+- **Recovery Rule:** no inference-based product edit is allowed from this checkpoint.
+- **Next Authorized Transition:** download and inspect the full diagnostic artifact.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
