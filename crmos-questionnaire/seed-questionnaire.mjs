@@ -2,7 +2,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 import { openTitle, renderQuestionIssue, renderStartIssue } from "./questionnaire-core.mjs";
 import { QUESTIONS } from "./questions/index.mjs";
-import { AUTHORIZED_RESPONDENTS, validateRespondents } from "./respondents.mjs";
+import { validateRespondents } from "./respondents.mjs";
 
 const token = process.env["GITHUB_TOKEN"];
 const repository = process.env["GITHUB_REPOSITORY"];
@@ -55,7 +55,7 @@ if (!startExists) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       title: "📋 CRMOS — начать здесь: анкета по процессу заказов",
-      body: renderStartIssue(repository, QUESTIONS, AUTHORIZED_RESPONDENTS),
+      body: renderStartIssue(repository, QUESTIONS),
     }),
   });
 }
