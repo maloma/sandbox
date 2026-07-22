@@ -1,7 +1,7 @@
 # Checkpoint Ledger — PF-08A-M2-01-DEBT-CHAINS-PRINCIPAL
 
 **Document Type:** Append-Only Runtime Checkpoint Ledger  
-**Status:** Active  
+**Status:** Active / Public Closure Pending  
 **Repository:** `maloma/sandbox`  
 **Branch:** `agent/pf08a-m2-01-debt-chains-principal`  
 **Created:** 2026-07-22
@@ -123,23 +123,70 @@ Append-only rule: preserve all records and append later transitions using monoto
 
 ---
 
-## Record 007 — Final Exact-Head Gate Passed
+## Record 007 — Preliminary Final Exact-Head Gate Passed
 
 - **Ordering Marker:** 007
 - **Checkpoint ID:** CP-03
+- **Status:** SUPERSEDED_BY_LATER_OWNER_HEAD
+- **Recorded Head:** `a514096a535f02d780b113f8cf043420c7a78953`.
+- **Recorded Suites:** six suites passed.
+- **Reason Superseded:** appending this record created a later owner head requiring a new exact-head run.
+- **Record Integrity State:** VALID HISTORICAL RECORD; not the final merge authority.
+
+---
+
+## Record 008 — Final Merge-Authorizing Exact Head Passed
+
+- **Ordering Marker:** 008
+- **Checkpoint ID:** CP-03
 - **Status:** READY_FOR_MERGE
-- **Exact Head:** `a514096a535f02d780b113f8cf043420c7a78953`.
-- **FamilyPilot Trusted PR Gate:** run `29924632404` — PASS.
-- **FamilyPilot Module Regression:** run `29924629855` — PASS.
-- **A3 Trusted PR Gate:** run `29924630039` — PASS.
-- **A3 Compact Analytics States:** run `29924631172` — PASS.
-- **PRIV-01 Trusted PR Gate:** run `29924631168` — PASS.
-- **PRIV-01 Hidden Capital Disclosure:** run `29924629762` — PASS.
+- **Exact Head:** `c1faf7074a2e5a49370e26c6ff325f304fada18b`.
+- **FamilyPilot Trusted PR Gate:** run `29924779136` — PASS.
+- **FamilyPilot Module Regression:** run `29924777333` — PASS.
+- **A3 Trusted PR Gate:** run `29924779273` — PASS.
+- **A3 Compact Analytics States:** run `29924777373` — PASS.
+- **PRIV-01 Trusted PR Gate:** run `29924779211` — PASS.
+- **PRIV-01 Hidden Capital Disclosure:** run `29924779269` — PASS.
 - **Zero-Diff:** PASS for canonical/generated HTML, Scope and Analytics artifacts.
 - **M2/M3/A3/Hidden Capital Browser Suites:** PASS.
 - **Mergeability:** PASS.
-- **Rollback:** revert eventual PR #40 merge to return to pre-batch main.
-- **Next Authorized Transition:** expected-head merge and public verification.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
+---
+
+## Record 009 — Implementation Merge Completed
+
+- **Ordering Marker:** 009
+- **Checkpoint ID:** CP-03
+- **Status:** COMPLETED
+- **Pull Request:** `#40`.
+- **Expected Head:** `c1faf7074a2e5a49370e26c6ff325f304fada18b`.
+- **Implementation Merge:** `9fecb7bad53e2de5481fbac745689afa9db8537a`.
+- **Rollback:** revert merge `9fecb7bad53e2de5481fbac745689afa9db8537a` to restore pre-batch runtime.
+- **Next Authorized Transition:** CP-04 downloaded-package public verification.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
+---
+
+## Record 010 — Downloaded-Package Public Verification Passed
+
+- **Ordering Marker:** 010
+- **Checkpoint ID:** CP-04
+- **Status:** PUBLIC_PASS
+- **Public Closure Pull Request:** `#41`.
+- **Public URL:** `https://maloma.github.io/sandbox/`.
+- **Expected Main:** `9fecb7bad53e2de5481fbac745689afa9db8537a`.
+- **Workflow Run:** `29925298021`.
+- **Workflow Job:** `88940775132`.
+- **Publication Attempts:** `1`.
+- **HTTP:** HTML, Scope, Analytics, Obligations domain/UI and Debts domain/UI — all `200`.
+- **Browser Marker:** `PF08A_M2_01_BROWSER_PASS`.
+- **Assertions:** active Debts route; source-derived Home totals; historical opening; four actions; principal in Capital and excluded from ordinary Analytics; automatic reciprocal debt; mutual offset; stable source edit; immutable closure/new chain; Trash/restore; personal isolation; M3/A3/Hidden Capital preservation — PASS.
+- **Runtime Exceptions:** NONE.
+- **Evidence:** `docs/execution-batches/PF-08A-M2-01-DEBT-CHAINS-PRINCIPAL/Public_Verification.md`.
+- **Next Authorized Transition:** terminal public rerun, closure PR merge and FamilyPilot synchronization.
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
