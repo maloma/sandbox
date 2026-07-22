@@ -46,7 +46,7 @@ export function renderQuestionIssue(question) {
     "",
     "> **Важно:** " + question.safety,
     "",
-    "> Анкета публичная. Не вставляйте сведения, по которым можно узнать реального клиента или его заказ.",
+    "> Анкета публичная. Не вставляйте сведения, по которым можно узнать реального клиента, сотрудника или конкретный заказ.",
     "",
     "## Как заполнить",
     "",
@@ -74,7 +74,7 @@ export function renderQuestionIssue(question) {
   return lines.join("\n");
 }
 
-export function renderStartIssue(repository, questions, respondents) {
+export function renderStartIssue(repository, questions) {
   const [owner, repo] = repository.split("/");
   const base = "https://github.com/" + owner + "/" + repo + "/issues";
   const openQuery = base + "?q=is%3Aissue+is%3Aopen+%22CRMOS+Q%22";
@@ -86,13 +86,12 @@ export function renderStartIssue(repository, questions, respondents) {
   const sections = [...sectionCounts.entries()]
     .map(([section, count]) => "- **" + section + ":** " + count + " вопросов")
     .join("\n");
-  const respondentList = respondents.map((login) => "@" + login).join(", ");
 
   return [
     START_MARKER,
     "# Анкета по фактическому процессу заказов",
     "",
-    "Эту анкету одновременно заполняют три сотрудницы: " + respondentList + ".",
+    "Эту анкету одновременно заполняют три уполномоченные сотрудницы через отдельные псевдонимные рабочие GitHub-аккаунты.",
     "Каждый вопрос находится в отдельной карточке, поэтому можно открыть разные вопросы и отвечать параллельно.",
     "",
     "## Главное правило",
@@ -119,7 +118,7 @@ export function renderStartIssue(repository, questions, respondents) {
     "",
     "## Публичность и защита данных",
     "",
-    "Эта анкета и ответы видны публично. Не вставляйте имена, телефоны, адреса, номера документов, фотографии, переписку, банковские данные, трек-номера или другие сведения реальных клиентов. Нужны только правила работы, роли, варианты действий и полностью обезличенные примеры.",
+    "Эта анкета и ответы видны публично. Не вставляйте имена сотрудников или клиентов, личные GitHub-логины, телефоны, адреса, номера документов, фотографии, переписку, банковские данные, трек-номера или другие сведения, позволяющие узнать человека или конкретный заказ. Нужны только роли, правила работы, варианты действий и полностью обезличенные примеры.",
     "",
   ].join("\n");
 }
