@@ -59,48 +59,44 @@
       const amount = Number(operation?.amount) || 0;
       if (operation?.kind === 'income') result.income += amount;
       if (operation?.kind === 'expense') result.expense += amount;
+      if (operation?.kind === 'debt_inflow') result.debtInflow += amount;
+      if (operation?.kind === 'debt_outflow') result.debtOutflow += amount;
       return result;
-    }, { income: 0, expense: 0 });
+    }, { income: 0, expense: 0, debtInflow: 0, debtOutflow: 0 });
+  }
+
+  function snapshot(state, selected, operations, opening, scope, currency) {
+    const flow = totals(operations);
+    const change = flow.income + flow.debtInflow - flow.expense - flow.debtOutflow;
+    return {
+      wallet: selected,
+      scope,
+      currency,
+      opening,
+      ...flow,
+      change,
+      capital: opening + change
+    };
   }
 
   function capitalSnapshot(state) {
     const selected = activeWallet(state);
     if (!selected) {
-      return { wallet: null, scope: 'household', currency: state?.household?.baseCurrency || 'EUR', opening: 0, income: 0, expense: 0, change: 0, capital: 0 };
+      return { wallet: null, scope: 'household', currency: state?.household?.baseCurrency || 'EUR', opening: 0, income: 0, expense: 0, debtInflow: 0, debtOutflow: 0, change: 0, capital: 0 };
     }
 
     if (isPersonalWallet(selected)) {
       const operations = activeOperations(state).filter(operation => operation.walletId === selected.id);
-      const flow = totals(operations);
       const opening = Number(selected.openingBalance) || 0;
-      const change = flow.income - flow.expense;
-      return {
-        wallet: selected,
-        scope: 'personal',
-        currency: selected.nativeCurrency || state?.household?.baseCurrency || 'EUR',
-        opening,
-        ...flow,
-        change,
-        capital: opening + change
-      };
+      return snapshot(state, selected, operations, opening, 'personal', selected.nativeCurrency || state?.household?.baseCurrency || 'EUR');
     }
 
     const operations = householdCapitalOperations(state);
-    const flow = totals(operations);
     const opening = Number(state?.household?.openingCapital) || 0;
     const additionalOpening = wallets(state)
       .filter(wallet => wallet.type !== 'household_default' && wallet.includedInHouseholdCapital === true)
       .reduce((sum, wallet) => sum + (Number(wallet.openingBalance) || 0), 0);
-    const change = flow.income - flow.expense;
-    return {
-      wallet: selected,
-      scope: 'household',
-      currency: state?.household?.baseCurrency || selected.nativeCurrency || 'EUR',
-      opening: opening + additionalOpening,
-      ...flow,
-      change,
-      capital: opening + additionalOpening + change
-    };
+    return snapshot(state, selected, operations, opening + additionalOpening, 'household', state?.household?.baseCurrency || selected.nativeCurrency || 'EUR');
   }
 
   function scopeDescriptor(state) {
