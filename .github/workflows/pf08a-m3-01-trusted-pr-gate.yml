@@ -9,6 +9,7 @@ on:
       - index.html
       - familypilot-obligations.js
       - tools/pf08a-m3-01-apply-plan-obligations.mjs
+      - tools/pf08a-m3-01-correct-today-payment-time.mjs
       - tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
       - tools/pf08a-m3-01-verify-plan-obligations.mjs
       - tools/pf08a-m3-01-domain-test.cjs
@@ -41,6 +42,7 @@ jobs:
         run: |
           node --check familypilot-obligations.js
           node --check tools/pf08a-m3-01-apply-plan-obligations.mjs
+          node --check tools/pf08a-m3-01-correct-today-payment-time.mjs
           node --check tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
           node --check tools/pf08a-m3-01-verify-plan-obligations.mjs
           node --check tools/pf08a-m3-01-domain-test.cjs
@@ -57,6 +59,9 @@ jobs:
           else
             node tools/pf08a-m3-01-apply-plan-obligations.mjs
           fi
+
+      - name: Correct same-day payment timestamp
+        run: node tools/pf08a-m3-01-correct-today-payment-time.mjs
 
       - name: Finalize root and source artifacts
         run: node tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
