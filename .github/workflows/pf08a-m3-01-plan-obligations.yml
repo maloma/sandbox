@@ -6,6 +6,7 @@ on:
       - agent/pf08a-wf02-base-currency-transfers
     paths:
       - src/familypilot.html
+      - src/familypilot-scope.js
       - index.html
       - familypilot-scope.js
       - familypilot-obligations.js

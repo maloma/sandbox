@@ -104,3 +104,19 @@ Append-only rule: preserve every record and append later transitions with monoto
 - **Storage Impact:** NONE.
 - **Next:** publish one human-authored cleanup commit and obtain final exact-head verification.
 - **Record Integrity:** VALID.
+
+---
+
+## Record 007 — Scope Mirror Integrity Correction Prepared
+
+- **Ordering Marker:** 007
+- **Checkpoint:** CP-03
+- **Status:** PREPARED
+- **Observed Verification:** FamilyPilot trusted gate, Privacy gates and compact Analytics gate passed on `008cdd8b3847f2adbb98e77d53d15302a613dbd8`; legacy A3 trusted gate alone failed its generated-artifact diff check.
+- **Root Cause:** `familypilot-scope.js` contained the WF-02 scope/bootstrap implementation while `src/familypilot-scope.js` remained an older canonical mirror; the A3 finalizer correctly attempted to replace root from source.
+- **Correction:** make source and root scope modules byte-identical, enforce equality in the WF-02 integration verifier and include the source scope path in both FamilyPilot workflow triggers.
+- **Product Semantics:** unchanged; this is source/root integrity reconciliation.
+- **Artifacts:** NONE.
+- **Workflow Expansion:** NONE; existing expected regression families only.
+- **Next:** one final meaningful verification cycle.
+- **Record Integrity:** VALID.

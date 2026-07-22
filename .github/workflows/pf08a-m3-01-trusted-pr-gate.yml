@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - src/familypilot.html
+      - src/familypilot-scope.js
       - index.html
       - familypilot-scope.js
       - familypilot-obligations.js
