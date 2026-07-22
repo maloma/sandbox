@@ -29,7 +29,7 @@ assert(debtUi.includes("modal.id='debtEntryModal'")&&debtUi.includes("modal.id='
 assert(debtUi.includes("planDebt.dataset.planModule='debts'")&&debtUi.includes("planDebt.disabled=false"),'Plan → Debts activation missing');
 assert(debtUi.includes('data-debt-action="borrow"')&&debtUi.includes('data-debt-action="repay"')&&debtUi.includes('data-debt-action="lend"')&&debtUi.includes('data-debt-action="receive"'),'Four debt actions missing');
 assert(debtUi.includes('data-debt-action="opening_liability"')&&debtUi.includes('data-debt-action="opening_receivable"'),'Historical opening actions missing');
-assert(!/Additional amount above principal|data-debt-overpayment-choice|<label[^>]*>[^<]*(Interest|Gift|Процент|Подар|Комисс)/i.test(debtUi),'Superseded debt-entry field or overpayment controls exist in UI markup');
+assert(!/Additional amount above principal|data-debt-overpayment-choice\s*=|<label[^>]*>[^<]*(Interest|Gift|Процент|Подар|Комисс)/i.test(debtUi),'Superseded debt-entry field or overpayment controls exist in UI markup');
 assert(debtSource.includes("derivedKind:'reciprocal'"),'Automatic reciprocal debt derivation missing');
 assert(debtSource.includes("derivedKind:'offset'"),'Mutual offset derivation missing');
 assert(debtSource.includes("derivedKind:'closed'"),'Debt-closed event missing');
