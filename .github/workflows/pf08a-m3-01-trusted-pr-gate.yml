@@ -126,8 +126,7 @@ jobs:
 
           entries='[]'
           for path in "${paths[@]}"; do
-            blob_payload=$(jq -Rs '{content:.,encoding:"utf-8"}' < "${path}")
-            blob_sha=$(curl --fail-with-body -sS -X POST "${auth[@]}" "${api}/git/blobs" -d "${blob_payload}" | jq -r '.sha')
+            blob_sha=$(jq -Rs '{content:.,encoding:"utf-8"}' < "${path}" | curl --fail-with-body -sS -X POST "${auth[@]}" "${api}/git/blobs" --data-binary @- | jq -r '.sha')
             test -n "${blob_sha}" -a "${blob_sha}" != "null"
             entries=$(jq --arg path "${path}" --arg sha "${blob_sha}" '. + [{path:$path,mode:"100644",type:"blob",sha:$sha}]' <<< "${entries}")
           done
