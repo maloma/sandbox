@@ -1,11 +1,12 @@
 # Batch Manifest — PF-08A-M3-01-PLAN-OBLIGATIONS
 
 **Document Type:** Runtime Execution Batch Manifest  
-**Status:** Active  
-**Version:** 1.0  
+**Status:** Ready for Automatic Prototype Merge  
+**Version:** 1.1  
 **Repository:** `maloma/sandbox`  
 **Starting Commit:** `ba7b4cae5f28c4a39bc80a251a2b43d7bb3ce194`  
 **Working Branch:** `agent/pf08a-m3-01-plan-obligations`  
+**Pull Request:** `#26`  
 **Authority:** Accepted Option A navigation, FamilyPilot A5 shared integration contract and accepted M3 semantics  
 **Depth Policy:** `SINGLE_DEPTH_HIGH`  
 **Created:** 2026-07-22
@@ -14,25 +15,25 @@
 
 Convert the existing Plan placeholder into the accepted Plan hub and mount the first bounded Obligations foundation without changing the bottom navigation or duplicating financial operations.
 
-## Included Scope
+## Implemented Scope
 
-- preserve `Главная · Операции · План · Ещё`;
-- replace the Plan placeholder with explicit Obligations, Debts and Savings entries;
-- mount Obligations as the first active module;
-- show Debts and Savings honestly as not yet integrated;
-- extend existing local state non-destructively with obligation rules and occurrences;
-- create, list, reopen and edit one-time and monthly obligation rules;
-- create concrete occurrences;
-- support planned, due, overdue, paid, postponed and skipped states;
-- pay by creating or linking exactly one existing-model Expense operation;
-- maintain reciprocal links between occurrence and operation;
-- recalculate payment state after linked operation edit, Trash, restore or permanent deletion;
-- preserve household/personal wallet scope isolation;
-- preserve Main, Operations, Analytics, hidden Capital, periods, filters, categories and existing storage;
-- add deterministic domain, static and headless-Chrome verification;
-- merge and publish only after exact trusted PASS and verified rollback.
+- preserved `Главная · Операции · План · Ещё`;
+- replaced the Plan placeholder with explicit Obligations, Debts and Savings entries;
+- mounted Obligations as the first active module;
+- showed Debts and Savings honestly as not yet integrated;
+- extended existing local state non-destructively to schema v3 with obligation rules and occurrences;
+- preserved the existing storage key and v2 readability;
+- implemented create, list, reopen and edit for one-time and monthly obligation rules;
+- implemented concrete occurrences and planned, due, overdue, paid, postponed and skipped states;
+- implemented payment through exactly one linked Expense operation;
+- implemented reciprocal occurrence/operation links;
+- implemented recalculation after linked operation edit, Trash and restore;
+- preserved household/personal wallet scope isolation;
+- preserved Main, Operations, Analytics, hidden Capital, periods, filters, categories and existing storage;
+- added deterministic domain, static, A3, hidden-Capital and M3 headless-Chrome verification;
+- preserved byte-identical root/source HTML.
 
-## Excluded Scope
+## Excluded Scope Preserved
 
 - no external push notifications;
 - no automatic bank payment execution;
@@ -44,41 +45,24 @@ Convert the existing Plan placeholder into the accepted Plan hub and mount the f
 - no real-data migration or new paid dependency;
 - no redesign of Main or bottom navigation.
 
-## Current Runtime Inspection
-
-- exact starting main: `ba7b4cae5f28c4a39bc80a251a2b43d7bb3ce194`;
-- canonical source and root artifact share blob `3e690de8d484c1822073904e6fab280bf8ca6486`;
-- bottom navigation already equals accepted Option A;
-- `plansScreen` is an isolated placeholder and is the direct mounting point;
-- existing state uses `familypilot.operations.foundation.v2` with schema version 2;
-- ordinary operations already have a `links` object;
-- current save/render pipeline recalculates Main, Operations and Analytics from `state.operations`;
-- current test API can be extended without replacing existing tests;
-- public development route is `https://maloma.github.io/sandbox/`.
-
 ## Runtime Model
 
 ### ObligationRule
 
-Minimum fields:
-
 - stable id;
 - name;
-- recurrence: once or monthly;
+- once or monthly cadence;
 - next due date;
 - expected amount and currency;
-- wallet id;
-- expense category id;
+- wallet and expense-category ids;
 - active/archived state;
-- creation/edit metadata.
+- creation/edit metadata and revisions.
 
 ### ObligationOccurrence
 
-Minimum fields:
-
 - stable id;
 - rule id;
-- due date;
+- scheduled and current due dates;
 - expected and actual amount;
 - status;
 - linked operation id;
@@ -92,64 +76,90 @@ ObligationOccurrence
 ↔ Expense operation links.obligationOccurrenceId
 ```
 
-One active linked Expense is the sole payment source. No duplicate module-only money record is allowed.
+One active linked Expense is the sole payment source. Duplicate module-only payment records are rejected.
 
-## Checkpoints
+## Checkpoint Results
 
 ### CP-01 — Exact Runtime Inspection and Model Contract
 
 - **Status:** COMPLETED
-- exact Plan, state, operation, routing and test mounting points identified;
-- v2 data preservation and v3 additive normalization selected;
+- Plan, state, operation, routing and test mounting points identified;
+- additive v3 normalization selected;
 - one-fact / one-source payment contract selected.
 
 ### CP-02 — Domain Module and Source Patch
 
-- **Status:** READY
-- add an obligations domain helper module;
-- add deterministic source patch/finalizer;
-- add Plan and Obligations UI/routes;
-- add state normalization and payment links.
+- **Status:** COMPLETED
+- obligations domain module implemented;
+- deterministic source patch and finalizer implemented;
+- Plan and Obligations routes implemented;
+- state normalization and payment links implemented;
+- same-day payment timestamp edge case corrected.
 
 ### CP-03 — Automated Regression and Trusted PR Gate
 
-- **Status:** PLANNED
-- static source contract;
-- domain unit scenarios;
-- headless Chrome create/pay/postpone/skip/scope/reload scenarios;
-- A3 Analytics and hidden Capital regression;
-- exact source/root equality;
-- trusted default-branch exact-head gate.
+- **Status:** READY_FOR_MERGE
+- **Verified Generated Head:** `37511d21d560b4d1dc93a4be7a548a40668af196`;
+- **Source/Root Blob:** `2ef81456faf5baaf0e92e4a802652d86ffc0bf3e`;
+- **Changed Paths:** exactly 13 expected implementation, workflow, test and evidence paths;
+- **Trusted Generation Run:** `29907309831`, conclusion `success`;
+- exact checkout — PASS;
+- syntax — PASS;
+- domain tests — PASS;
+- deterministic patch/finalization — PASS;
+- static source contract — PASS;
+- compact Analytics Chrome — PASS;
+- hidden Capital Chrome — PASS;
+- Plan/Obligations Chrome — PASS;
+- atomic artifact persistence — PASS;
+- generated test API correction durably committed — PASS.
 
 ### CP-04 — Merge, Publication and Public Verification
 
-- **Status:** PLANNED
-- merge with expected-head protection;
-- verify published HTML and all runtime modules over HTTP 200;
-- run public Chrome scenarios;
-- store hashes and terminal evidence;
-- preserve previous stable runtime and Git-revert rollback.
+- **Status:** READY
+- remaining transition: final zero-diff exact-head gate on evidence head, merge with expected-head protection, public GitHub Pages Chrome verification and terminal evidence.
 
-## Required Invariants
+## Verification Summary
+
+- navigation unchanged — PASS;
+- Plan hub and honest module states — PASS;
+- one-time/monthly rule creation — PASS;
+- occurrence creation and reopening — PASS;
+- due/overdue/paid/postponed/skipped behavior — PASS;
+- one payment / one linked Expense — PASS;
+- duplicate payment rejected — PASS;
+- linked operation visible in Operations and Analytics — PASS;
+- linked edit recalculates amount — PASS;
+- Trash invalidates paid projection — PASS;
+- restore reestablishes paid projection — PASS;
+- personal/household scope isolation — PASS;
+- existing v2 state readability — PASS;
+- hidden Capital — PASS;
+- compact Analytics — PASS;
+- source/root equality — PASS;
+- rollback — AVAILABLE.
+
+## Required Invariants Preserved
 
 - navigation labels and order unchanged;
 - Capital remains hidden until explicit press;
-- Income and Expense stay in thumb reach on Main and Operations;
-- existing v2 localStorage remains readable;
-- ordinary operation semantics remain unchanged;
-- one payment produces one actual Expense;
-- linked payment is visible in Operations and Analytics;
-- Trash/removal of linked Expense invalidates paid projection;
-- restore reestablishes paid projection;
-- personal obligations do not appear in household or another personal scope;
-- recurrence does not silently rewrite a specific occurrence;
+- Income and Expense stay in thumb reach;
+- ordinary operation semantics unchanged;
 - no fabricated Debts or Savings values;
 - no reminder popup or competing global badge;
-- root/source HTML remain byte-identical.
+- no production authorization claim.
 
-## Recovery
+## Recovery Record
 
-One bounded source/test correction is allowed per failed checkpoint. Reject merge on duplicate payment, data loss, scope mixing, stale paid state, unexpected path, existing-regression failure or public verification failure.
+Bounded recovery corrected:
+
+- browser navigation whitespace expectation;
+- same-day date-only payment timestamp;
+- browser test API namespace;
+- diagnostic output extraction;
+- large-artifact transport through streamed atomic Git persistence.
+
+No recovery expanded product scope or changed accepted financial semantics.
 
 ## Rollback
 
@@ -161,5 +171,17 @@ Revert the eventual implementation merge or restore `ba7b4cae5f28c4a39bc80a251a2
 - `CHECKPOINT_FAILED_AFTER_BOUNDED_RECOVERY`;
 - `REPOSITORY_STATE_CONFLICT`;
 - `PUBLIC_VERIFICATION_FAILED`.
+
+## Changelog
+
+### Version 1.1 — 2026-07-22
+
+- marked CP-02 completed;
+- recorded verified generated artifacts and full trusted PASS;
+- advanced CP-03 to READY_FOR_MERGE and CP-04 to READY.
+
+### Version 1.0 — 2026-07-22
+
+- established the Plan and Obligations runtime batch.
 
 # END OF FILE
