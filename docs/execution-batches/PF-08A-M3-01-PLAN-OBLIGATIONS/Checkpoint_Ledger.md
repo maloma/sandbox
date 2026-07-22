@@ -100,4 +100,27 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 005 — Exact Browser API Failure Classified and Corrected
+
+- **Ordering Marker:** 005
+- **Checkpoint ID:** CP-03-REC02
+- **Status:** COMPLETED / RETRY_READY
+- **Diagnostic Trusted Run:** `29906180501`.
+- **Diagnostic Artifact:** `pf08a-m3-01-browser-3edeb337fdeb433044c614550cb65ffda28c454c`.
+- **Artifact SHA-256:** `e6de92ee26ac760d99edd19b00cb539a1eff8c8f2166a5a77f25e23841c0761f`.
+- **Exact Failure:** `TypeError: api.openPlan is not a function` at the final Plan-reopen assertion.
+- **Classification:** test-only API path mismatch. Product exposes `openPlan` under `api.obligations`; all earlier product assertions in the same scenario completed.
+- **Correction:** deterministically replace `api.openPlan()` with `api.obligations.openPlan()` in the browser test.
+- **Correction File:** `tools/pf08a-m3-01-correct-browser-test-api.mjs`.
+- **Trusted Gate Correction Pull Request:** `#30` — `Correct exact M3 browser test API route`.
+- **Trusted Gate Correction Merge:** `309dd3f661f694da15fd0806351c3bf741120878`.
+- **Persistence Rule:** after complete PASS, the trusted gate persists the corrected browser test together with generated source/root HTML.
+- **Scope:** no runtime product behavior, navigation, financial semantics or data model changed.
+- **Verification Result:** RETRY_READY. Exact-head full-pipeline run is authorized.
+- **Next Authorized Transition:** run corrected trusted gate and inspect generated artifacts.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
