@@ -85,6 +85,9 @@
   if(typeof document==='undefined'||!root||root.__FP_WF02_BOOTSTRAP__)return;
   root.__FP_WF02_BOOTSTRAP__=true;
 
+  const testMode=new URLSearchParams(location.search).has('test');
+  const testApiDeadline=Date.now()+30000;
+
   function ensurePackageMarker(){
     const selector='meta[name="familypilot-package"][content="base-currency-wallet-transfers-v1"]';
     if(document.head&&!document.head.querySelector(selector)){
@@ -110,9 +113,17 @@
     script.addEventListener('error',()=>{root.__FP_WF02_BOOTSTRAP_ERROR__=`Failed to load ${path}`},{once:true});
     document.head.appendChild(script);
   }
+  function loadUiWhenBaseRuntimeReady(){
+    if(testMode&&!root.__FP_TEST__){
+      if(Date.now()>=testApiDeadline){root.__FP_WF02_BOOTSTRAP_ERROR__='Base FamilyPilot test API did not become ready';return}
+      setTimeout(loadUiWhenBaseRuntimeReady,25);
+      return;
+    }
+    loadScript('familypilot-wallet-transfers-ui.js',()=>{root.__FP_WF02_READY__=true});
+  }
   function mount(){
     ensurePackageMarker();
-    loadScript('familypilot-wallet-transfers.js',()=>loadScript('familypilot-wallet-transfers-ui.js',()=>{root.__FP_WF02_READY__=true}));
+    loadScript('familypilot-wallet-transfers.js',loadUiWhenBaseRuntimeReady);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});
   else queueMicrotask(mount);

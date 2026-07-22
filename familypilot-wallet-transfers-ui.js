@@ -98,7 +98,8 @@
   document.addEventListener('click',event=>{const opener=event.target.closest('[data-open-transfer]'),closer=event.target.closest('[data-transfer-close]');if(opener||closer){event.preventDefault();event.stopImmediatePropagation()}if(opener){openTransferEditor();return}if(closer){close(closer.dataset.transferClose);return}},true);
   for(const id of ['walletTransferModal','walletTransferDetailModal'])$(id).addEventListener('click',event=>{if(event.target===$(id))close(id)});
 
-  if(new URLSearchParams(location.search).has('test')&&window.__FP_TEST__){window.__FP_TEST__.transfers={
+  const testMode=new URLSearchParams(location.search).has('test');
+  const transferTestApi={
     normalize:()=>{transferApi.normalizeState(state,now());save();renderAll();return true},
     create:input=>{const result=transferApi.createTransfer(state,input,state.currentMemberId,now());save();renderAll();return result},
     correct:(id,input)=>{const result=transferApi.correctTransfer(state,id,input,state.currentMemberId,now());save();renderAll();return result},
@@ -112,7 +113,13 @@
     openDetail:id=>openTransferDetail(id),
     setMember:id=>{state.currentMemberId=id;ensureAccessibleActiveWallet();save();renderAll();return state.activeWalletId},
     setActive:id=>{state.activeWalletId=id;ensureAccessibleActiveWallet();save();renderAll();return state.activeWalletId}
-  }}
+  };
+  function installTransferTestApi(attempt=0){
+    if(!testMode)return;
+    if(window.__FP_TEST__){window.__FP_TEST__.transfers=transferTestApi;return}
+    if(attempt<1200)setTimeout(()=>installTransferTestApi(attempt+1),25);
+  }
+  installTransferTestApi();
 
   transferApi.normalizeState(state,now());save();renderAll();
 })();
