@@ -86,3 +86,21 @@ Append-only rule: preserve every record and append later transitions with monoto
 - **Cost/Storage Impact:** bounded CI minutes only; storage impact NONE.
 - **Next:** publish one authored correction commit, allow deterministic generated-runtime commit, then evaluate exact-head gates.
 - **Record Integrity:** VALID.
+
+---
+
+## Record 006 — Runtime Bridge Generated and Diagnostic Cleanup Prepared
+
+- **Ordering Marker:** 006
+- **Checkpoint:** CP-03
+- **Status:** COMPLETED
+- **Authored Correction:** `012073fd57218f3316bc808d91cb7a326eedeb6d`.
+- **Generated Runtime Commit:** `d9222dee83a09725bd2c285d5537ddc58d9b65f4`.
+- **Generation Gate:** existing push workflow completed syntax, domain, deterministic generation, integration and all browser regressions before creating the generated-runtime commit.
+- **Canonical Runtime:** `src/familypilot.html` and `index.html` contain one bounded runtime bridge and remain byte-identical.
+- **Bot-Head PR Runs:** GitHub returned `action_required` for bot-authored head; no test failure was reported and no unchanged rerun was requested.
+- **Cleanup:** remove temporary failure-classification steps while retaining named browser regressions; add 20-minute job timeouts and superseded-run cancellation.
+- **Artifacts:** NONE.
+- **Storage Impact:** NONE.
+- **Next:** publish one human-authored cleanup commit and obtain final exact-head verification.
+- **Record Integrity:** VALID.
