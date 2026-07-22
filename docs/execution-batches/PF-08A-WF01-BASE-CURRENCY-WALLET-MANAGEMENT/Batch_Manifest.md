@@ -1,12 +1,13 @@
 # Batch Manifest — PF-08A-WF01-BASE-CURRENCY-WALLET-MANAGEMENT
 
 **Document Type:** Runtime Execution Batch Manifest  
-**Status:** Trusted PASS / Owner Checkpoint  
-**Version:** 1.0  
+**Status:** Completed / Public PASS  
+**Version:** 1.1  
 **Repository:** `maloma/sandbox`  
 **Starting Commit:** `fad18ac3c63af94f1cc987bb23036ecf18c0e4a5`  
-**Working Branch:** `agent/pf08a-wf01-base-currency-wallet-management`  
-**Pull Request:** `#45`  
+**Implementation Pull Request:** `#45`  
+**Implementation Merge:** `85339932958f58cd416eb966a67e1bb35f56383c`  
+**Public Closure Pull Request:** `#46`  
 **Authority:** `maloma/FamilyPilot@88d7bead`, documents 46, 51 and 69  
 **Created:** 2026-07-22
 
@@ -17,24 +18,16 @@ Integrate bounded base-currency wallet management while preserving personal-wall
 ## Included
 
 - `Ещё → Кошельки`;
-- create additional shared wallet in household base currency;
-- create current-member personal wallet;
-- stable ids and zero starting balance;
-- rename according to ownership;
-- shared included in household capital;
-- personal owner-only and excluded by default;
+- additional shared and current-member personal base-currency wallets;
+- stable ids, zero start and ownership-aware rename;
+- shared capital inclusion and personal owner-only/excluded default;
 - owner-controlled personal capital inclusion;
-- selector refresh and IF-02 scope preservation;
+- accessible selector and IF-02 scope preservation;
 - deterministic, Chrome and public verification.
 
 ## Excluded
 
-- grant/revoke access and production permissions;
-- personal-data access changes;
-- FX, crypto, investment and pension wallets;
-- valuation and exchange rates;
-- transfers and opening-balance entry;
-- archive/delete/merge/split/ownership conversion.
+Permissions and real personal-data access; FX/crypto/investment/pension valuation; transfers and opening-balance entry; destructive or ownership-conversion lifecycle actions.
 
 ## Financial and Privacy Boundary
 
@@ -44,38 +37,52 @@ Wallet creation, rename and capital-inclusion changes create no Income, Expense 
 
 ### CP-01 — Runtime Inspection — COMPLETED
 
-Current runtime already contained wallet fixtures, selector and IF-02 scope. Wallet management was absent. Existing dynamic finalizer pattern was reusable.
+Fixtures, selector and IF-02 scope existed; wallet management was absent.
 
 ### CP-02 — Domain, UI and Verification — COMPLETED
 
-- schema-v7 wallet management domain;
-- shared/personal creation defaults;
-- stable rename and owner-only inclusion change;
-- Wallet Management screen and modal;
-- no permission, FX, transfer or destructive controls;
-- domain/static/Chrome tests;
-- existing workflow families extended.
+Schema-v7 wallet management, restricted UI, domain/static/Chrome tests and existing workflow-family extensions completed.
 
-### CP-03 — Exact PR Gate — TRUSTED PASS
+### CP-03 — Exact PR Gate — COMPLETED
 
-- verified source head: `93cf1e481e990af91edceb2204a01e2b47062e0d`;
-- trusted run `29933728879`, job `88969762365`;
-- domain and static contracts — PASS;
-- A3, Hidden Capital, M3, M2 and M4 regressions — PASS;
-- WF-01 Chrome journey — PASS;
+- initial trusted functional PASS: run `29933728879`;
+- verified generated artifacts: `2cddb7795a6acfaa1e6fd3d80dcce4be28012860`;
+- final exact owner head: `af7357010a10e0a0720f787be9b6ae6bbd273540`;
+- final trusted run `29934029164`, job `88970802238` — PASS;
+- all domain/static/browser regressions and zero-diff — PASS;
 - runtime exceptions — NONE;
-- generated artifacts persisted by the parallel verified branch run at `2cddb7795a6acfaa1e6fd3d80dcce4be28012860`;
-- trusted persistence correctly failed closed after the branch moved, preventing a stale write.
+- expected-head merge — `85339932958f58cd416eb966a67e1bb35f56383c`.
 
-### CP-04 — Publication and Closure — PLANNED
+### CP-04 — Publication and Closure — COMPLETED
 
-- owner checkpoint and exact-head zero-diff rerun;
-- expected-head merge;
-- downloaded-package public verification;
-- terminal evidence and canonical synchronization.
+- public run `29934350619`, job `88971923616` — PASS;
+- expected main `85339932958f58cd416eb966a67e1bb35f56383c`;
+- HTML plus ten runtime modules — HTTP 200;
+- publication attempts — 1;
+- browser marker — `PF08A_WF01_BROWSER_PASS`;
+- shared/personal creation, privacy defaults, independent capital inclusion, cross-member isolation and selector/scope — PASS;
+- no management operations or permission/FX/transfer controls — PASS;
+- prior modules — PASS;
+- runtime exceptions — NONE.
+
+## Public Evidence
+
+`docs/execution-batches/PF-08A-WF01-BASE-CURRENCY-WALLET-MANAGEMENT/Public_Verification.md`
+
+Key hashes:
+
+- HTML: `a651fd54a516fd2d70f811432f5a4be7e5eca586445f716d85d8ab09848912a4`;
+- wallet domain: `6e7d8d4142f3417099126ef607ff6084ca082fc2c39e641c289472eb02d87bc3`;
+- wallet UI: `5ca234f3950e0b9eeca34b338b506b8d51755611299e4e77cfc5f383a6efbf6e`.
 
 ## Rollback
 
-Revert the eventual PR #45 merge. Pre-batch accepted runtime remains `fad18ac3c63af94f1cc987bb23036ecf18c0e4a5`.
+Revert implementation merge `85339932958f58cd416eb966a67e1bb35f56383c`. Pre-batch runtime remains `fad18ac3c63af94f1cc987bb23036ecf18c0e4a5`.
+
+## Terminal State
+
+```text
+BATCH_COMPLETED
+```
 
 # END OF FILE
