@@ -123,4 +123,26 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 006 — Product Pipeline Passed and Atomic Persistence Activated
+
+- **Ordering Marker:** 006
+- **Checkpoint ID:** CP-03-REC03
+- **Status:** COMPLETED / RETRY_READY
+- **Trusted Run:** `29906626752`.
+- **Complete Verification Result:** exact checkout PASS; syntax PASS; domain tests PASS; deterministic patch PASS; same-day correction PASS; browser API correction PASS; source/root finalization PASS; static contract PASS; A3 Chrome PASS; Hidden Capital Chrome PASS; M3 Chrome PASS.
+- **Remaining Failure:** only sequential Contents API persistence failed; generated artifacts were not accepted as durable branch state.
+- **Transport Classification:** verification-complete artifact persistence issue, not a product, domain, browser or regression defect.
+- **Atomic Persistence Pull Request:** `#31` — `Persist verified M3 artifacts atomically`.
+- **Atomic Persistence Merge:** `cbaed455b6b2d51ab55898c0561dec74d8fbd69d`.
+- **Atomic Contract:** create three blobs, one tree and one child commit from the exact verified head, then perform one non-force fast-forward branch ref update.
+- **Protected Paths:** `src/familypilot.html`, `index.html`, `tools/pf08a-m3-01-browser-smoke.mjs`.
+- **Branch Drift Rule:** abort if the live PR head differs from the exact verified workflow head.
+- **Scope:** no generated content, product behavior or financial semantics changed.
+- **Verification Result:** RETRY_READY. Final trusted generation and atomic persistence are authorized.
+- **Next Authorized Transition:** verify atomic commit creation, then require zero-diff synchronized-head PASS.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
