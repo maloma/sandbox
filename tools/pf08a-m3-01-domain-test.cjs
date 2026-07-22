@@ -1,5 +1,12 @@
 const assert=require('node:assert/strict');
+const {writeFileSync}=require('node:fs');
 const obligations=require('../familypilot-obligations.js');
+
+process.on('uncaughtException',error=>{
+  writeFileSync('m3-browser.log',String(error&&error.stack||error),'utf8');
+  console.error(error);
+  process.exit(1);
+});
 
 const NOW=new Date('2026-07-22T12:00:00Z').getTime();
 const DAY=86400000;
