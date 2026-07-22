@@ -128,4 +128,35 @@ Append-only rule: preserve all existing records and append later transitions usi
 - **Next Authorized Transition:** Automatic merge after final exact-head workflow PASS.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 006 — CP-03 Merge and Public Verification Completed
+
+- **Ordering Marker:** 006
+- **Checkpoint ID:** CP-03
+- **Status:** COMPLETED
+- **Objective:** Record final exact-head workflow PASS, merge, publication and public browser evidence.
+- **Pull Request:** `#16`.
+- **Final Head:** `9818d9c372cb3621a71e3022c2f59dda078a5b67`.
+- **Final Workflow:** `PF-08A IF-02 Personal Wallet Scope`, run `29883754076`, conclusion `success`.
+- **Final Changed Paths:** exactly twelve bounded paths.
+- **Mergeability Before Merge:** PASS.
+- **Merge Method:** merge commit with expected-head protection.
+- **Resulting Main Commit:** `98ce13bf2ef73dbda3e7806f4c368016b46796cc`.
+- **Public URL:** `https://maloma.github.io/sandbox/`.
+- **Public Verification Time:** `2026-07-22T01:44:30.195Z`.
+- **Public HTML Status:** `200`.
+- **Public Scope Module Status:** `200`.
+- **Publication Attempts:** `1`.
+- **Public HTML SHA-256:** `fca20da5e19e9f0325c10fa66481eb564ebb6ae0281ae5d60739d473c960abab`.
+- **Public Scope Module SHA-256:** `800ae1d9b8d8ad68ae6f0215e5b94978890e7a87d9f012fd5448e6e39de0899b`.
+- **Public Browser Assertions:** household scope excluded personal operations; personal Operations and Analytics contained only the selected wallet; personal Capital equaled `260 EUR`; personal warning appeared; household scope and default-wallet silence restored; inaccessible personal wallet fell back; runtime exceptions none.
+- **Evidence Path:** `docs/execution-batches/PF-08A-IF-02-PERSONAL-WALLET-SCOPE/Public_Verification.md`.
+- **Verification Result:** PASS. The published runtime implements the accepted existing-surface personal-wallet contract without household detail leakage.
+- **Rollback Method:** Revert `98ce13bf2ef73dbda3e7806f4c368016b46796cc` or restore `6cfa4bfaff9294b39e61d5e159b19ebd82dc114e`.
+- **Terminal State:** `BATCH_COMPLETED`.
+- **Next Authorized Transition:** synchronize FamilyPilot roadmap and begin compact Analytics / secondary-navigation decision preparation.
+- **Founder Intervention Required:** only at the materially different final navigation choice.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
