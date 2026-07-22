@@ -1,0 +1,98 @@
+name: PF-08A PRIV-01 Hidden Capital Disclosure
+
+on:
+  push:
+    branches:
+      - agent/pf08a-priv01-hidden-capital
+    paths:
+      - src/familypilot.html
+      - index.html
+      - tools/pf08a-priv01-apply-hidden-capital.mjs
+      - tools/pf08a-priv01-finalize-runtime-artifacts.mjs
+      - tools/pf08a-priv01-verify-hidden-capital.mjs
+      - tools/pf08a-priv01-browser-smoke.mjs
+      - .github/workflows/pf08a-priv01-hidden-capital.yml
+      - docs/execution-batches/PF-08A-PRIV-01-HIDDEN-CAPITAL/**
+  pull_request:
+    branches:
+      - main
+    paths:
+      - src/familypilot.html
+      - index.html
+      - tools/pf08a-priv01-apply-hidden-capital.mjs
+      - tools/pf08a-priv01-finalize-runtime-artifacts.mjs
+      - tools/pf08a-priv01-verify-hidden-capital.mjs
+      - tools/pf08a-priv01-browser-smoke.mjs
+      - .github/workflows/pf08a-priv01-hidden-capital.yml
+      - docs/execution-batches/PF-08A-PRIV-01-HIDDEN-CAPITAL/**
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pf08a-priv01-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  implement:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Apply hidden Capital disclosure once
+        shell: bash
+        run: |
+          if grep -Fq 'hidden-capital-disclosure-v1' src/familypilot.html; then
+            echo "Hidden Capital disclosure is already present."
+          else
+            node tools/pf08a-priv01-apply-hidden-capital.mjs
+          fi
+
+      - name: Finalize root and source artifacts
+        run: node tools/pf08a-priv01-finalize-runtime-artifacts.mjs
+
+      - name: Verify hidden Capital source contract
+        run: node tools/pf08a-priv01-verify-hidden-capital.mjs
+
+      - name: Run compact Analytics regression
+        run: node tools/pf08a-a3-01-browser-smoke.mjs
+
+      - name: Run hidden Capital browser regression
+        run: node tools/pf08a-priv01-browser-smoke.mjs
+
+      - name: Commit generated privacy runtime artifacts
+        shell: bash
+        run: |
+          if git diff --quiet -- src/familypilot.html index.html; then
+            echo "Hidden Capital runtime artifacts are already generated."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/familypilot.html index.html
+          git commit -m "Generate hidden Capital disclosure"
+          git push origin HEAD:${{ github.ref_name }}
+
+  verify:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require generated privacy marker
+        run: grep -Fq 'hidden-capital-disclosure-v1' src/familypilot.html
+      - name: Recreate final privacy artifacts
+        run: node tools/pf08a-priv01-finalize-runtime-artifacts.mjs
+      - name: Require generated artifacts to be committed
+        run: git diff --exit-code -- src/familypilot.html index.html
+      - name: Verify hidden Capital source contract
+        run: node tools/pf08a-priv01-verify-hidden-capital.mjs
+      - name: Run compact Analytics regression
+        run: node tools/pf08a-a3-01-browser-smoke.mjs
+      - name: Run hidden Capital browser regression
+        run: node tools/pf08a-priv01-browser-smoke.mjs
