@@ -16,6 +16,7 @@
 <meta name="familypilot-package" content="hidden-capital-disclosure-v1">
 <meta name="familypilot-package" content="plan-obligations-foundation-v1">
 <meta name="familypilot-package" content="debt-chains-principal-v1">
+<meta name="familypilot-package" content="savings-goal-config-v1">
 <style>
 :root{color-scheme:light;--bg:#f4f7fb;--card:#fff;--card2:#f8fbfd;--ink:#10213b;--muted:#728197;--line:#e2e9f0;--green:#10a958;--green2:#078842;--red:#f03842;--red2:#ce202e;--blue:#3978d8;--purple:#7556d8;--shadow:0 8px 24px rgba(31,50,82,.08);--nav:62px;--dock:82px}
 :root[data-theme=dark],body[data-theme=dark]{color-scheme:dark;--bg:#071824;--card:#102532;--card2:#0c202c;--ink:#f4f8fb;--muted:#a6b5c0;--line:#263b47;--green:#28bd70;--green2:#118a4d;--red:#ff4b55;--red2:#ca2630;--blue:#5896ef;--purple:#9b7af2;--shadow:0 9px 26px rgba(0,0,0,.28)}
@@ -216,6 +217,7 @@ body.personal-wallet-scope .scope-context{color:color-mix(in srgb,var(--purple) 
 <script src="./familypilot-analytics-state.js"></script>
 <script src="./familypilot-obligations.js"></script>
 <script src="./familypilot-debts.js"></script>
+<script src="./familypilot-savings-goals.js"></script>
 <script>
 (()=>{'use strict';
 const APP_KEY='familypilot.operations.foundation.v2',OLD_KEY='familypilot.main.v7',PERIOD_KEY='familypilot.period.selection.v5',THEME_KEY='familypilot.theme';
@@ -878,6 +880,73 @@ if(new URLSearchParams(location.search).has('test')&&window.__FP_TEST__)window._
   debtApi.normalizeState(state,now());save();renderAll();
 })();
 /* pf08a-m2-01-inline-ui:end */
+
+/* pf08a-m4-01-inline-ui:start */
+(()=>{
+  'use strict';
+
+  const savingsApi=window.FamilyPilotSavingsGoals;
+  if(!savingsApi||window.__FP_M4_01_UI__)return;
+  window.__FP_M4_01_UI__=true;
+
+  let savingsFilter='active';
+  let savingsEditingGoalId='';
+
+  const savingsStyle=document.createElement('style');
+  savingsStyle.id='familypilot-m4-01-style';
+  savingsStyle.textContent=`
+    .savings-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px}.savings-toolbar .btn{min-width:118px}
+    .savings-filter{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px}.savings-filter button{min-height:38px;border:0;border-radius:12px;background:transparent;color:var(--muted);font-size:12px;font-weight:850}.savings-filter button.active{background:var(--card2);color:var(--green)}
+    .savings-list{display:grid;gap:9px}.savings-card{border:1px solid var(--line);border-radius:17px;background:var(--card);box-shadow:var(--shadow);padding:13px;display:grid;gap:10px}.savings-card.archived{opacity:.75}.savings-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.savings-head strong,.savings-head small{display:block}.savings-head strong{font-size:15px}.savings-head small{color:var(--muted);font-size:11px;margin-top:3px}.savings-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.savings-actions .btn{min-height:34px;padding:6px 9px;font-size:11px}.savings-progress{height:9px;border-radius:999px;background:var(--line);overflow:hidden}.savings-progress span{display:block;height:100%;border-radius:999px;background:var(--green)}.savings-values{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:12px;color:var(--muted)}.savings-values strong{color:var(--ink);font-size:16px}.savings-remaining{font-size:11px;color:var(--muted)}
+    .savings-empty{border:1px dashed var(--line);border-radius:15px;background:var(--card2);padding:18px;text-align:center;color:var(--muted);font-size:13px}.savings-note{border:1px solid var(--line);border-radius:14px;background:var(--card2);padding:11px 12px;color:var(--muted);font-size:12px;line-height:1.45}.savings-help{width:28px;height:28px;min-height:28px;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--card);color:var(--green);font-weight:950}.savings-label{display:flex;align-items:center;justify-content:space-between;gap:8px}.savings-label label{margin:0}.savings-readonly{display:inline-block;border-radius:999px;padding:3px 7px;background:var(--card2);color:var(--muted);font-size:10px;font-weight:900}.savings-help-copy{line-height:1.55;color:var(--ink)}
+    @media(max-width:380px){.savings-toolbar{align-items:stretch;flex-direction:column}.savings-toolbar .btn{width:100%}.savings-head{display:grid}.savings-actions{justify-content:flex-start}.savings-values{align-items:flex-start;flex-direction:column}}
+  `;
+  document.head.appendChild(savingsStyle);
+
+  const helpCopy={
+    scope:{title:'Что настраивается здесь',body:'Здесь создаются только конкретные семейные цели накоплений. Подушка безопасности, накопления без цели и общий обзор относятся к отдельным поверхностям.'},
+    name:{title:'Название цели',body:'Коротко укажите назначение денег: отпуск, ремонт, автомобиль, обучение или другое. Название можно изменить позже.'},
+    target:{title:'Сколько хотите накопить',body:'Это желаемый итог по цели. Недостающая будущая сумма является планом и не считается уже существующими деньгами.'},
+    saved:{title:'Уже накоплено на цель',body:'Это реальные деньги, которые семья уже относит к этой цели. Изменение поля не создаёт операцию и не меняет капитал — оно только описывает назначение существующих накоплений.'},
+    date:{title:'Желаемый срок',body:'Дата необязательна. Она помогает понимать горизонт цели, но сама по себе не создаёт обязательство или напоминание.'},
+    archive:{title:'Архив цели',body:'Архив убирает цель из активного списка, но сохраняет сам объект и его историю. Архивная цель доступна только для чтения.'}
+  };
+
+  function installSavingsDom(){
+    const planSavings=[...document.querySelectorAll('#plansScreen .plan-module')].find(button=>button.textContent.includes('Накопления'));
+    if(planSavings){planSavings.disabled=false;planSavings.dataset.planModule='savings';planSavings.id='planSavingsModule';const copy=planSavings.querySelector('.plan-module-copy small');if(copy)copy.textContent='Цели накоплений';const stateNode=planSavings.querySelector('.plan-module-state');if(stateNode){stateNode.id='planSavingsState';stateNode.textContent='Открыть'}}
+    if(!$('savingsGoalsScreen')){const section=document.createElement('section');section.id='savingsGoalsScreen';section.className='screen';section.innerHTML=`<div class="page-title"><button class="back" type="button" data-savings-back="plans">‹</button><div class="page-title-copy"><h1>Накопления</h1><small id="savingsScopeLabel" class="scope-context">Семейные цели</small></div></div><section class="card section"><div class="savings-toolbar"><div><div style="display:flex;align-items:center;gap:7px"><h2>Цели накоплений</h2><button class="savings-help" type="button" data-savings-help="scope" aria-label="Что настраивается здесь">?</button></div><small class="analytics-data-basis">Цели необязательны и не меняют баланс кошелька.</small></div><button id="savingsAddBtn" class="btn primary" type="button">Добавить</button></div><div class="savings-note" style="margin-top:12px">На этом экране настраиваются только конкретные цели. Подушка безопасности и накопления без цели настраиваются отдельно.</div></section><section class="card savings-filter"><button type="button" data-savings-filter="active">Активные</button><button type="button" data-savings-filter="archived">Архив</button></section><div id="savingsGoalList" class="savings-list"></div>`;$('moreScreen').parentNode.insertBefore(section,$('moreScreen'))}
+    if(!$('savingsGoalModal')){const modal=document.createElement('div');modal.id='savingsGoalModal';modal.className='modal';modal.innerHTML=`<div class="sheet"><div class="sheet-head"><h2 id="savingsGoalTitle">Новая цель</h2><button class="close" type="button" data-savings-close="savingsGoalModal">Закрыть</button></div><input id="savingsGoalId" type="hidden"><div class="field"><div class="savings-label"><label for="savingsGoalName">Название</label><button class="savings-help" type="button" data-savings-help="name" aria-label="Подсказка к названию">?</button></div><input id="savingsGoalName" maxlength="80" placeholder="Например, отпуск"></div><div class="field"><div class="savings-label"><label for="savingsGoalTarget">Сколько хотите накопить</label><button class="savings-help" type="button" data-savings-help="target" aria-label="Подсказка к целевой сумме">?</button></div><input id="savingsGoalTarget" inputmode="decimal" placeholder="3000"></div><div class="field"><div class="savings-label"><label for="savingsGoalSaved">Уже накоплено на эту цель</label><button class="savings-help" type="button" data-savings-help="saved" aria-label="Подсказка к накопленной сумме">?</button></div><input id="savingsGoalSaved" inputmode="decimal" placeholder="500"></div><div class="field"><div class="savings-label"><label for="savingsGoalDate">Желаемый срок <span style="color:var(--muted);font-weight:700">необязательно</span></label><button class="savings-help" type="button" data-savings-help="date" aria-label="Подсказка к сроку">?</button></div><input id="savingsGoalDate" type="date"></div><div class="savings-note">«Хочу накопить» — план. «Уже накоплено» — назначение существующих семейных накоплений. Сохранение цели не создаёт Приход, Расход или перевод.</div><div id="savingsGoalError" class="error"></div><div class="sheet-actions"><button class="btn secondary" type="button" data-savings-close="savingsGoalModal">Отмена</button><button id="savingsGoalSave" class="btn primary" type="button">Сохранить цель</button></div></div>`;document.body.appendChild(modal)}
+    if(!$('savingsHelpModal')){const modal=document.createElement('div');modal.id='savingsHelpModal';modal.className='modal';modal.innerHTML=`<div class="sheet"><div class="sheet-head"><h2 id="savingsHelpTitle">Подсказка</h2><button class="close" type="button" data-savings-close="savingsHelpModal">Закрыть</button></div><section id="savingsHelpBody" class="card section savings-help-copy" style="margin-top:12px"></section></div>`;document.body.appendChild(modal)}
+  }
+
+  function goalById(id){return state.savingsGoals.find(goal=>goal.id===id)}
+  function displayDate(value){if(!value)return'Без срока';return new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric'}).format(new Date(`${value}T00:00:00`))}
+  function goalCard(goal){const progress=savingsApi.progress(goal),archived=goal.status==='archived';return `<article class="savings-card${archived?' archived':''}" data-savings-goal="${esc(goal.id)}"><div class="savings-head"><div><strong>${esc(goal.name)}</strong><small>${esc(displayDate(goal.targetDate))}</small></div>${archived?'<span class="savings-readonly">В архиве</span>':`<div class="savings-actions"><button class="btn secondary" type="button" data-savings-edit="${esc(goal.id)}">Изменить</button><button class="btn secondary" type="button" data-savings-archive="${esc(goal.id)}">Архив</button><button class="savings-help" type="button" data-savings-help="archive" aria-label="Что произойдёт при архивации">?</button></div>`}</div><div class="savings-values"><span><strong>${money(progress.saved,'EUR')}</strong> из ${money(progress.target,'EUR')}</span><span>${Math.round(progress.percent)}%</span></div><div class="savings-progress"><span style="width:${progress.percent}%"></span></div><div class="savings-remaining">Осталось накопить ${money(progress.remaining,'EUR')}</div></article>`}
+  function visibleSavingsGoals(){return savingsFilter==='archived'?savingsApi.archivedGoals(state):savingsApi.activeGoals(state)}
+  function renderSavings(){if(!$('savingsGoalList'))return;$('savingsScopeLabel').textContent='Семейные цели';document.querySelectorAll('[data-savings-filter]').forEach(button=>button.classList.toggle('active',button.dataset.savingsFilter===savingsFilter));const goals=visibleSavingsGoals();$('savingsGoalList').innerHTML=goals.length?goals.map(goalCard).join(''):`<div class="savings-empty">${savingsFilter==='archived'?'В архиве пока нет целей.':'Целей пока нет. Добавьте первую сейчас или сделайте это позже — FamilyPilot продолжает работать без целей.'}</div>`}
+  function renderSavingsPlan(){const summary=savingsApi.summary(state),button=$('planSavingsModule'),stateNode=$('planSavingsState');if(button){button.disabled=false;button.dataset.planModule='savings';const copy=button.querySelector('.plan-module-copy small');if(copy)copy.textContent=summary.active?`${summary.active} активн. · ${summary.archived} в архиве`:'Цели накоплений'}if(stateNode)stateNode.textContent=summary.active?`${summary.active} активн.`:'Открыть'}
+
+  function openSavingsEditor(goalId=''){const goal=goalById(goalId);if(goal?.status==='archived'){toast('Архивная цель доступна только для чтения');return}savingsEditingGoalId=goalId;$('savingsGoalId').value=goalId;$('savingsGoalTitle').textContent=goal?'Изменить цель':'Новая цель';$('savingsGoalName').value=goal?.name||'';$('savingsGoalTarget').value=goal?String(goal.targetAmount).replace('.',','):'';$('savingsGoalSaved').value=goal?String(goal.savedAmount).replace('.',','):'';$('savingsGoalDate').value=goal?.targetDate||'';$('savingsGoalError').textContent='';open('savingsGoalModal')}
+  function goalInput(){return{name:$('savingsGoalName').value,targetAmount:Number($('savingsGoalTarget').value.trim().replace(',','.')),savedAmount:Number($('savingsGoalSaved').value.trim().replace(',','.')),targetDate:$('savingsGoalDate').value}}
+  function saveSavingsGoal(){const result=savingsEditingGoalId?savingsApi.updateGoal(state,savingsEditingGoalId,goalInput(),state.currentMemberId,now()):savingsApi.createGoal(state,goalInput(),state.currentMemberId,now());if(!result.ok){$('savingsGoalError').textContent=result.error;return}save();close('savingsGoalModal');renderAll();showScreen('savingsGoals');toast(savingsEditingGoalId?'Цель обновлена':'Цель добавлена')}
+  function archiveSavingsGoal(goalId){const result=savingsApi.archiveGoal(state,goalId,state.currentMemberId,now());if(!result.ok){toast(result.error);return}save();renderAll();toast('Цель перемещена в архив')}
+  function openSavingsHelp(key){const help=helpCopy[key]||helpCopy.scope;$('savingsHelpTitle').textContent=help.title;$('savingsHelpBody').textContent=help.body;open('savingsHelpModal')}
+
+  const baseRenderPlan=renderPlan;renderPlan=function(){baseRenderPlan();renderSavingsPlan()};
+  const baseRenderAll=renderAll;renderAll=function(){savingsApi.normalizeState(state,now());const result=baseRenderAll();if($('savingsGoalsScreen'))renderSavings();return result};
+
+  installSavingsDom();
+  $('savingsAddBtn').onclick=()=>openSavingsEditor();
+  $('savingsGoalSave').onclick=saveSavingsGoal;
+
+  document.addEventListener('click',event=>{const plan=event.target.closest('[data-plan-module="savings"]'),filter=event.target.closest('[data-savings-filter]'),edit=event.target.closest('[data-savings-edit]'),archive=event.target.closest('[data-savings-archive]'),help=event.target.closest('[data-savings-help]'),back=event.target.closest('[data-savings-back]'),closer=event.target.closest('[data-savings-close]');if(plan||filter||edit||archive||help||back||closer){event.preventDefault();event.stopImmediatePropagation()}if(plan){savingsFilter='active';showScreen('savingsGoals');renderAll();return}if(filter){savingsFilter=filter.dataset.savingsFilter;renderSavings();return}if(edit){openSavingsEditor(edit.dataset.savingsEdit);return}if(archive){archiveSavingsGoal(archive.dataset.savingsArchive);return}if(help){openSavingsHelp(help.dataset.savingsHelp);return}if(back){showScreen(back.dataset.savingsBack);renderAll();return}if(closer){close(closer.dataset.savingsClose);return}},true);
+
+  if(new URLSearchParams(location.search).has('test')&&window.__FP_TEST__){window.__FP_TEST__.savings={normalize:()=>{savingsApi.normalizeState(state,now());save();renderAll();return true},create:input=>{const result=savingsApi.createGoal(state,input,state.currentMemberId,now());save();renderAll();return result},update:(id,input)=>{const result=savingsApi.updateGoal(state,id,input,state.currentMemberId,now());save();renderAll();return result},archive:id=>{const result=savingsApi.archiveGoal(state,id,state.currentMemberId,now());save();renderAll();return result},active:()=>savingsApi.activeGoals(state).map(goal=>({...goal})),archived:()=>savingsApi.archivedGoals(state).map(goal=>({...goal})),all:()=>state.savingsGoals.map(goal=>({...goal})),summary:()=>savingsApi.summary(state),openList:()=>{savingsFilter='active';showScreen('savingsGoals');renderAll()},openEditor:id=>openSavingsEditor(id),capital:()=>scopeApi.capitalSnapshot(state),ordinaryTotals:()=>totals(scopeOps().filter(operation=>operation.kind==='income'||operation.kind==='expense'))}}
+
+  savingsApi.normalizeState(state,now());save();renderAll();
+})();
+/* pf08a-m4-01-inline-ui:end */
 
 syncCategoryVisualViewport();
 renderAll();
