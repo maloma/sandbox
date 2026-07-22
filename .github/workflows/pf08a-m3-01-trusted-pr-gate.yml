@@ -1,4 +1,4 @@
-name: PF-08A M3-01 Trusted PR Gate
+name: PF-08A FamilyPilot Trusted PR Gate
 
 on:
   pull_request:
@@ -7,7 +7,11 @@ on:
     paths:
       - src/familypilot.html
       - index.html
+      - familypilot-scope.js
       - familypilot-obligations.js
+      - familypilot-obligations-ui-v2.js
+      - familypilot-debts.js
+      - familypilot-debts-ui.js
       - tools/pf08a-m3-01-apply-plan-obligations.mjs
       - tools/pf08a-m3-01-correct-today-payment-time.mjs
       - tools/pf08a-m3-01-correct-browser-test-api.mjs
@@ -15,14 +19,19 @@ on:
       - tools/pf08a-m3-01-verify-plan-obligations.mjs
       - tools/pf08a-m3-01-domain-test.cjs
       - tools/pf08a-m3-01-browser-smoke.mjs
+      - tools/pf08a-m2-01-domain-test.cjs
+      - tools/pf08a-m2-01-verify-debt-integration.mjs
+      - tools/pf08a-m2-01-browser-smoke.mjs
       - .github/workflows/pf08a-m3-01-plan-obligations.yml
+      - .github/workflows/pf08a-m3-01-trusted-pr-gate.yml
       - docs/execution-batches/PF-08A-M3-01-PLAN-OBLIGATIONS/**
+      - docs/execution-batches/PF-08A-M2-01-DEBT-CHAINS-PRINCIPAL/**
 
 permissions:
   contents: write
 
 concurrency:
-  group: pf08a-m3-01-trusted-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  group: pf08a-family-trusted-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -39,9 +48,12 @@ jobs:
         shell: bash
         run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
 
-      - name: Check M3 tools and module syntax
+      - name: Check FamilyPilot tools and modules syntax
         run: |
           node --check familypilot-obligations.js
+          node --check familypilot-obligations-ui-v2.js
+          node --check familypilot-debts.js
+          node --check familypilot-debts-ui.js
           node --check tools/pf08a-m3-01-apply-plan-obligations.mjs
           node --check tools/pf08a-m3-01-correct-today-payment-time.mjs
           node --check tools/pf08a-m3-01-correct-browser-test-api.mjs
@@ -49,9 +61,15 @@ jobs:
           node --check tools/pf08a-m3-01-verify-plan-obligations.mjs
           node --check tools/pf08a-m3-01-domain-test.cjs
           node --check tools/pf08a-m3-01-browser-smoke.mjs
+          node --check tools/pf08a-m2-01-domain-test.cjs
+          node --check tools/pf08a-m2-01-verify-debt-integration.mjs
+          node --check tools/pf08a-m2-01-browser-smoke.mjs
 
       - name: Run obligations domain tests
         run: node tools/pf08a-m3-01-domain-test.cjs
+
+      - name: Run debt domain tests
+        run: node tools/pf08a-m2-01-domain-test.cjs
 
       - name: Apply Plan and obligations patch once
         shell: bash
@@ -65,14 +83,17 @@ jobs:
       - name: Correct same-day payment timestamp
         run: node tools/pf08a-m3-01-correct-today-payment-time.mjs
 
-      - name: Correct M3 browser test API route
+      - name: Correct legacy M3 browser test API route
         run: node tools/pf08a-m3-01-correct-browser-test-api.mjs
 
       - name: Finalize root and source artifacts
         run: node tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
 
-      - name: Verify M3 source contract
+      - name: Verify obligations source contract
         run: node tools/pf08a-m3-01-verify-plan-obligations.mjs
+
+      - name: Verify debt integration contract
+        run: node tools/pf08a-m2-01-verify-debt-integration.mjs
 
       - name: Run compact Analytics regression
         run: node tools/pf08a-a3-01-browser-smoke.mjs
@@ -81,22 +102,25 @@ jobs:
         run: node tools/pf08a-priv01-browser-smoke.mjs
 
       - name: Run Plan and obligations browser regression
-        id: m3_browser
+        run: node tools/pf08a-m3-01-browser-smoke.mjs
+
+      - name: Run debt chains browser regression
+        id: m2_browser
         shell: bash
         run: |
           set +e
-          node tools/pf08a-m3-01-browser-smoke.mjs > m3-browser.log 2>&1
+          node tools/pf08a-m2-01-browser-smoke.mjs > m2-browser.log 2>&1
           status=$?
-          cat m3-browser.log
+          cat m2-browser.log
           echo "exit_code=${status}" >> "$GITHUB_OUTPUT"
           exit "$status"
 
-      - name: Upload M3 browser diagnostics
+      - name: Upload debt browser diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pf08a-m3-01-browser-${{ github.event.pull_request.head.sha }}
-          path: m3-browser.log
+          name: pf08a-m2-01-browser-${{ github.event.pull_request.head.sha }}
+          path: m2-browser.log
           if-no-files-found: error
           retention-days: 7
 
@@ -108,37 +132,31 @@ jobs:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          paths=(src/familypilot.html index.html tools/pf08a-m3-01-browser-smoke.mjs)
+          paths=(src/familypilot.html index.html)
           if git diff --quiet -- "${paths[@]}"; then
-            echo "Verified M3 artifacts are already committed."
+            echo "Verified FamilyPilot artifacts are already committed."
             exit 0
           fi
-
           api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
           auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
-
           base_sha=$(curl --fail-with-body -sS "${auth[@]}" "${api}/git/ref/heads/${HEAD_BRANCH}" | jq -r '.object.sha')
           if test "${base_sha}" != "${EXPECTED_HEAD}"; then
             echo "PR branch moved during trusted verification: expected ${EXPECTED_HEAD}, found ${base_sha}" >&2
             exit 1
           fi
           base_tree=$(curl --fail-with-body -sS "${auth[@]}" "${api}/git/commits/${base_sha}" | jq -r '.tree.sha')
-
           entries='[]'
           for path in "${paths[@]}"; do
             blob_sha=$(jq -Rs '{content:.,encoding:"utf-8"}' < "${path}" | curl --fail-with-body -sS -X POST "${auth[@]}" "${api}/git/blobs" --data-binary @- | jq -r '.sha')
             test -n "${blob_sha}" -a "${blob_sha}" != "null"
             entries=$(jq --arg path "${path}" --arg sha "${blob_sha}" '. + [{path:$path,mode:"100644",type:"blob",sha:$sha}]' <<< "${entries}")
           done
-
           tree_payload=$(jq -n --arg base_tree "${base_tree}" --argjson tree "${entries}" '{base_tree:$base_tree,tree:$tree}')
           tree_sha=$(curl --fail-with-body -sS -X POST "${auth[@]}" "${api}/git/trees" -d "${tree_payload}" | jq -r '.sha')
           test -n "${tree_sha}" -a "${tree_sha}" != "null"
-
-          commit_payload=$(jq -n --arg message "Generate verified Plan and obligations artifacts" --arg tree "${tree_sha}" --arg parent "${base_sha}" '{message:$message,tree:$tree,parents:[$parent]}')
+          commit_payload=$(jq -n --arg message "Generate verified FamilyPilot runtime artifacts" --arg tree "${tree_sha}" --arg parent "${base_sha}" '{message:$message,tree:$tree,parents:[$parent]}')
           commit_sha=$(curl --fail-with-body -sS -X POST "${auth[@]}" "${api}/git/commits" -d "${commit_payload}" | jq -r '.sha')
           test -n "${commit_sha}" -a "${commit_sha}" != "null"
-
           ref_payload=$(jq -n --arg sha "${commit_sha}" '{sha:$sha,force:false}')
           curl --fail-with-body -sS -X PATCH "${auth[@]}" "${api}/git/refs/heads/${HEAD_BRANCH}" -d "${ref_payload}"
-          echo "Persisted verified M3 artifacts at ${commit_sha}."
+          echo "Persisted verified FamilyPilot artifacts at ${commit_sha}."
