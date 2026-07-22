@@ -24,6 +24,23 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24.18.0
+      - name: Verify public anonymization boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find crmos-questionnaire -type f -iname '*inessa*' | grep -q .; then
+            echo 'An employee-identifying filename remains in the public questionnaire.' >&2
+            exit 1
+          fi
+          if grep -RniE 'Инесса|Виктория|шеф|inessa' \
+            crmos-questionnaire/questions \
+            crmos-questionnaire/README.md \
+            crmos-questionnaire/questionnaire-core.mjs \
+            crmos-questionnaire/seed-questionnaire.mjs \
+            crmos-questionnaire/respondents.mjs; then
+            echo 'An employee-identifying value remains in public questionnaire content.' >&2
+            exit 1
+          fi
       - name: Run questionnaire contract tests
         run: node --test crmos-questionnaire/questionnaire.test.mjs
       - name: Parse runtime scripts
