@@ -4,10 +4,12 @@ import { createHash } from 'node:crypto';
 
 const sourcePath = 'src/familypilot.html';
 const indexPath = 'index.html';
-const scopePath = 'src/familypilot-scope.js';
+const sourceScopePath = 'src/familypilot-scope.js';
+const rootScopePath = 'familypilot-scope.js';
 const source = readFileSync(sourcePath, 'utf8');
 const index = readFileSync(indexPath, 'utf8');
-const scopeCode = readFileSync(scopePath, 'utf8');
+const sourceScopeCode = readFileSync(sourceScopePath, 'utf8');
+const rootScopeCode = readFileSync(rootScopePath, 'utf8');
 const sha256 = value => createHash('sha256').update(value).digest('hex');
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const equal = (actual, expected, message) => {
@@ -18,7 +20,7 @@ const equal = (actual, expected, message) => {
 
 const sandbox = {};
 sandbox.globalThis = sandbox;
-vm.runInNewContext(scopeCode, sandbox, { filename: scopePath });
+vm.runInNewContext(sourceScopeCode, sandbox, { filename: sourceScopePath });
 const scope = sandbox.FamilyPilotScope;
 assert(scope, 'FamilyPilotScope was not attached');
 
@@ -27,9 +29,9 @@ const state = {
   currentMemberId: 'anna',
   activeWalletId: 'household',
   wallets: [
-    { id: 'household', type: 'household_default', nativeCurrency: 'EUR', allowedMemberIds: ['anna', 'martin'], includedInHouseholdCapital: true, openingBalance: 0, archivedAt: null },
-    { id: 'personal-anna', type: 'personal', nativeCurrency: 'EUR', ownerMemberId: 'anna', allowedMemberIds: ['anna'], includedInHouseholdCapital: false, openingBalance: 0, archivedAt: null },
-    { id: 'personal-martin', type: 'personal', nativeCurrency: 'EUR', ownerMemberId: 'martin', allowedMemberIds: ['martin'], includedInHouseholdCapital: false, openingBalance: 0, archivedAt: null }
+    { id: 'household', type: 'household_default', name: 'Семейный кошелёк', nativeCurrency: 'EUR', allowedMemberIds: ['anna', 'martin'], includedInHouseholdCapital: true, openingBalance: 0, archivedAt: null },
+    { id: 'personal-anna', type: 'personal', name: 'Личный кошелёк Анны', nativeCurrency: 'EUR', ownerMemberId: 'anna', allowedMemberIds: ['anna'], includedInHouseholdCapital: false, openingBalance: 0, archivedAt: null },
+    { id: 'personal-martin', type: 'personal', name: 'Личный кошелёк Мартина', nativeCurrency: 'EUR', ownerMemberId: 'martin', allowedMemberIds: ['martin'], includedInHouseholdCapital: false, openingBalance: 0, archivedAt: null }
   ],
   operations: [
     { id: 'h-income', walletId: 'household', kind: 'income', amount: 100, status: 'active' },
@@ -45,12 +47,13 @@ equal(scope.accessibleWallets(state).map(wallet => wallet.id), ['household', 'pe
 equal(scope.visibleOperations(state).map(operation => operation.id), ['h-income', 'h-expense'], 'household visible operations exclude personal wallets');
 let capital = scope.capitalSnapshot(state);
 equal({ scope: capital.scope, capital: capital.capital, change: capital.change }, { scope: 'household', capital: 5280, change: 80 }, 'household capital');
+equal(scope.scopeDescriptor(state).capitalLabel, 'включённые кошельки', 'household capital label');
 
 state.activeWalletId = 'personal-anna';
 equal(scope.visibleOperations(state).map(operation => operation.id), ['a-income', 'a-expense'], 'personal visible operations');
 capital = scope.capitalSnapshot(state);
 equal({ scope: capital.scope, capital: capital.capital, change: capital.change }, { scope: 'personal', capital: 45, change: 45 }, 'personal capital');
-equal(scope.scopeDescriptor(state).capitalLabel, 'personal-anna' in state ? '' : scope.activeWallet(state).name || 'Личный кошелёк', 'personal label fallback contract');
+equal(scope.scopeDescriptor(state).capitalLabel, 'Личный кошелёк Анны', 'personal capital label');
 
 state.activeWalletId = 'household';
 state.wallets.find(wallet => wallet.id === 'personal-anna').includedInHouseholdCapital = true;
@@ -65,7 +68,7 @@ equal(scope.activeWallet(state).id, 'household', 'inaccessible personal wallet f
 
 const requiredSourceTokens = [
   'personal-wallet-scope-v1',
-  '<script src="./src/familypilot-scope.js"></script>',
+  '<script src="./familypilot-scope.js"></script>',
   'id="capitalTitleText"',
   'id="capitalScopeLabel"',
   'id="operationsScopeLabel"',
@@ -83,6 +86,7 @@ const requiredSourceTokens = [
 for (const token of requiredSourceTokens) assert(source.includes(token), `required source token missing: ${token}`);
 
 const forbiddenSourceTokens = [
+  '<script src="./src/familypilot-scope.js"></script>',
   'function renderHome(){const list=inPeriod(activeOps(),periods.home)',
   'function filteredOperations(){let list=inPeriod(activeOps(),periods.operations)',
   'function analyticsFilteredOperations(){let list=inPeriod(activeOps(),periods.analytics)',
@@ -93,9 +97,17 @@ const forbiddenSourceTokens = [
 for (const token of forbiddenSourceTokens) assert(!source.includes(token), `forbidden old scope token present: ${token}`);
 
 assert(source === index, 'index.html must be byte-identical to src/familypilot.html');
+assert(sourceScopeCode === rootScopeCode, 'root and source scope modules must be byte-identical');
 assert(!index.includes("fetch('./src/familypilot.html"), 'old root fetch loader returned');
 assert(!index.includes('document.write(source)'), 'old root document.write loader returned');
 assert((source.match(/personal-wallet-scope-v1/g) || []).length >= 2, 'personal wallet marker must cover metadata and CSS');
+
+const inlineScripts = [...source.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
+  .map(match => match[1].trim())
+  .filter(Boolean);
+assert(inlineScripts.length === 1, `expected one inline application script, found ${inlineScripts.length}`);
+new vm.Script(inlineScripts[0], { filename: sourcePath });
+new vm.Script(sourceScopeCode, { filename: sourceScopePath });
 
 console.log(JSON.stringify({
   status: 'PASS',
@@ -106,6 +118,9 @@ console.log(JSON.stringify({
   household_capital_with_personal_opt_in: 5325,
   source_sha256: sha256(source),
   index_sha256: sha256(index),
-  scope_sha256: sha256(scopeCode),
-  source_bytes: Buffer.byteLength(source)
+  source_scope_sha256: sha256(sourceScopeCode),
+  root_scope_sha256: sha256(rootScopeCode),
+  source_bytes: Buffer.byteLength(source),
+  scope_bytes: Buffer.byteLength(sourceScopeCode),
+  syntax_validation: 'PASS'
 }, null, 2));
