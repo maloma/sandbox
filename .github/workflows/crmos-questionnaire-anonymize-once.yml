@@ -1,0 +1,116 @@
+name: Anonymize CRMOS questionnaire once
+
+on:
+  push:
+    branches:
+      - feature/crmos-questionnaire-full-anonymization
+
+permissions:
+  contents: write
+
+concurrency:
+  group: crmos-questionnaire-anonymize-once
+  cancel-in-progress: false
+
+jobs:
+  anonymize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v6
+        with:
+          ref: feature/crmos-questionnaire-full-anonymization
+      - name: Apply deterministic anonymization
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          root = Path('crmos-questionnaire')
+          replacements = [
+              ('Инессе', 'ответственной сотруднице'),
+              ('Инессы', 'ответственной сотрудницы'),
+              ('Инесса', 'ответственная сотрудница'),
+              ('Виктории', 'бухгалтеру'),
+              ('Виктория', 'бухгалтер'),
+              ('Шеф', 'Руководитель'),
+              ('шеф', 'руководитель'),
+              ('inessa-example', 'respondent-one'),
+              ('handoffToInessa', 'orderHandoff'),
+              ('./01-handoff-to-inessa.mjs', './01-order-handoff.mjs'),
+              ('реальных клиентов.', 'реальных клиентов или сотрудников.'),
+          ]
+          for path in root.rglob('*'):
+              if not path.is_file() or path.suffix not in {'.mjs', '.md'}:
+                  continue
+              text = path.read_text(encoding='utf-8')
+              for old, new in replacements:
+                  text = text.replace(old, new)
+              path.write_text(text, encoding='utf-8')
+
+          old = root / 'questions' / '01-handoff-to-inessa.mjs'
+          new = root / 'questions' / '01-order-handoff.mjs'
+          if old.exists():
+              content = old.read_text(encoding='utf-8')
+              if new.exists():
+                  # Prefer the already-created explicitly anonymized version.
+                  old.unlink()
+              else:
+                  old.rename(new)
+
+          core = root / 'questionnaire-core.mjs'
+          text = core.read_text(encoding='utf-8')
+          text = text.replace('export function renderStartIssue(repository, questions, respondents) {', 'export function renderStartIssue(repository, questions) {')
+          text = text.replace('  const respondentList = respondents.map((login) => "@" + login).join(", ");\n', '')
+          text = text.replace('    "Эту анкету одновременно заполняют три сотрудницы: " + respondentList + ".",', '    "Эту анкету одновременно заполняют три уполномоченные сотрудницы.",')
+          core.write_text(text, encoding='utf-8')
+
+          seed = root / 'seed-questionnaire.mjs'
+          text = seed.read_text(encoding='utf-8').replace('renderStartIssue(repository, QUESTIONS, AUTHORIZED_RESPONDENTS)', 'renderStartIssue(repository, QUESTIONS)')
+          seed.write_text(text, encoding='utf-8')
+
+          test = root / 'questionnaire.test.mjs'
+          text = test.read_text(encoding='utf-8').replace('renderStartIssue("maloma/sandbox", QUESTIONS, respondents)', 'renderStartIssue("maloma/sandbox", QUESTIONS)')
+          marker = 'test("fails closed until exactly three unique usernames are configured", () => {'
+          privacy_test = '''test("public questionnaire source contains no employee names or personal usernames", () => {\n  const publicText = JSON.stringify(QUESTIONS);\n  assert.doesNotMatch(publicText, /Инесса|Виктория|шеф|inessa/i);\n  const start = renderStartIssue("maloma/sandbox", QUESTIONS);\n  assert.doesNotMatch(start, /respondent-one|employee-two|employee-three/);\n});\n\n'''
+          if privacy_test not in text:
+              text = text.replace(marker, privacy_test + marker)
+          test.write_text(text, encoding='utf-8')
+
+          index = root / 'questions' / 'index.mjs'
+          text = index.read_text(encoding='utf-8').replace('export const QUESTIONNAIRE_VERSION = "1.0";', 'export const QUESTIONNAIRE_VERSION = "1.1-anonymized";')
+          index.write_text(text, encoding='utf-8')
+
+          respondents = root / 'respondents.mjs'
+          text = respondents.read_text(encoding='utf-8')
+          note = '// Configure only pseudonymous work-account logins; personal employee identities must not be exposed.\n'
+          if not text.startswith(note):
+              respondents.write_text(note + text, encoding='utf-8')
+
+          readme = root / 'README.md'
+          text = readme.read_text(encoding='utf-8')
+          addition = '''\n## Employee anonymity\n\nOnly pseudonymous work GitHub accounts may be configured as respondents. Personal names and personal GitHub accounts must not be used. GitHub displays the commenting account publicly, so the account itself must not identify the employee.\n'''
+          if '## Employee anonymity' not in text:
+              text += addition
+          readme.write_text(text, encoding='utf-8')
+          PY
+          rm -f .github/workflows/crmos-questionnaire-anonymize-once.yml
+      - name: Verify forbidden identifiers are absent
+        shell: bash
+        run: |
+          if grep -RniE 'Инесса|Виктория|шеф|inessa' crmos-questionnaire; then
+            echo 'Forbidden identifying text remains.' >&2
+            exit 1
+          fi
+          node --test crmos-questionnaire/questionnaire.test.mjs
+          node --check crmos-questionnaire/seed-questionnaire.mjs
+          node --check crmos-questionnaire/accept-answer.mjs
+      - name: Commit anonymized public questionnaire
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- crmos-questionnaire .github/workflows/crmos-questionnaire-anonymize-once.yml
+          git commit -m "Fully anonymize public CRMOS questionnaire"
+          git push origin HEAD:feature/crmos-questionnaire-full-anonymization
