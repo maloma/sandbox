@@ -56,4 +56,29 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 003 — CP-03 Bounded Browser Recovery
+
+- **Ordering Marker:** 003
+- **Checkpoint ID:** CP-03-REC01
+- **Status:** COMPLETED / RETRY_READY
+- **First Trusted Run:** `29905118834`.
+- **Passed Before Failure:** exact checkout, tool/module syntax, domain tests, deterministic patch, source/root finalization, static source contract, A3 Chrome and Hidden Capital Chrome.
+- **First M3 Browser Failure:** test expected whitespace between adjacent navigation icon and label nodes; corrected only the expected DOM text.
+- **Second Trusted Run:** `29905290923`.
+- **Passed Before Failure:** all previous steps including A3 and Hidden Capital regressions.
+- **Second M3 Browser Finding:** a date-only payment value for `today` was converted to local noon and could be rejected as a future operation before 12:00.
+- **Product Correction:** today's selected payment date now uses the current timestamp; earlier selected dates retain date-based normalization.
+- **Correction File:** `tools/pf08a-m3-01-correct-today-payment-time.mjs`.
+- **Trusted Gate Correction Pull Request:** `#28`.
+- **Trusted Gate Correction Merge:** `fb10c567315bc5ce63d7f02def8d0d9ba2d5a457`.
+- **Scope:** no navigation, domain, calculation or unrelated behavior expansion.
+- **Verification Result:** RETRY_READY. This record triggers the corrected trusted gate.
+- **Recovery Budget:** bounded correction used; further failure requires exact classification before any additional mutation.
+- **Exact Stop Point:** corrected trusted generation pending.
+- **Next Authorized Transition:** inspect corrected full-pipeline result and generated branch artifacts.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
