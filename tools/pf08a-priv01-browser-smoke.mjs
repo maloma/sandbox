@@ -21,8 +21,9 @@ const harness = `<!doctype html>
   const result = document.getElementById('result');
   const frame = document.getElementById('app');
   const assert = (condition, message) => { if (!condition) throw new Error(message); };
-  const text = node => (node?.textContent || '').replace(/\\s+/g, ' ').trim();
-  const money = (value, currency = 'EUR') => new Intl.NumberFormat('ru-RU', { style: 'currency', currency, maximumFractionDigits: 2 }).format(Math.abs(Number(value) || 0));
+  const normalizeText = value => String(value ?? '').replace(/\\s+/g, ' ').trim();
+  const text = node => normalizeText(node?.textContent || '');
+  const money = (value, currency = 'EUR') => normalizeText(new Intl.NumberFormat('ru-RU', { style: 'currency', currency, maximumFractionDigits: 2 }).format(Math.abs(Number(value) || 0)));
   const signed = (value, currency = 'EUR') => (value > 0 ? '+' : value < 0 ? '−' : '') + money(value, currency);
 
   async function waitForTestApi() {
@@ -70,7 +71,6 @@ const harness = `<!doctype html>
     const api = await waitForTestApi();
     const doc = frame.contentDocument;
 
-    // Household disclosure is hidden by default.
     api.setActiveWallet('wallet-household-main');
     let button = assertMainHidden(doc, 'семейный капитал');
     let snapshot = api.capitalSnapshot();
@@ -79,7 +79,6 @@ const harness = `<!doctype html>
     openAndAssert(doc, snapshot, 'Семейный капитал');
     assertMainHidden(doc, 'семейный капитал');
 
-    // Personal disclosure remains generic on Main and is scoped inside the overlay.
     api.setActiveWallet('wallet-personal-anna');
     button = assertMainHidden(doc, 'Личный кошелёк Анны');
     snapshot = api.capitalSnapshot();
@@ -92,7 +91,6 @@ const harness = `<!doctype html>
     assert(!personalContent.includes('Семейный капитал'), 'Household summary must not replace personal disclosure');
     assertMainHidden(doc, 'Личный кошелёк Анны');
 
-    // Switching back keeps the disclosure closed and generic.
     api.setActiveWallet('wallet-household-main');
     assertMainHidden(doc, 'семейный капитал');
 
@@ -132,7 +130,7 @@ const server = createServer((request, response) => {
     const url = new URL(request.url || '/', 'http://127.0.0.1');
     const requested = url.pathname === '/' ? '/index.html' : url.pathname;
     const normalized = normalize(decodeURIComponent(requested)).replace(/^([.][.][/\\])+/, '');
-    const absolute = resolve(root, \`.${sep}\${normalized.replace(/^[/\\]+/, '')}\`);
+    const absolute = resolve(root, `.${sep}${normalized.replace(/^[/\\]+/, '')}`);
     if (!absolute.startsWith(root + sep) && absolute !== root) {
       response.writeHead(403).end('Forbidden');
       return;
@@ -157,7 +155,7 @@ const chromeCandidates = [
   '/usr/bin/chromium-browser'
 ].filter(Boolean);
 const chrome = chromeCandidates.find(candidate => existsSync(candidate));
-if (!chrome) throw new Error(\`No supported Chrome executable found. Checked: \${chromeCandidates.join(', ')}\`);
+if (!chrome) throw new Error(`No supported Chrome executable found. Checked: ${chromeCandidates.join(', ')}`);
 
 try {
   await new Promise((resolveListen, rejectListen) => {
@@ -165,12 +163,12 @@ try {
     server.listen(0, '127.0.0.1', resolveListen);
   });
   const address = server.address();
-  const url = \`http://127.0.0.1:\${address.port}/\${harnessName}\`;
+  const url = `http://127.0.0.1:${address.port}/${harnessName}`;
   const args = [
     '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
     '--disable-background-networking', '--disable-default-apps', '--disable-extensions',
     '--disable-sync', '--metrics-recording-only', '--mute-audio', '--no-first-run',
-    \`--user-data-dir=\${profilePath}\`, '--virtual-time-budget=22000', '--dump-dom', url
+    `--user-data-dir=${profilePath}`, '--virtual-time-budget=22000', '--dump-dom', url
   ];
 
   const output = await new Promise((resolveRun, rejectRun) => {
@@ -179,20 +177,20 @@ try {
     let stderr = '';
     const timeout = setTimeout(() => {
       child.kill('SIGKILL');
-      rejectRun(new Error(\`Chrome browser smoke timed out. stderr: \${stderr.slice(-2000)}\`));
+      rejectRun(new Error(`Chrome browser smoke timed out. stderr: ${stderr.slice(-2000)}`));
     }, 50000);
     child.stdout.on('data', chunk => { stdout += chunk; });
     child.stderr.on('data', chunk => { stderr += chunk; });
     child.once('error', error => { clearTimeout(timeout); rejectRun(error); });
     child.once('close', code => {
       clearTimeout(timeout);
-      if (code !== 0) rejectRun(new Error(\`Chrome exited with \${code}. stderr: \${stderr.slice(-4000)}\`));
+      if (code !== 0) rejectRun(new Error(`Chrome exited with ${code}. stderr: ${stderr.slice(-4000)}`));
       else resolveRun({ stdout, stderr });
     });
   });
 
-  if (!output.stdout.includes('data-status="PASS"')) throw new Error(\`Hidden Capital browser smoke did not pass. DOM tail: \${output.stdout.slice(-7000)}\`);
-  if (!output.stdout.includes(marker)) throw new Error(\`Browser smoke marker \${marker} missing\`);
+  if (!output.stdout.includes('data-status="PASS"')) throw new Error(`Hidden Capital browser smoke did not pass. DOM tail: ${output.stdout.slice(-7000)}`);
+  if (!output.stdout.includes(marker)) throw new Error(`Browser smoke marker ${marker} missing`);
 
   console.log(JSON.stringify({
     status: 'PASS', browser: chrome, marker,
