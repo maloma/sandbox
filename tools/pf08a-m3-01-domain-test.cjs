@@ -21,7 +21,9 @@ function stateFixture(){
       {id:'wallet-personal-anna',type:'personal',name:'Личный кошелёк Анны',nativeCurrency:'EUR'}
     ],
     categories:[{id:'cat-rent',kind:'expense',name:'Жильё'}],
-    operations:[]
+    operations:[],
+    obligationRules:[],
+    obligationOccurrences:[]
   };
 }
 
