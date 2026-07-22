@@ -29,4 +29,25 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 002 — Trusted Generation and Verification Gate Activated
+
+- **Ordering Marker:** 002
+- **Checkpoint ID:** CP-02
+- **Status:** READY_FOR_TRUSTED_GENERATION
+- **Objective:** Generate privacy runtime artifacts from trusted default-branch workflow code rather than accepting unverified branch output.
+- **Implementation Pull Request:** `#21` — `Hide Capital values behind explicit disclosure`.
+- **Trusted Gate Pull Request:** `#22` — `Add trusted hidden Capital pull-request gate`.
+- **Trusted Gate Head:** `dc6edb93c790452906da61af57d48a26a2169262`.
+- **Trusted Gate Merge:** `6100ade6953a9a27dcfa70446bd7aa39fbc806da`.
+- **Gate Contract:** exact PR-head checkout; apply patch once; generate byte-identical root/source HTML; static no-leak validation; compact Analytics regression; family/personal hidden-Capital Chrome regression; commit generated HTML only after every check passes.
+- **Expected Runtime Result:** Main first control text exactly `Капитал`; no Capital amount, change, graph, dates or wallet label on Main; family/personal values only inside the opened overlay.
+- **Verification Result:** READY. This ledger commit synchronizes PR #21 and triggers trusted generation.
+- **Recovery Action:** reject merge if generation, no-leak checks, A3 regression or disclosure browser scenario fails.
+- **Exact Stop Point:** trusted generation and synchronized-head PASS pending.
+- **Next Authorized Transition:** inspect generated source and workflow evidence.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
