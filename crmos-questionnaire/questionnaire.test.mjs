@@ -7,9 +7,11 @@ import { applyAcceptedAnswer, readAcceptedMetadata, renderQuestionIssue, renderS
 import { QUESTIONS } from "./questions/index.mjs";
 import { validateRespondents } from "./respondents.mjs";
 
-const respondents = ["inessa-example", "employee-two", "employee-three"];
+const respondents = ["respondent-one", "respondent-two", "respondent-three"];
 const unanswered = { owner: null, commentId: null, updatedAt: null };
-const answered = { owner: "inessa-example", commentId: "1001", updatedAt: "2026-07-22T10:00:00Z" };
+const answered = { owner: "respondent-one", commentId: "1001", updatedAt: "2026-07-22T10:00:00Z" };
+
+const forbiddenPublicIdentifiers = /Инесса|Виктория|шеф|inessa/i;
 
 test("contains sixty stable and personal-data-safe questions", () => {
   assert.equal(QUESTIONS.length, 60);
@@ -22,39 +24,47 @@ test("contains sixty stable and personal-data-safe questions", () => {
   }
 });
 
-test("fails closed until exactly three unique usernames are configured", () => {
+test("public question register contains no employee names", () => {
+  assert.doesNotMatch(JSON.stringify(QUESTIONS), forbiddenPublicIdentifiers);
+});
+
+test("fails closed until exactly three unique pseudonymous usernames are configured", () => {
   assert.equal(validateRespondents([]).ready, false);
   assert.equal(validateRespondents(["one", "two"]).ready, false);
   assert.equal(validateRespondents(["one", "one", "three"]).ready, false);
   assert.equal(validateRespondents(respondents).ready, true);
 });
 
-test("renders public privacy and first-author correction instructions", () => {
+test("renders public privacy and first-author correction instructions without listing respondents", () => {
   const question = renderQuestionIssue(QUESTIONS[0]);
-  const start = renderStartIssue("maloma/sandbox", QUESTIONS, respondents);
+  const start = renderStartIssue("maloma/sandbox", QUESTIONS);
   assert.match(question, /Анкета публичная/);
   assert.match(question, /первоначального комментария/);
   assert.match(start, /Другая сотрудница не может заменить/);
   assert.match(start, /видны публично/);
+  assert.match(start, /псевдонимные рабочие GitHub-аккаунты/);
+  for (const respondent of respondents) {
+    assert.doesNotMatch(start, new RegExp(respondent));
+  }
 });
 
 test("accepts first authorized answer and rejects unauthorized or competing users", () => {
-  assert.deepEqual(decideAnswerAction({ accepted: unanswered, action: "created", commentId: "1001", commentAuthor: "inessa-example", sender: "inessa-example", answerBody: "Ответ", authorizedRespondents: respondents }), { type: "ACCEPT", owner: "inessa-example" });
+  assert.deepEqual(decideAnswerAction({ accepted: unanswered, action: "created", commentId: "1001", commentAuthor: "respondent-one", sender: "respondent-one", answerBody: "Ответ", authorizedRespondents: respondents }), { type: "ACCEPT", owner: "respondent-one" });
   assert.equal(decideAnswerAction({ accepted: unanswered, action: "created", commentId: "2001", commentAuthor: "stranger", sender: "stranger", answerBody: "Ответ", authorizedRespondents: respondents }).type, "REJECT");
-  assert.equal(decideAnswerAction({ accepted: answered, action: "created", commentId: "2002", commentAuthor: "employee-two", sender: "employee-two", answerBody: "Другой ответ", authorizedRespondents: respondents }).type, "REJECT");
-  assert.equal(decideAnswerAction({ accepted: answered, action: "created", commentId: "1002", commentAuthor: "inessa-example", sender: "inessa-example", answerBody: "Второй комментарий", authorizedRespondents: respondents }).type, "REJECT");
+  assert.equal(decideAnswerAction({ accepted: answered, action: "created", commentId: "2002", commentAuthor: "respondent-two", sender: "respondent-two", answerBody: "Другой ответ", authorizedRespondents: respondents }).type, "REJECT");
+  assert.equal(decideAnswerAction({ accepted: answered, action: "created", commentId: "1002", commentAuthor: "respondent-one", sender: "respondent-one", answerBody: "Второй комментарий", authorizedRespondents: respondents }).type, "REJECT");
 });
 
 test("allows only accepted author to edit original accepted comment", () => {
-  assert.deepEqual(decideAnswerAction({ accepted: answered, action: "edited", commentId: "1001", commentAuthor: "inessa-example", sender: "inessa-example", answerBody: "Исправление", authorizedRespondents: respondents }), { type: "REFRESH", owner: "inessa-example" });
-  assert.equal(decideAnswerAction({ accepted: answered, action: "edited", commentId: "1001", commentAuthor: "inessa-example", sender: "employee-two", answerBody: "Подмена", authorizedRespondents: respondents }).type, "REJECT");
+  assert.deepEqual(decideAnswerAction({ accepted: answered, action: "edited", commentId: "1001", commentAuthor: "respondent-one", sender: "respondent-one", answerBody: "Исправление", authorizedRespondents: respondents }), { type: "REFRESH", owner: "respondent-one" });
+  assert.equal(decideAnswerAction({ accepted: answered, action: "edited", commentId: "1001", commentAuthor: "respondent-one", sender: "respondent-two", answerBody: "Подмена", authorizedRespondents: respondents }).type, "REJECT");
 });
 
 test("refreshes accepted snapshot without changing owner or source comment", () => {
   const initial = renderQuestionIssue(QUESTIONS[0]);
-  const acceptedBody = applyAcceptedAnswer(initial, { owner: "inessa-example", commentId: "1001", commentUrl: "https://github.com/maloma/sandbox/issues/1#issuecomment-1001", updatedAt: "2026-07-22T10:00:00Z", body: "Первый ответ" });
-  const corrected = applyAcceptedAnswer(acceptedBody, { owner: "inessa-example", commentId: "1001", commentUrl: "https://github.com/maloma/sandbox/issues/1#issuecomment-1001", updatedAt: "2026-07-22T10:05:00Z", body: "Исправленный ответ" });
-  assert.deepEqual(readAcceptedMetadata(corrected), { owner: "inessa-example", commentId: "1001", updatedAt: "2026-07-22T10:05:00Z" });
+  const acceptedBody = applyAcceptedAnswer(initial, { owner: "respondent-one", commentId: "1001", commentUrl: "https://github.com/maloma/sandbox/issues/1#issuecomment-1001", updatedAt: "2026-07-22T10:00:00Z", body: "Первый ответ" });
+  const corrected = applyAcceptedAnswer(acceptedBody, { owner: "respondent-one", commentId: "1001", commentUrl: "https://github.com/maloma/sandbox/issues/1#issuecomment-1001", updatedAt: "2026-07-22T10:05:00Z", body: "Исправленный ответ" });
+  assert.deepEqual(readAcceptedMetadata(corrected), { owner: "respondent-one", commentId: "1001", updatedAt: "2026-07-22T10:05:00Z" });
   assert.match(corrected, /Исправленный ответ/);
   assert.doesNotMatch(corrected, /Первый ответ/);
 });
