@@ -13,6 +13,8 @@ const obligationScript='<script src="./familypilot-obligations.js"></script>';
 const debtScript='<script src="./familypilot-debts.js"></script>';
 const planMarker='<meta name="familypilot-package" content="plan-obligations-foundation-v1">';
 const debtMarker='<meta name="familypilot-package" content="debt-chains-principal-v1">';
+const legacyDebtHome='<div class="debts"><button class="debt"><b>Мне должны</b><strong class="positive">180 €</strong></button><button class="debt"><b>Я верну</b><strong class="negative">420 €</strong></button></div>';
+const generatedDebtHome='<div class="debts"><button id="homeDebtReceivable" class="debt" type="button" data-debt-filter="receivable"><b>Мне должны</b><strong id="homeDebtReceivableValue" class="positive">0 €</strong></button><button id="homeDebtLiability" class="debt" type="button" data-debt-filter="liability"><b>Я должен</b><strong id="homeDebtLiabilityValue" class="negative">0 €</strong></button></div>';
 
 let html=readFileSync(sourceFile,'utf8');
 const obligationUi=readFileSync(obligationUiFile,'utf8').trim();
@@ -23,6 +25,9 @@ if(!html.includes(obligationScript))throw new Error('Obligations module script a
 
 if(!html.includes(debtMarker))html=html.replace(planMarker,`${planMarker}\n${debtMarker}`);
 if(!html.includes(debtScript))html=html.replace(obligationScript,`${obligationScript}\n${debtScript}`);
+if(html.includes(legacyDebtHome))html=html.replace(legacyDebtHome,generatedDebtHome);
+if(!html.includes('id="homeDebtReceivableValue"')||!html.includes('id="homeDebtLiabilityValue"'))throw new Error('Stable Home debt mount is missing');
+if(html.includes('>180 €</strong>')||html.includes('>420 €</strong>'))throw new Error('Fabricated Home debt fixtures remain');
 
 function replaceOrInsertBlock(source,startMarker,endMarker,content,anchor){
   const block=`${startMarker}\n${content}\n${endMarker}`;
@@ -42,4 +47,4 @@ html=replaceOrInsertBlock(html,debtStart,debtEnd,debtUi,finalAnchor);
 
 writeFileSync(sourceFile,html);
 writeFileSync(publishedFile,html);
-console.log(JSON.stringify({status:'PASS',sourceFile,publishedFile,obligationUiFile,debtUiFile,obligationInline:true,debtInline:true,debtScript:true,bytes:Buffer.byteLength(html)},null,2));
+console.log(JSON.stringify({status:'PASS',sourceFile,publishedFile,obligationUiFile,debtUiFile,obligationInline:true,debtInline:true,debtScript:true,stableHomeDebtMount:true,fabricatedHomeDebtFixtures:false,bytes:Buffer.byteLength(html)},null,2));
