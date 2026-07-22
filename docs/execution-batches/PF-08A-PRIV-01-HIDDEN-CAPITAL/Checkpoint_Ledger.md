@@ -73,4 +73,30 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 004 — CP-02 Completed and CP-03 Pull Request Gate Passed
+
+- **Ordering Marker:** 004
+- **Checkpoint ID:** CP-02 / CP-03
+- **Status:** READY_FOR_MERGE
+- **Objective:** Record the durable generated runtime and exact-head eligibility for automatic prototype merge.
+- **Pull Request:** `#21` — `Hide Capital values behind explicit disclosure`.
+- **Verified Head Before This Evidence Update:** `4c652b28252517438346c7126e03093a48a94261`.
+- **Generated HTML Blob:** `3e690de8d484c1822073904e6fab280bf8ca6486` for both `src/familypilot.html` and `index.html`.
+- **Actual Changed Paths:** exactly nine expected paths.
+- **Mergeability:** PASS.
+- **Privacy Trusted Workflow:** `PF-08A PRIV-01 Trusted PR Gate`, run `29889336451`, conclusion `success`.
+- **Privacy Branch Workflow:** `PF-08A PRIV-01 Hidden Capital Disclosure`, run `29889336122`, conclusion `success`.
+- **A3 Trusted Regression:** `PF-08A A3-01 Trusted PR Gate`, run `29889336343`, conclusion `success`.
+- **A3 Branch Regression:** `PF-08A A3-01 Compact Analytics States`, run `29889336108`, conclusion `success`.
+- **Assertions:** first Main control exactly `Капитал`; no Main Capital amount/change/graph/dates/scope label; family value opens only in overlay; personal value opens only in isolated personal overlay; close restores hidden state; source/root equal; A3 unchanged.
+- **Verification Result:** PASS. No Capital calculation, wallet inclusion, permission, navigation, storage-key or unrelated product change exists.
+- **Rollback Method:** revert the eventual merge or restore `6289b1188cab01ca53c30fd07ef48453bf97425c`.
+- **Remaining Work:** obtain the same complete PASS on this new evidence head, merge with expected-head protection, then verify the public route in Chrome.
+- **Exact Stop Point:** append-only evidence committed.
+- **Next Authorized Transition:** final evidence-head gate and automatic merge.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
