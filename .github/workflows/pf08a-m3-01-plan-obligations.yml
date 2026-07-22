@@ -5,6 +5,7 @@ on:
     branches:
       - agent/pf08a-m3-01-plan-obligations
       - agent/pf08a-m2-01-debt-chains-principal
+      - agent/pf08a-m4-01-savings-goals
     paths:
       - src/familypilot.html
       - index.html
@@ -13,6 +14,8 @@ on:
       - familypilot-obligations-ui-v2.js
       - familypilot-debts.js
       - familypilot-debts-ui.js
+      - familypilot-savings.js
+      - familypilot-savings-ui.js
       - tools/pf08a-m3-01-apply-plan-obligations.mjs
       - tools/pf08a-m3-01-correct-today-payment-time.mjs
       - tools/pf08a-m3-01-correct-browser-test-api.mjs
@@ -23,9 +26,13 @@ on:
       - tools/pf08a-m2-01-domain-test.cjs
       - tools/pf08a-m2-01-verify-debt-integration.mjs
       - tools/pf08a-m2-01-browser-smoke.mjs
+      - tools/pf08a-m4-01-domain-test.cjs
+      - tools/pf08a-m4-01-verify-savings-integration.mjs
+      - tools/pf08a-m4-01-browser-smoke.mjs
       - .github/workflows/pf08a-m3-01-plan-obligations.yml
       - docs/execution-batches/PF-08A-M3-01-PLAN-OBLIGATIONS/**
       - docs/execution-batches/PF-08A-M2-01-DEBT-CHAINS-PRINCIPAL/**
+      - docs/execution-batches/PF-08A-M4-01-SAVINGS-GOALS/**
   pull_request:
     branches:
       - main
@@ -37,6 +44,8 @@ on:
       - familypilot-obligations-ui-v2.js
       - familypilot-debts.js
       - familypilot-debts-ui.js
+      - familypilot-savings.js
+      - familypilot-savings-ui.js
       - tools/pf08a-m3-01-apply-plan-obligations.mjs
       - tools/pf08a-m3-01-correct-today-payment-time.mjs
       - tools/pf08a-m3-01-correct-browser-test-api.mjs
@@ -47,9 +56,13 @@ on:
       - tools/pf08a-m2-01-domain-test.cjs
       - tools/pf08a-m2-01-verify-debt-integration.mjs
       - tools/pf08a-m2-01-browser-smoke.mjs
+      - tools/pf08a-m4-01-domain-test.cjs
+      - tools/pf08a-m4-01-verify-savings-integration.mjs
+      - tools/pf08a-m4-01-browser-smoke.mjs
       - .github/workflows/pf08a-m3-01-plan-obligations.yml
       - docs/execution-batches/PF-08A-M3-01-PLAN-OBLIGATIONS/**
       - docs/execution-batches/PF-08A-M2-01-DEBT-CHAINS-PRINCIPAL/**
+      - docs/execution-batches/PF-08A-M4-01-SAVINGS-GOALS/**
 
 permissions:
   contents: write
@@ -74,6 +87,8 @@ jobs:
           node --check familypilot-obligations-ui-v2.js
           node --check familypilot-debts.js
           node --check familypilot-debts-ui.js
+          node --check familypilot-savings.js
+          node --check familypilot-savings-ui.js
           node --check tools/pf08a-m3-01-apply-plan-obligations.mjs
           node --check tools/pf08a-m3-01-correct-today-payment-time.mjs
           node --check tools/pf08a-m3-01-correct-browser-test-api.mjs
@@ -84,12 +99,18 @@ jobs:
           node --check tools/pf08a-m2-01-domain-test.cjs
           node --check tools/pf08a-m2-01-verify-debt-integration.mjs
           node --check tools/pf08a-m2-01-browser-smoke.mjs
+          node --check tools/pf08a-m4-01-domain-test.cjs
+          node --check tools/pf08a-m4-01-verify-savings-integration.mjs
+          node --check tools/pf08a-m4-01-browser-smoke.mjs
 
       - name: Run obligations domain tests
         run: node tools/pf08a-m3-01-domain-test.cjs
 
       - name: Run debt domain tests
         run: node tools/pf08a-m2-01-domain-test.cjs
+
+      - name: Run savings goal domain tests
+        run: node tools/pf08a-m4-01-domain-test.cjs
 
       - name: Apply Plan and obligations patch once
         shell: bash
@@ -103,7 +124,7 @@ jobs:
       - name: Correct same-day payment timestamp
         run: node tools/pf08a-m3-01-correct-today-payment-time.mjs
 
-      - name: Reconcile M3 regression with integrated navigation
+      - name: Reconcile legacy Plan regression with integrated navigation
         run: node tools/pf08a-m3-01-correct-browser-test-api.mjs
 
       - name: Finalize root and source artifacts
@@ -114,6 +135,9 @@ jobs:
 
       - name: Verify debt integration contract
         run: node tools/pf08a-m2-01-verify-debt-integration.mjs
+
+      - name: Verify savings goal integration contract
+        run: node tools/pf08a-m4-01-verify-savings-integration.mjs
 
       - name: Run compact Analytics regression
         run: node tools/pf08a-a3-01-browser-smoke.mjs
@@ -126,6 +150,9 @@ jobs:
 
       - name: Run debt chains browser regression
         run: node tools/pf08a-m2-01-browser-smoke.mjs
+
+      - name: Run savings goals browser regression
+        run: node tools/pf08a-m4-01-browser-smoke.mjs
 
       - name: Commit verified generated runtime artifacts
         shell: bash
@@ -152,6 +179,7 @@ jobs:
         run: |
           grep -Fq 'plan-obligations-foundation-v1' src/familypilot.html
           grep -Fq 'debt-chains-principal-v1' src/familypilot.html
+          grep -Fq 'savings-goals-v1' src/familypilot.html
 
       - name: Check syntax and domain behavior
         run: |
@@ -159,15 +187,19 @@ jobs:
           node --check familypilot-obligations-ui-v2.js
           node --check familypilot-debts.js
           node --check familypilot-debts-ui.js
+          node --check familypilot-savings.js
+          node --check familypilot-savings-ui.js
           node --check tools/pf08a-m3-01-apply-plan-obligations.mjs
           node --check tools/pf08a-m3-01-correct-today-payment-time.mjs
           node --check tools/pf08a-m3-01-correct-browser-test-api.mjs
           node --check tools/pf08a-m3-01-browser-smoke.mjs
           node --check tools/pf08a-m2-01-browser-smoke.mjs
+          node --check tools/pf08a-m4-01-browser-smoke.mjs
           node tools/pf08a-m3-01-domain-test.cjs
           node tools/pf08a-m2-01-domain-test.cjs
+          node tools/pf08a-m4-01-domain-test.cjs
 
-      - name: Reconcile M3 regression with integrated navigation
+      - name: Reconcile legacy Plan regression with integrated navigation
         run: node tools/pf08a-m3-01-correct-browser-test-api.mjs
 
       - name: Recreate final runtime artifacts
@@ -182,6 +214,9 @@ jobs:
       - name: Verify debt integration contract
         run: node tools/pf08a-m2-01-verify-debt-integration.mjs
 
+      - name: Verify savings goal integration contract
+        run: node tools/pf08a-m4-01-verify-savings-integration.mjs
+
       - name: Run compact Analytics regression
         run: node tools/pf08a-a3-01-browser-smoke.mjs
 
@@ -193,3 +228,6 @@ jobs:
 
       - name: Run debt chains browser regression
         run: node tools/pf08a-m2-01-browser-smoke.mjs
+
+      - name: Run savings goals browser regression
+        run: node tools/pf08a-m4-01-browser-smoke.mjs
