@@ -186,11 +186,11 @@ await new Promise((resolvePromise,reject)=>{
 try{
   const address=server.address();
   const {stdout}=await runChrome(`http://127.0.0.1:${address.port}/${harnessName}`);
-  if(!stdout.includes('data-status="PASS"')||!stdout.includes(marker)){
-    throw new Error(`M3 browser smoke did not pass\n${stdout.slice(-5000)}`);
-  }
   const match=stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/);
-  const decoded=(match?.[1]||'').replace(/&quot;/g,'"').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+  const decoded=(match?.[1]||'').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+  if(!stdout.includes('data-status="PASS"')||!stdout.includes(marker)){
+    throw new Error(`M3 browser smoke did not pass\n${decoded||stdout.slice(-5000)}`);
+  }
   console.log(decoded||JSON.stringify({status:'PASS',marker},null,2));
 }finally{
   await new Promise(resolvePromise=>server.close(resolvePromise));
