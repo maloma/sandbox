@@ -56,4 +56,28 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 003 — CP-02 Implementation Package Completed
+
+- **Ordering Marker:** 003
+- **Checkpoint ID:** CP-02
+- **Status:** COMPLETED / READY_FOR_PR_GATE
+- **Domain Commit:** `0ec4488aa51e7d7d412d6369de09a7e31b668927`.
+- **UI Commit:** `74af500809abe5abe45cd518cc54c43ef4cbbd9b`.
+- **Domain Test Commit:** `329afaeec661f396500e42dfb7cbbbbfe7bb1d23`.
+- **Static Verifier Commit:** `a8778e1e0d050966b2aedb718d8da9d580d233e8`.
+- **Browser Scenario Commit:** `23987a4ac2cc5c2ace481c4790f749aa521e8fc2`.
+- **Implemented Domain:** additive schema v4; arbitrary interval; count/date/unlimited ending; deterministic sequence; legacy monthly normalization; amount versions; one-occurrence move; archive/restore; one linked Expense; stable-operation correction.
+- **Implemented UI:** forbidden summary removal; month navigation; date grouping and native-currency totals; quick pay; expanded recurrence editor; payment correction; amount-scope editor; archive/restore.
+- **Verification Reuse:** existing M3-01 domain/static/browser filenames were upgraded so existing trusted workflows execute the M3-02 contract without adding another workflow family.
+- **Preserved Invariants:** Option A navigation; byte-identical source/root HTML; hidden Capital; A3 Analytics; M1 operations; household/personal isolation; honest unavailable Debts/Savings entries.
+- **Local Verification:** domain syntax PASS; UI syntax PASS; complete deterministic domain suite PASS.
+- **Browser Verification State:** pending authoritative GitHub Chrome gate; no local browser PASS is claimed.
+- **Expected Changed Paths:** seven bounded files — two runtime modules, three existing verification files, Manifest and Ledger.
+- **Verification Result:** PASS for package construction. One Draft PR and one existing workflow gate are authorized.
+- **Next Authorized Transition:** open PR, enumerate actual paths, inspect exact workflow results and correct only exact failures.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
