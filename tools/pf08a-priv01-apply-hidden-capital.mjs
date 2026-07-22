@@ -34,7 +34,7 @@ replaceOnce(
   `\n/* hidden-capital-disclosure-v1 */
 .capital-launch{width:100%;min-height:70px;padding:0 18px;display:flex;align-items:center;justify-content:space-between;gap:16px;color:var(--ink);text-align:left;cursor:pointer}
 .capital-launch strong{font-size:20px;line-height:1;font-weight:950;letter-spacing:.01em}
-.capital-launch-arrow{font-size:30px;line-height:1;color:var(--muted);transform:translateY(-1px)}
+.capital-launch::after{content:"›";font-size:30px;line-height:1;color:var(--muted);transform:translateY(-1px)}
 .capital-launch:focus-visible{outline:3px solid color-mix(in srgb,var(--green) 48%,transparent);outline-offset:2px}
 .capital-detail-summary{display:grid;gap:5px;padding:14px;border:1px solid var(--line);border-radius:17px;background:var(--card);margin:12px 0}
 .capital-detail-label{color:var(--muted);font-size:12px;font-weight:800}
@@ -46,7 +46,7 @@ replaceOnce(
 replaceOnce(
   'Main Capital card',
   '<section class="card capital"><div class="capital-head"><div><h2><span id="capitalTitleText">Капитал</span> · <span id="capitalScopeLabel" style="color:var(--muted)">включённые кошельки</span></h2><div id="capitalValue" class="capital-value">0 €</div><div id="capitalChange" class="capital-change">0 €</div></div><button id="capitalInfoBtn" class="info">i</button></div><svg class="spark" viewBox="0 0 360 50"><path d="M4 39 L95 31 L184 35 L271 21 L356 9" fill="none" stroke="var(--green)" stroke-width="3" stroke-linecap="round"/><circle cx="356" cy="9" r="4" fill="var(--card)" stroke="var(--green)" stroke-width="3"/></svg><div class="dates"><span id="capitalStartDate"></span><span id="capitalEndDate"></span></div></section>',
-  '<button id="capitalRevealBtn" class="card capital-launch" type="button" aria-haspopup="dialog" aria-controls="capitalInfo" aria-label="Открыть капитал"><strong>Капитал</strong><span class="capital-launch-arrow" aria-hidden="true">›</span></button>'
+  '<button id="capitalRevealBtn" class="card capital-launch" type="button" aria-haspopup="dialog" aria-controls="capitalInfo" aria-label="Открыть капитал"><strong>Капитал</strong></button>'
 );
 
 replaceOnce(
