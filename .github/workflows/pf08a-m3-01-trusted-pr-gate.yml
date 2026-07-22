@@ -15,6 +15,8 @@ on:
       - familypilot-savings-goals-ui.js
       - familypilot-wallet-management.js
       - familypilot-wallet-management-ui.js
+      - familypilot-wallet-transfers.js
+      - familypilot-wallet-transfers-ui.js
       - tools/pf08a-m3-01-apply-plan-obligations.mjs
       - tools/pf08a-m3-01-correct-today-payment-time.mjs
       - tools/pf08a-m3-01-correct-browser-test-api.mjs
@@ -31,22 +33,22 @@ on:
       - tools/pf08a-wf01-domain-test.cjs
       - tools/pf08a-wf01-verify-integration.mjs
       - tools/pf08a-wf01-browser-smoke.mjs
+      - tools/pf08a-wf02-domain-test.cjs
+      - tools/pf08a-wf02-verify-integration.mjs
+      - tools/pf08a-wf02-browser-smoke.mjs
       - .github/workflows/pf08a-m3-01-plan-obligations.yml
       - .github/workflows/pf08a-m3-01-trusted-pr-gate.yml
-      - docs/execution-batches/PF-08A-M3-01-PLAN-OBLIGATIONS/**
-      - docs/execution-batches/PF-08A-M2-01-DEBT-CHAINS-PRINCIPAL/**
-      - docs/execution-batches/PF-08A-M4-01-SAVINGS-GOALS/**
-      - docs/execution-batches/PF-08A-WF01-BASE-CURRENCY-WALLET-MANAGEMENT/**
+      - docs/execution-batches/PF-08A-WF02-BASE-CURRENCY-WALLET-TRANSFERS/**
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: pf08a-family-trusted-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
   cancel-in-progress: false
 
 jobs:
-  generate-and-verify-exact-head:
+  verify-exact-head:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
@@ -58,22 +60,21 @@ jobs:
       - name: Verify exact checked-out head
         run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
 
-      - name: Check FamilyPilot syntax
+      - name: Check syntax
         run: |
           for file in \
             familypilot-obligations.js familypilot-obligations-ui-v2.js \
             familypilot-debts.js familypilot-debts-ui.js \
             familypilot-savings-goals.js familypilot-savings-goals-ui.js \
             familypilot-wallet-management.js familypilot-wallet-management-ui.js \
-            tools/pf08a-m3-01-apply-plan-obligations.mjs \
-            tools/pf08a-m3-01-correct-today-payment-time.mjs \
-            tools/pf08a-m3-01-correct-browser-test-api.mjs \
-            tools/pf08a-m3-01-finalize-runtime-artifacts.mjs \
-            tools/pf08a-m3-01-verify-plan-obligations.mjs \
-            tools/pf08a-m3-01-domain-test.cjs tools/pf08a-m3-01-browser-smoke.mjs \
+            familypilot-wallet-transfers.js familypilot-wallet-transfers-ui.js \
+            tools/pf08a-m3-01-apply-plan-obligations.mjs tools/pf08a-m3-01-correct-today-payment-time.mjs \
+            tools/pf08a-m3-01-correct-browser-test-api.mjs tools/pf08a-m3-01-finalize-runtime-artifacts.mjs \
+            tools/pf08a-m3-01-verify-plan-obligations.mjs tools/pf08a-m3-01-domain-test.cjs tools/pf08a-m3-01-browser-smoke.mjs \
             tools/pf08a-m2-01-domain-test.cjs tools/pf08a-m2-01-verify-debt-integration.mjs tools/pf08a-m2-01-browser-smoke.mjs \
             tools/pf08a-m4-01-domain-test.cjs tools/pf08a-m4-01-verify-integration.mjs tools/pf08a-m4-01-browser-smoke.mjs \
-            tools/pf08a-wf01-domain-test.cjs tools/pf08a-wf01-verify-integration.mjs tools/pf08a-wf01-browser-smoke.mjs; do node --check "$file"; done
+            tools/pf08a-wf01-domain-test.cjs tools/pf08a-wf01-verify-integration.mjs tools/pf08a-wf01-browser-smoke.mjs \
+            tools/pf08a-wf02-domain-test.cjs tools/pf08a-wf02-verify-integration.mjs tools/pf08a-wf02-browser-smoke.mjs; do node --check "$file"; done
 
       - name: Run domain tests
         run: |
@@ -81,18 +82,17 @@ jobs:
           node tools/pf08a-m2-01-domain-test.cjs
           node tools/pf08a-m4-01-domain-test.cjs
           node tools/pf08a-wf01-domain-test.cjs
+          node tools/pf08a-wf02-domain-test.cjs
 
-      - name: Apply Plan and obligations patch once
+      - name: Recreate deterministic runtime
         run: |
-          if grep -Fq 'plan-obligations-foundation-v1' src/familypilot.html; then echo "M3 patch present"; else node tools/pf08a-m3-01-apply-plan-obligations.mjs; fi
-
-      - name: Apply compatibility corrections
-        run: |
+          if ! grep -Fq 'plan-obligations-foundation-v1' src/familypilot.html; then node tools/pf08a-m3-01-apply-plan-obligations.mjs; fi
           node tools/pf08a-m3-01-correct-today-payment-time.mjs
           node tools/pf08a-m3-01-correct-browser-test-api.mjs
+          node tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
 
-      - name: Finalize root and source artifacts
-        run: node tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
+      - name: Require generated artifacts committed
+        run: git diff --exit-code -- src/familypilot.html index.html
 
       - name: Verify integration contracts
         run: |
@@ -100,63 +100,14 @@ jobs:
           node tools/pf08a-m2-01-verify-debt-integration.mjs
           node tools/pf08a-m4-01-verify-integration.mjs
           node tools/pf08a-wf01-verify-integration.mjs
+          node tools/pf08a-wf02-verify-integration.mjs
 
-      - name: Run compact Analytics regression
-        run: node tools/pf08a-a3-01-browser-smoke.mjs
-
-      - name: Run hidden Capital regression
-        run: node tools/pf08a-priv01-browser-smoke.mjs
-
-      - name: Run Plan and obligations browser regression
-        run: node tools/pf08a-m3-01-browser-smoke.mjs
-
-      - name: Run debt chains browser regression
-        run: node tools/pf08a-m2-01-browser-smoke.mjs > m2-browser.log 2>&1
-
-      - name: Run savings goals browser regression
-        run: node tools/pf08a-m4-01-browser-smoke.mjs > m4-browser.log 2>&1
-
-      - name: Run wallet management browser regression
-        run: node tools/pf08a-wf01-browser-smoke.mjs > wf01-browser.log 2>&1
-
-      - name: Print browser logs
-        if: always()
+      - name: Run browser regressions
         run: |
-          for file in m2-browser.log m4-browser.log wf01-browser.log; do test -f "$file" && { echo "===== $file ====="; cat "$file"; }; done
-
-      - name: Upload browser diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pf08a-family-browser-${{ github.event.pull_request.head.sha }}
-          path: |
-            m2-browser.log
-            m4-browser.log
-            wf01-browser.log
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Persist verified artifacts atomically
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
-          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          paths=(src/familypilot.html index.html)
-          if git diff --quiet -- "${paths[@]}"; then echo "Verified artifacts already committed."; exit 0; fi
-          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
-          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
-          base_sha=$(curl --fail-with-body -sS "${auth[@]}" "${api}/git/ref/heads/${HEAD_BRANCH}" | jq -r '.object.sha')
-          test "${base_sha}" = "${EXPECTED_HEAD}" || { echo "PR branch moved" >&2; exit 1; }
-          base_tree=$(curl --fail-with-body -sS "${auth[@]}" "${api}/git/commits/${base_sha}" | jq -r '.tree.sha')
-          entries='[]'
-          for path in "${paths[@]}"; do
-            blob_sha=$(jq -Rs '{content:.,encoding:"utf-8"}' < "$path" | curl --fail-with-body -sS -X POST "${auth[@]}" "${api}/git/blobs" --data-binary @- | jq -r '.sha')
-            entries=$(jq --arg path "$path" --arg sha "$blob_sha" '. + [{path:$path,mode:"100644",type:"blob",sha:$sha}]' <<< "$entries")
-          done
-          tree_sha=$(jq -n --arg base_tree "$base_tree" --argjson tree "$entries" '{base_tree:$base_tree,tree:$tree}' | curl --fail-with-body -sS -X POST "${auth[@]}" "${api}/git/trees" --data-binary @- | jq -r '.sha')
-          commit_sha=$(jq -n --arg message "Generate verified FamilyPilot runtime artifacts" --arg tree "$tree_sha" --arg parent "$base_sha" '{message:$message,tree:$tree,parents:[$parent]}' | curl --fail-with-body -sS -X POST "${auth[@]}" "${api}/git/commits" --data-binary @- | jq -r '.sha')
-          jq -n --arg sha "$commit_sha" '{sha:$sha,force:false}' | curl --fail-with-body -sS -X PATCH "${auth[@]}" "${api}/git/refs/heads/${HEAD_BRANCH}" --data-binary @-
-          echo "Persisted verified artifacts at ${commit_sha}."
+          node tools/pf08a-a3-01-browser-smoke.mjs
+          node tools/pf08a-priv01-browser-smoke.mjs
+          node tools/pf08a-m3-01-browser-smoke.mjs
+          node tools/pf08a-m2-01-browser-smoke.mjs
+          node tools/pf08a-m4-01-browser-smoke.mjs
+          node tools/pf08a-wf01-browser-smoke.mjs
+          node tools/pf08a-wf02-browser-smoke.mjs
