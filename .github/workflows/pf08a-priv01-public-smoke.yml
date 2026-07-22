@@ -1,0 +1,36 @@
+name: PF-08A PRIV-01 Public Hidden Capital Smoke
+
+on:
+  push:
+    branches:
+      - agent/pf08a-priv01-public-verification
+    paths:
+      - tools/pf08a-priv01-public-browser-smoke.mjs
+      - .github/workflows/pf08a-priv01-public-smoke.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify-public-hidden-capital:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Verify published hidden Capital package in Chrome
+        env:
+          PUBLIC_URL: https://maloma.github.io/sandbox/
+          EXPECTED_MAIN: 3b62f927d7728d5c05bb3dd3e3e649974a9cb441
+        run: node tools/pf08a-priv01-public-browser-smoke.mjs --evidence=docs/execution-batches/PF-08A-PRIV-01-HIDDEN-CAPITAL/Public_Verification.md
+
+      - name: Commit public verification evidence
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/execution-batches/PF-08A-PRIV-01-HIDDEN-CAPITAL/Public_Verification.md
+          git commit -m "Record hidden Capital public verification"
+          git push origin HEAD:${{ github.ref_name }}
