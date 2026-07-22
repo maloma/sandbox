@@ -165,4 +165,25 @@ Append-only rule: preserve all records and append later transitions using monoto
 - **Founder Intervention Required:** No.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 008 — Verified Artifacts Persisted and Final Gate Ready
+
+- **Ordering Marker:** 008
+- **Checkpoint ID:** CP-03
+- **Status:** READY_FOR_FINAL_GATE
+- **Trusted Generation Run:** `29907309831`, conclusion `success`.
+- **Complete Pipeline:** exact checkout, syntax, domain tests, deterministic patch, same-day correction, browser API correction, source/root finalization, static source contract, A3 Chrome, Hidden Capital Chrome, M3 Chrome and atomic persistence all PASS.
+- **Generated Artifact Commit:** `37511d21d560b4d1dc93a4be7a548a40668af196`.
+- **Source/Root Blob:** `2ef81456faf5baaf0e92e4a802652d86ffc0bf3e` for both `src/familypilot.html` and `index.html`.
+- **Corrected Browser Test Blob:** `459e00274163e44898b13fb8e6933ce502b5b1cd`.
+- **Package Marker:** `plan-obligations-foundation-v1` present.
+- **Actual Changed Paths:** exactly 13 expected paths.
+- **Durable Product Result:** accepted navigation unchanged; Plan hub active; Obligations mounted; Debts/Savings honest; schema v3 additive state; linked payment and recalculation verified; scope isolation verified.
+- **Workflow Note:** the bot-generated artifact commit did not automatically rerun PR workflows; this owner evidence commit triggers the required synchronized zero-diff gate.
+- **Verification Result:** READY. Merge remains blocked until this evidence head passes the complete trusted pipeline without generated diff.
+- **Next Authorized Transition:** final exact-head trusted PASS, Ready state and expected-head merge.
+- **Founder Intervention Required:** No.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
