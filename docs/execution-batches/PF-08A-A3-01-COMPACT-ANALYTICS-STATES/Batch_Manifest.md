@@ -1,8 +1,8 @@
 # Batch Manifest — PF-08A-A3-01-COMPACT-ANALYTICS-STATES
 
 **Document Type:** Runtime Execution Batch Manifest  
-**Status:** Ready for Trusted Pull Request Gate  
-**Version:** 1.1  
+**Status:** Ready for Automatic Prototype Merge  
+**Version:** 1.2  
 **Repository:** `maloma/sandbox`  
 **Starting Commit:** `667ee9980a584f55fd5de9191df15230d796a438`  
 **Working Branch:** `agent/pf08a-a3-01-compact-analytics-states`  
@@ -74,23 +74,24 @@ Required result classes:
 
 ### CP-02 — Runtime Implementation and Browser Regression Package
 
-- **Status:** COMPLETED / AWAITING TRUSTED RE-RUN
+- **Status:** COMPLETED
 - **Generated Runtime:**
   - `src/familypilot.html` and `index.html` share blob `32d309bdbca5eecd84f2aaaad1ef2d28837b0a22`;
   - `src/familypilot-analytics-state.js` and `familypilot-analytics-state.js` share blob `9d727a7ae18c8bfdb9a06adcd46b6e54f43c1aea`;
   - package marker `compact-analytics-states-v1` is present;
   - deterministic verification and headless-Chrome scripts are committed.
-- **Trusted Verification Rule:** generated artifacts are not accepted for merge until the default-branch workflow recreates them with zero diff and reruns classifier, syntax and browser checks on the exact PR head.
+- **Result:** PASS under the trusted default-branch workflow.
 
 ### CP-03 — Trusted PR, Merge and Public Verification
 
-- **Status:** READY
+- **Status:** READY_FOR_MERGE
 - trusted workflow installed on `sandbox/main` by PR #19, merge commit `4e0e8cc1cf2451318ccb4e03e3b5b613c40dacd1`;
-- enumerate exactly twelve expected changed paths;
-- obtain trusted exact-head workflow PASS;
-- merge with expected-head protection;
-- verify the public page in Chrome;
-- record rollback and terminal evidence.
+- exact changed paths: twelve, all expected;
+- trusted workflow: `PF-08A A3-01 Trusted PR Gate`, run `29888240647`, conclusion `success`;
+- branch workflow: `PF-08A A3-01 Compact Analytics States`, run `29888240634`, conclusion `success`;
+- exact checked head before this evidence update: `9e22554e36eab23c673fa40c3387a1af60cd363f`;
+- all trusted steps passed: exact checkout, marker, artifact recreation, zero diff, classifier/syntax, headless Chrome;
+- next transition: rerun trusted gate on the new evidence head, merge with expected-head protection, then public Chrome verification.
 
 ## Required Invariants
 
@@ -109,6 +110,19 @@ Required result classes:
 
 A separate follow-on privacy batch must hide Capital values on Main by default and expose them only after the user presses a button labeled `Капитал`. This decision does not alter A3 Analytics calculations and must not be mixed into PR #18.
 
+## Verification Summary
+
+- expected paths only — PASS;
+- root/source HTML equality — PASS;
+- root/source Analytics module equality — PASS;
+- generated artifact reproducibility — PASS;
+- deterministic classifier scenarios — PASS;
+- JavaScript syntax and source contract — PASS;
+- headless Chrome empty/period/one-sided/filter/missing-category/scope scenarios — PASS;
+- wallet-scope isolation — PASS;
+- period preservation — PASS;
+- rollback retained — PASS.
+
 ## Recovery
 
 One bounded implementation or verification correction is allowed. Reject automatic merge on any value/source mismatch, wallet-scope leak, period mutation, missing-category value loss, unexpected path, workflow failure or public verification failure.
@@ -126,6 +140,12 @@ Revert the eventual implementation merge or restore sandbox main `667ee9980a584f
 - `PUBLIC_VERIFICATION_FAILED`.
 
 ## Changelog
+
+### Version 1.2 — 2026-07-22
+
+- recorded trusted exact-head and branch-workflow PASS;
+- advanced CP-03 to READY_FOR_MERGE;
+- retained final evidence-head rerun and public verification as mandatory.
 
 ### Version 1.1 — 2026-07-22
 
