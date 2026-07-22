@@ -1,4 +1,4 @@
-import handoffToInessa from "./01-handoff-to-inessa.mjs";
+import orderHandoff from "./01-order-handoff.mjs";
 import orderRegistration from "./02-order-registration.mjs";
 import pricingAccounting from "./03-pricing-accounting.mjs";
 import attorneyDispatch from "./04-attorney-dispatch.mjs";
@@ -10,7 +10,7 @@ import postalDelivery from "./09-postal-delivery.mjs";
 import statusControl from "./10-status-control.mjs";
 import exceptions from "./11-exceptions.mjs";
 
-export const QUESTIONNAIRE_VERSION = "1.0";
+export const QUESTIONNAIRE_VERSION = "1.1-anonymized";
 
 export const QUESTION_PRIORITIES = Object.freeze({
   REQUIRED: "Обязательно",
@@ -19,7 +19,7 @@ export const QUESTION_PRIORITIES = Object.freeze({
 });
 
 export const QUESTIONS = Object.freeze([
-  ...handoffToInessa,
+  ...orderHandoff,
   ...orderRegistration,
   ...pricingAccounting,
   ...attorneyDispatch,
