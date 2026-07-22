@@ -94,4 +94,26 @@ Append-only rule: preserve all existing records and append later transitions usi
 - **Next Authorized Transition:** CP-03 PR creation and verification.
 - **Record Integrity State:** VALID.
 
+---
+
+## Record 005 — CP-03 Pull Request Gate Passed
+
+- **Ordering Marker:** 005
+- **Checkpoint ID:** CP-03
+- **Status:** READY_FOR_MERGE
+- **Objective:** Prove the exact pull-request state is eligible for automatic development-prototype merge.
+- **Pull Request:** `#14` — `Consolidate FamilyPilot into one canonical runtime source`.
+- **Base Commit:** `32ddc846cdea4cafe8126e5a7fda9e320fe2c78a`.
+- **Verified Head Before This Record:** `9ed654bcad1b8e420f220eef42a7133e8e386a49`.
+- **Actual Changed Paths:** exactly the six expected paths from Record 004.
+- **Mergeability:** PASS.
+- **Workflow:** `PF-08A IF-01 Canonical Runtime Source`, run `29882198354`, conclusion `success`.
+- **Runtime Artifact Evidence:** `index.html` and `src/familypilot.html` share blob SHA `90931925157a592d22a1d040efe97c13d0870e16`.
+- **Verification Result:** PASS. No unexpected path, product-semantic change, dependency, permission, migration or cost change is present.
+- **Rollback Method:** Revert the eventual merge commit or restore main commit `32ddc846cdea4cafe8126e5a7fda9e320fe2c78a`.
+- **Remaining Work:** obtain workflow PASS on the new ledger head, mark PR Ready, merge with exact-head protection, verify public root marker and close the batch.
+- **Exact Stop Point:** Commit this record; re-read PR head and workflow state.
+- **Next Authorized Transition:** Automatic merge after the new exact head passes the PR workflow.
+- **Record Integrity State:** VALID.
+
 # END OF CURRENT LEDGER PREFIX
