@@ -15,10 +15,15 @@
   `;
   document.head.appendChild(style);
 
+  const entryMarkup=`<div class="wallet-manager-summary"><div><h2>Кошельки</h2><small id="walletManagementSummary">Управление общими и личными кошельками</small></div><button id="walletManagementOpen" class="btn secondary" type="button">Управление</button></div><div class="wallet-manager-note" style="margin-top:12px">Личный кошелёк приватен и не входит в семейный капитал, пока владелец явно не включит его.</div>`;
   function memberLabel(id){return MEMBERS.find(member=>member.id===id)?.name||id||'—'}
+  function renderWalletManagementEntry(){
+    const host=$('walletContracts');if(!host)return;
+    if(!$('walletManagementOpen'))host.innerHTML=entryMarkup;
+    const button=$('walletManagementOpen');if(button)button.onclick=()=>{showScreen('walletManagement');renderAll()};
+  }
   function installWalletManagementDom(){
-    const host=$('walletContracts');
-    if(host)host.innerHTML=`<div class="wallet-manager-summary"><div><h2>Кошельки</h2><small id="walletManagementSummary">Управление общими и личными кошельками</small></div><button id="walletManagementOpen" class="btn secondary" type="button">Управление</button></div><div class="wallet-manager-note" style="margin-top:12px">Личный кошелёк приватен и не входит в семейный капитал, пока владелец явно не включит его.</div>`;
+    renderWalletManagementEntry();
     if(!$('walletManagementScreen')){const screen=document.createElement('section');screen.id='walletManagementScreen';screen.className='screen';screen.innerHTML=`<div class="page-title"><button class="back" type="button" data-wallet-management-back="more">‹</button><div class="page-title-copy"><h1>Кошельки</h1><small id="walletManagementScopeLabel" class="scope-context">Доступные текущему участнику</small></div></div><section class="card section"><div class="wallet-manager-summary"><div><h2>Управление кошельками</h2><small>Базовая валюта семьи · без переводов и прав доступа</small></div><button id="walletManagementAdd" class="btn primary" type="button">Добавить</button></div><div class="wallet-manager-note" style="margin-top:12px">Новый кошелёк начинается с нуля. Создание и редактирование не создают Приход, Расход или перевод.</div></section><div id="walletManagementList" class="wallet-manager-list"></div>`;$('moreScreen').parentNode.insertBefore(screen,$('moreScreen'))}
     if(!$('walletManagementModal')){const modal=document.createElement('div');modal.id='walletManagementModal';modal.className='modal';modal.innerHTML=`<div class="sheet"><div class="sheet-head"><h2 id="walletManagementTitle">Новый кошелёк</h2><button class="close" type="button" data-wallet-management-close="walletManagementModal">Закрыть</button></div><input id="walletManagementId" type="hidden"><div id="walletManagementTypeField" class="field"><label>Тип кошелька</label><div class="wallet-class-options"><label class="wallet-class-option"><input type="radio" name="walletManagementType" value="household_shared" checked><span><strong>Общий семейный</strong><small>Доступен текущим участникам семьи и входит в семейный капитал.</small></span></label><label class="wallet-class-option"><input type="radio" name="walletManagementType" value="personal"><span><strong>Личный</strong><small>Принадлежит текущему участнику, приватен и исключён из семейного капитала.</small></span></label></div></div><div id="walletManagementClassReadonly" class="field" hidden><label>Тип кошелька</label><div id="walletManagementClassValue" class="wallet-readonly"></div></div><div class="field"><label for="walletManagementName">Название</label><input id="walletManagementName" maxlength="60" placeholder="Например, Повседневные расходы"></div><div class="field"><label>Валюта</label><div id="walletManagementCurrency" class="wallet-readonly">EUR · базовая валюта семьи</div></div><label id="walletManagementInclusionRow" class="wallet-toggle" hidden><input id="walletManagementIncluded" type="checkbox"><span><strong>Включать в семейный капитал</strong><small>Меняется только расчёт общего капитала. Доступ к личному кошельку не предоставляется.</small></span></label><div class="wallet-manager-note" style="margin-top:13px">Тип, владелец, валюта и начальный баланс не меняются в этом пакете.</div><div id="walletManagementError" class="error"></div><div class="sheet-actions"><button class="btn secondary" type="button" data-wallet-management-close="walletManagementModal">Отмена</button><button id="walletManagementSave" class="btn primary" type="button">Сохранить</button></div></div>`;document.body.appendChild(modal)}
   }
@@ -26,6 +31,7 @@
   function accessible(){return walletManagementApi.accessibleWallets(state,state.currentMemberId)}
   function walletCard(wallet){const d=walletManagementApi.descriptor(wallet,MEMBERS),canEdit=walletManagementApi.canEdit(wallet,state.currentMemberId);return `<article class="wallet-manager-card" data-wallet-management-wallet="${esc(wallet.id)}"><div class="wallet-manager-head"><div><strong>${esc(wallet.name)}</strong><small>${esc(d.classLabel)}${wallet.ownerMemberId?` · владелец ${esc(memberLabel(wallet.ownerMemberId))}`:''} · ${esc(wallet.nativeCurrency)}</small></div><div class="wallet-manager-badges"><span class="wallet-badge">${wallet.type==='personal'?'Личный':'Семейный'}</span><span class="wallet-badge${wallet.includedInHouseholdCapital?' included':''}">${wallet.includedInHouseholdCapital?'В семейном капитале':'Вне семейного капитала'}</span></div></div><div class="wallet-manager-badges"><span class="wallet-badge">Доступ: ${wallet.type==='personal'&&wallet.allowedMemberIds.length===1?'только владелец':wallet.allowedMemberIds.map(memberLabel).join(', ')}</span><span class="wallet-badge">Старт: ${money(wallet.openingBalance||0,wallet.nativeCurrency)}</span></div><div class="wallet-manager-actions">${canEdit?`<button class="btn secondary" type="button" data-wallet-management-edit="${esc(wallet.id)}">Изменить</button>`:'<span class="wallet-badge">Системный кошелёк</span>'}</div></article>`}
   function renderWalletManagement(){
+    renderWalletManagementEntry();
     if(!$('walletManagementList'))return;
     const items=accessible();
     $('walletManagementScopeLabel').textContent=`${memberLabel(state.currentMemberId)} · доступно ${items.length}`;
@@ -63,7 +69,6 @@
   renderAll=function(){walletManagementApi.normalizeState(state,MEMBERS,now());ensureAccessibleActiveWallet();const result=baseRenderAll();refreshWalletSelector();renderWalletManagement();return result};
 
   installWalletManagementDom();
-  $('walletManagementOpen').onclick=()=>{showScreen('walletManagement');renderAll()};
   $('walletManagementAdd').onclick=()=>openWalletEditor();
   $('walletManagementSave').onclick=saveWalletEditor;
 
