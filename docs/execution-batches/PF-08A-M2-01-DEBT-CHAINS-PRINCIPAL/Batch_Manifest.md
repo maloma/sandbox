@@ -1,12 +1,16 @@
 # Batch Manifest — PF-08A-M2-01-DEBT-CHAINS-PRINCIPAL
 
 **Document Type:** Runtime Execution Batch Manifest  
-**Status:** Trusted PASS / Final Zero-Diff Gate Pending  
-**Version:** 1.1  
+**Status:** Public PASS / Closure Merge Pending  
+**Version:** 1.2  
 **Repository:** `maloma/sandbox`  
 **Starting Commit:** `6cf4b74c9cc648d9f7e17815b918a809f309e48e`  
-**Working Branch:** `agent/pf08a-m2-01-debt-chains-principal`  
-**Pull Request:** `#40`  
+**Implementation Branch:** `agent/pf08a-m2-01-debt-chains-principal`  
+**Implementation Pull Request:** `#40`  
+**Implementation Head:** `c1faf7074a2e5a49370e26c6ff325f304fada18b`  
+**Implementation Merge:** `9fecb7bad53e2de5481fbac745689afa9db8537a`  
+**Public Closure Branch:** `agent/pf08a-m2-01-public-verification`  
+**Public Closure Pull Request:** `#41`  
 **Authority:** `maloma/FamilyPilot@7eaaa3323d42328f512382e4a7d98990740077f6`, documents 31 Debt, 34, 60, 65 and 67  
 **Created:** 2026-07-22
 
@@ -14,26 +18,26 @@
 
 Integrate the accepted M2 debt model into Plan, wallet capital, Operations and Home without classifying debt principal as ordinary Income or Expense.
 
-## Included Scope
+## Completed Scope
 
-- activate Plan → Debts;
-- counterparties and reusable identities;
-- active and immutable closed chains;
-- historical opening liabilities/receivables;
-- four source actions: borrow, repay, lend, receive;
+- activated Plan → Debts;
+- implemented counterparties and reusable identities;
+- implemented active and immutable closed chains;
+- implemented historical opening liabilities/receivables;
+- implemented borrow, repay, lend and receive source actions;
 - linked `debt_inflow` and `debt_outflow` principal movements;
-- one net position and chronological mutual offset;
-- automatic reciprocal debt from repayment excess without a dialog;
-- source editing with stable movement id and deterministic recalculation;
-- zero-balance keep-open or close decision;
+- implemented one net position and chronological mutual offset;
+- implemented automatic reciprocal debt from repayment excess without a dialog;
+- implemented source editing with stable movement id and deterministic recalculation;
+- implemented zero-balance keep-open or close decision;
 - later activity creates a new chain after closure;
-- personal/household scope isolation;
-- real Home receivable/liability totals;
-- neutral principal rows in Operations;
-- debt principal included in Capital but excluded from ordinary Income/Expense Analytics;
-- deterministic, Chrome and public verification.
+- preserved personal/household scope isolation;
+- replaced fabricated Home values with source-derived receivable/liability totals;
+- presented principal movements neutrally in Operations;
+- included debt principal in Capital while excluding it from ordinary Income/Expense Analytics;
+- completed deterministic, Chrome and public verification.
 
-## Excluded Scope
+## Excluded Scope Preserved
 
 - interest, gifts or commissions inside debt entry;
 - four-option overpayment dialog;
@@ -48,63 +52,51 @@ Integrate the accepted M2 debt model into Plan, wallet capital, Operations and H
 
 ## Verification Strategy
 
-Existing FamilyPilot workflow files are extended; no new workflow family is introduced.
+Existing FamilyPilot workflow files were extended; no new workflow family was introduced.
 
-Required suites:
+Completed suites:
 
-- M2 domain tests;
-- M2 static integration contract;
-- M2 Chrome user journey;
-- existing M3 domain/static/Chrome;
-- A3 Analytics Chrome;
-- Hidden Capital Chrome;
-- source/root equality;
-- public downloaded-package verification;
-- rollback evidence.
+- M2 domain tests — PASS;
+- M2 static integration contract — PASS;
+- M2 Chrome user journey — PASS;
+- M3 domain/static/Chrome — PASS;
+- A3 Analytics Chrome — PASS;
+- Hidden Capital Chrome — PASS;
+- source/root and source/generated module equality — PASS;
+- public downloaded-package verification — PASS;
+- rollback evidence — AVAILABLE.
 
 ## Checkpoints
 
 ### CP-01 — Exact Runtime Inspection
 
 - **Status:** COMPLETED
-- Plan Debts entry disabled;
-- Home debt totals fabricated;
-- Capital excluded principal movements;
-- Operations lacked neutral debt-principal presentation;
-- Analytics required explicit principal exclusion;
-- app state/UI remained inside a closed IIFE.
+- identified disabled Debts route, fabricated Home values and missing principal-flow integration.
 
 ### CP-02 — Domain, Scope and UI Integration
 
 - **Status:** COMPLETED
-- schema-v5 debt domain added;
-- scope Capital extended with principal inflow/outflow;
-- debt UI constructed and attached through deterministic finalization;
-- stable source-derived Home debt mount replaces fabricated values;
-- domain/static/browser tests added;
-- existing workflow family extended.
+- schema-v5 debt domain, scope integration, UI, source-derived Home mount and verification package completed.
 
-### CP-03 — Exact PR Gate
+### CP-03 — Exact PR Gate and Merge
 
-- **Status:** TRUSTED_PASS / GENERATED_HEAD_COMMITTED / FINAL_ZERO_DIFF_PENDING
-- Draft PR `#40` opened from the exact batch branch;
-- authoritative trusted run `29923429307`, job `88934388190`: PASS;
-- M2 domain/static/Chrome: PASS;
-- M3 domain/static/Chrome: PASS;
-- A3 Analytics Chrome: PASS;
-- Hidden Capital Chrome: PASS;
-- verified generated runtime atomically committed at `4ebe5b6f6f675beeb8cebf91e4116561753abdd1`;
-- owner checkpoint commit is required only to trigger the final zero-diff suites after bot-generated head protection.
+- **Status:** COMPLETED
+- Draft PR `#40` verified on exact owner heads;
+- final authoritative implementation head `c1faf7074a2e5a49370e26c6ff325f304fada18b` passed all six suites;
+- exact-head protected merge completed at `9fecb7bad53e2de5481fbac745689afa9db8537a`.
 
 ### CP-04 — Publication and Closure
 
-- **Status:** PLANNED
-- merge PR `#40` only after final exact-head zero-diff PASS;
-- verify published HTML and runtime modules;
-- run M2 Chrome against the downloaded public package;
-- save hashes and terminal evidence;
-- synchronize FamilyPilot;
-- activate M4 only after PASS.
+- **Status:** PUBLIC_PASS / CLOSURE_MERGE_PENDING
+- public URL: `https://maloma.github.io/sandbox/`;
+- expected published main: `9fecb7bad53e2de5481fbac745689afa9db8537a`;
+- trusted public run `29925298021`, job `88940775132`: PASS;
+- HTML, Scope, Analytics, Obligations domain/UI and Debts domain/UI: HTTP 200;
+- publication attempts: 1;
+- downloaded-package M2 Chrome marker: `PF08A_M2_01_BROWSER_PASS`;
+- runtime exceptions: NONE;
+- evidence: `docs/execution-batches/PF-08A-M2-01-DEBT-CHAINS-PRINCIPAL/Public_Verification.md`;
+- closure PR `#41` remains to receive a terminal rerun and merge.
 
 ## Bounded Recovery Record
 
@@ -113,27 +105,43 @@ Recovered without changing accepted M2 semantics:
 - made Home debt elements stable generated mount points and removed fabricated `180 € / 420 €` values;
 - aligned static verification with dynamic UI mounting;
 - removed self-referential forbidden-control assertions;
-- reconciled the existing M3 regression with the newly active Debts route while leaving Savings disabled;
+- reconciled the existing M3 regression with active Debts while leaving Savings disabled;
+- synchronized canonical/generated Scope bytes;
+- made the legacy A3 finalizer byte-idempotent;
+- applied the same M3 navigation reconciliation in trusted and module-regression jobs;
 - preserved all prior M3, A3 and Hidden Capital checks.
+
+## Public Evidence SHA-256
+
+- HTML: `0bdb9e27a6db76a43bf50bd4bd3b5016be7ad67b6949e0c1ff913d17e944cddd`;
+- Scope: `519b507fc7bc15266013c5218b0ed50222ab47706706bac2d87fd3d32da44c82`;
+- Analytics: `9f934f1ecd3c87e747cd9f99a2cb9b83abc07040eacc67ddaf1808fe3ab77c9f`;
+- Obligations: `539f0d44868478a51b07da63f58dc3ab28ae46ac96d2e203fbe6f94381b0f61b`;
+- Obligations UI: `00f3660eb7d5458c5a12ab051d59704f725e1dcb3d2a090543189e71cf5ea86f`;
+- Debts: `ae4831457d791ad49f3f7fd78cab2baad93db7469d1ebbc19edf9d8dea7c7c77`;
+- Debts UI: `74e8595ade32023b08a048c6a5b9917ae4be9b8c964f7069b9fb79b9a049a520`.
 
 ## Rollback
 
-Revert the eventual M2 implementation merge. Pre-batch accepted runtime remains `maloma/sandbox@6cf4b74c9cc648d9f7e17815b918a809f309e48e`.
+Revert implementation merge `9fecb7bad53e2de5481fbac745689afa9db8537a`. Pre-batch accepted runtime remains `maloma/sandbox@6cf4b74c9cc648d9f7e17815b918a809f309e48e`.
 
-## Terminal Conditions
+## Terminal State After Closure Merge
 
-- `BATCH_COMPLETED`;
-- `CHECKPOINT_FAILED_AFTER_BOUNDED_RECOVERY`;
-- `REPOSITORY_STATE_CONFLICT`;
-- `PUBLIC_VERIFICATION_FAILED`.
+```text
+BATCH_COMPLETED_M2_PUBLIC_PASS
+```
 
 ## Changelog
 
+### Version 1.2 — 2026-07-22
+
+- recorded final implementation head and merge;
+- recorded downloaded-package public PASS and hashes;
+- advanced CP-04 to closure merge.
+
 ### Version 1.1 — 2026-07-22
 
-- recorded exact trusted PASS;
-- recorded generated runtime head;
-- advanced CP-03 to final owner-triggered zero-diff gate.
+- recorded exact trusted PASS and generated runtime head.
 
 ### Version 1.0 — 2026-07-22
 
