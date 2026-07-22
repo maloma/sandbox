@@ -116,7 +116,7 @@ const harness=`<!doctype html>
     // Existing foundations remain operational.
     assert(doc.querySelector('meta[content="compact-analytics-states-v1"]'),'A3 Analytics marker missing');
     assert(doc.querySelector('meta[content="hidden-capital-disclosure-v1"]'),'Hidden Capital marker missing');
-    api.openPlan();
+    api.obligations.openPlan();
     assert(doc.getElementById('plansScreen').classList.contains('active'),'Plan root cannot reopen');
 
     const output={
