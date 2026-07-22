@@ -67,3 +67,22 @@ Append-only rule: preserve every record and append later transitions with monoto
 - **Protected Boundary Crossed:** No.
 - **Next:** one correction commit, one Draft PR and exact-head trusted verification.
 - **Record Integrity:** VALID.
+
+---
+
+## Record 005 — Soft-Mode Usage Review and Runtime Bridge Correction Prepared
+
+- **Ordering Marker:** 005
+- **Checkpoint:** CP-03
+- **Status:** PREPARED
+- **GitHub Resource Mode:** Soft Development Mode with temporary containment review after the same readiness failure repeated three times.
+- **Observed Failure:** `window.__FP_TEST__.transfers` never became ready while all syntax, domain, deterministic-runtime, integration and prior browser regressions passed.
+- **Root Cause:** `familypilot-wallet-transfers-ui.js` executed as an external script but referenced `state`, `MEMBERS`, `$`, `renderAll` and other bindings private to the main application IIFE.
+- **Correction:** generate one bounded `window.__FP_RUNTIME__` extension bridge inside the canonical IIFE and require WF-02 UI to integrate only through explicit getter/setter hooks.
+- **Runtime Semantics:** TransferEvent, linked movements, projection, Capital, privacy and correction contracts unchanged.
+- **Generated Runtime:** `src/familypilot.html` and `index.html` will be produced byte-identically by the existing generated-runtime workflow only after complete verification.
+- **Workflow Fan-Out:** existing FamilyPilot push generator plus trusted PR gate; no new workflow family, matrix or artifact.
+- **Artifacts:** NONE.
+- **Cost/Storage Impact:** bounded CI minutes only; storage impact NONE.
+- **Next:** publish one authored correction commit, allow deterministic generated-runtime commit, then evaluate exact-head gates.
+- **Record Integrity:** VALID.
