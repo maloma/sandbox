@@ -93,12 +93,24 @@ jobs:
           cat /tmp/pf08a-m3-03-browser.log
           if [ "$status" -ne 0 ]; then
             {
-              echo '### M3-03 browser failure'
+              echo '### M3-03 browser failure and click-handler context'
               echo
-              echo 'Exact output from the bounded payment-attention browser smoke:'
+              echo 'Exact browser output:'
               echo
               echo '```text'
-              tail -n 120 /tmp/pf08a-m3-03-browser.log
+              tail -n 80 /tmp/pf08a-m3-03-browser.log
+              echo '```'
+              echo
+              echo 'Relevant UI lines:'
+              echo
+              echo '```text'
+              grep -nE 'attention|obligation|showScreen|data-' familypilot-payment-attention-ui.js | tail -n 120
+              echo '```'
+              echo
+              echo 'Relevant smoke-test lines:'
+              echo
+              echo '```text'
+              nl -ba tools/pf08a-m3-03-browser-smoke.mjs | sed -n '45,80p'
               echo '```'
             } > /tmp/pf08a-m3-03-comment.md
             gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/pf08a-m3-03-comment.md
