@@ -1,0 +1,41 @@
+name: PF-08A M3-08 Trusted Public Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - tools/pf08a-m3-08-public-browser-smoke.mjs
+      - .github/workflows/pf08a-m3-08-trusted-public-gate.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify-public-package:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+
+      - name: Verify exact checked-out head
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Verify published M3-08 rule-history package
+        env:
+          PUBLIC_URL: https://maloma.github.io/sandbox/
+          EXPECTED_MAIN_M308: 67026c362456c8e126b8c9a80e47238d2738061e
+        run: node tools/pf08a-m3-08-public-browser-smoke.mjs
