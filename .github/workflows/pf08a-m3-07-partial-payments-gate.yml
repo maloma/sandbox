@@ -57,5 +57,8 @@ jobs:
           grep -qF "obligation-row--partial" familypilot-partial-payments-render-sync.js
           grep -qF "window.__FP_TEST__.renderAll=()=>runtime.renderAll()" familypilot-partial-payments-render-sync.js
 
+      - name: Browser regression — original obligations foundation
+        run: node tools/pf08a-m3-01-browser-smoke.mjs
+
       - name: Browser regression — partial and cumulative payments
         run: node tools/pf08a-m3-07-partial-payments-browser-smoke.mjs
