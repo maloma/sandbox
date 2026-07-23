@@ -1,0 +1,50 @@
+name: PF-08A M3-04 Obligation State Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - familypilot-scope.js
+      - familypilot-obligation-state-ui.js
+      - tools/pf08a-m3-04-browser-smoke.mjs
+      - .github/workflows/pf08a-m3-04-obligation-state-gate.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify-exact-head:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          show-progress: false
+
+      - name: Verify exact checked-out head
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Check syntax
+        run: |
+          node --check familypilot-scope.js
+          node --check familypilot-obligation-state-ui.js
+          node --check tools/pf08a-m3-04-browser-smoke.mjs
+
+      - name: Verify package contract
+        run: |
+          grep -F "familypilot-obligation-state-ui.js" familypilot-scope.js
+          grep -F "data-state-payment-toggle" familypilot-obligation-state-ui.js
+          grep -F "Скрытые платежи" familypilot-obligation-state-ui.js
+          grep -F 'data-payment-context-action="hide"' familypilot-obligation-state-ui.js
+          ! grep -F "Notification.requestPermission" familypilot-obligation-state-ui.js
+          ! grep -F "new Notification" familypilot-obligation-state-ui.js
+
+      - name: Browser regression — obligation states
+        run: node tools/pf08a-m3-04-browser-smoke.mjs
