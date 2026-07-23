@@ -125,7 +125,10 @@
             loadScript('familypilot-mobile-payment-tap.js',()=>loadScript('familypilot-operation-mobile-ui.js',()=>loadScript('familypilot-operation-date-picker.js',()=>{
               root.__FP_M3_06_READY__=true;
               root.__FP_M3_07_READY__=true;
-              loadScript('familypilot-rule-history.js',()=>{root.__FP_M3_08_READY__=true});
+              loadScript('familypilot-rule-history.js',()=>{
+                root.__FP_M3_08_READY__=true;
+                loadScript('familypilot-planned-income.js',()=>loadScript('familypilot-planned-income-ui.js',()=>{root.__FP_M4_01_READY__=true}));
+              });
             })));
           });
         })));
