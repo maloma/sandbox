@@ -14,15 +14,7 @@ if(scope!==sourceScope)fail('Source and root scope modules differ');
 if(!source.includes('window.__FP_RUNTIME__'))fail('Existing bounded runtime bridge missing');
 for(const needle of ['familypilot-payment-attention.js','familypilot-payment-attention-ui.js','__FP_M3_03_READY__'])if(!scope.includes(needle))fail(`M3-03 bootstrap missing: ${needle}`);
 for(const needle of ['DEFAULT_LEAD_DAYS=3','paymentReminderLeadDaysByRuleId','groupedAttention','overdue','today','upcoming','m3-03-payment-attention-demo-v1','paymentAttentionDemo','data-payment-demo-load','data-payment-demo-remove'])if(!domain.includes(needle))fail(`M3-03 domain/demo contract missing: ${needle}`);
-for(const needle of [
-  'planned-payment-attention-v3','repairMonth','plan-attention-badge','obligation-pay-check','data-ux-payment-toggle',
-  'PRESS_MS=550','paymentContextModal','data-payment-context-action="paid"','data-payment-context-action="unpaid"','data-payment-context-action="skipped"',
-  'paymentReconcileModal','matchingExpenses','linkExistingExpense','unpayOccurrence','obligationLinkMode','obligation_payment_unchecked',
-  'Обязательство · срок','actions.wf02-actions .action.transfer{order:2}','Активные правила','Отключённые','data-ux-rule-toggle',
-  'Выполнение правила','Дата начала','Последний выполненный','Пропущено до последней оплаты','#obligationArchiveBtn{display:none!important}',
-  'Системные уведомления и их общий выключатель появятся вместе с отдельным push-модулем','window.__FP_TEST__.obligationUx',
-  "node.querySelector('strong')?.textContent.trim()"
-])if(!ui.includes(needle))fail(`M3-03 interaction UX contract missing: ${needle}`);
+for(const needle of ['planned-payment-attention-v3','repairMonth','plan-attention-badge','obligation-pay-check','data-ux-payment-toggle','PRESS_MS=550','paymentContextModal','data-payment-context-action="paid"','data-payment-context-action="unpaid"','data-payment-context-action="skipped"','paymentReconcileModal','matchingExpenses','linkExistingExpense','unpayOccurrence','obligationLinkMode','obligation_payment_unchecked','Обязательство · срок','actions.wf02-actions .action.transfer{order:2}','Активные правила','Отключённые','data-ux-rule-toggle','Выполнение правила','Дата начала','Последний выполненный','Пропущено до последней оплаты','#obligationArchiveBtn{display:none!important}','Системные уведомления и их общий выключатель появятся вместе с отдельным push-модулем','window.__FP_TEST__.obligationUx',"node.querySelector('strong')?.textContent.trim()"])if(!ui.includes(needle))fail(`M3-03 interaction UX contract missing: ${needle}`);
 if(!oldSmoke.includes('Right-side quick payment toggle creates one linked Expense.')||!oldSmoke.includes('data-ux-payment-toggle'))fail('M3-02 browser smoke does not exercise accepted right-side payment toggle');
 if(oldSmoke.includes('data-m302-quick-pay'))fail('Removed legacy quick-pay selector remains in M3-02 browser smoke');
 for(const forbidden of ['Notification.requestPermission','new Notification','PushManager','serviceWorker.register','mailto:','sms:'])if(domain.includes(forbidden)||ui.includes(forbidden))fail(`External notification scope leaked: ${forbidden}`);
