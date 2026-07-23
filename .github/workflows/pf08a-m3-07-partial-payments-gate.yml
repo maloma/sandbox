@@ -1,0 +1,68 @@
+name: PF-08A M3-07 Partial Payments Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - familypilot-scope.js
+      - src/familypilot-scope.js
+      - familypilot-partial-payments.js
+      - familypilot-partial-payment-settlement.js
+      - familypilot-partial-payments-render-sync.js
+      - tools/pf08a-m3-07-partial-payments-browser-smoke.mjs
+      - .github/workflows/pf08a-m3-07-partial-payments-gate.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify-exact-head:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+
+      - name: Verify exact checked-out head
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Check syntax and mirrors
+        run: |
+          node --check familypilot-scope.js
+          node --check familypilot-partial-payments.js
+          node --check familypilot-partial-payment-settlement.js
+          node --check familypilot-partial-payments-render-sync.js
+          node --check tools/pf08a-m3-07-partial-payments-browser-smoke.mjs
+          cmp familypilot-scope.js src/familypilot-scope.js
+
+      - name: Verify package contract
+        run: |
+          grep -qF "familypilot-partial-payments.js" familypilot-scope.js
+          grep -qF "familypilot-partial-payment-settlement.js" familypilot-scope.js
+          grep -qF "familypilot-partial-payments-render-sync.js" familypilot-scope.js
+          grep -qF "Частичная оплата" familypilot-partial-payments.js
+          grep -qF "obligationAllocationOccurrenceId" familypilot-partial-payments.js
+          grep -qF "Плановый расход" familypilot-partial-payments.js
+          grep -qF "Снять отметку и удалить связанные операции" familypilot-partial-payments.js
+          grep -qF "explicitFullSettlement" familypilot-partial-payment-settlement.js
+          grep -qF "obligation-row--partial" familypilot-partial-payments-render-sync.js
+          grep -qF "window.__FP_TEST__.renderAll=()=>runtime.renderAll()" familypilot-partial-payments-render-sync.js
+
+      - name: Browser regression — original obligations foundation
+        run: node tools/pf08a-m3-01-browser-smoke.mjs
+
+      - name: Browser regression — partial and cumulative payments
+        run: node tools/pf08a-m3-07-partial-payments-browser-smoke.mjs

@@ -118,10 +118,13 @@
       root.__FP_M3_03_READY__=true;
       loadScript('familypilot-obligation-state-ui.js',()=>{
         root.__FP_M3_04_READY__=true;
-        loadScript('familypilot-payment-link-lifecycle.js',()=>{
-          root.__FP_M3_05_READY__=true;
-          loadScript('familypilot-mobile-payment-tap.js',()=>loadScript('familypilot-operation-mobile-ui.js',()=>loadScript('familypilot-operation-date-picker.js',()=>{root.__FP_M3_06_READY__=true})));
-        });
+        loadScript('familypilot-partial-payments.js',()=>loadScript('familypilot-partial-payment-settlement.js',()=>loadScript('familypilot-partial-payments-render-sync.js',()=>{
+          root.__FP_M3_07_MODEL_READY__=true;
+          loadScript('familypilot-payment-link-lifecycle.js',()=>{
+            root.__FP_M3_05_READY__=true;
+            loadScript('familypilot-mobile-payment-tap.js',()=>loadScript('familypilot-operation-mobile-ui.js',()=>loadScript('familypilot-operation-date-picker.js',()=>{root.__FP_M3_06_READY__=true;root.__FP_M3_07_READY__=true})));
+          });
+        })));
       });
     }));
   }
