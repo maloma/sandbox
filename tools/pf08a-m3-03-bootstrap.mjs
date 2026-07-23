@@ -1,3 +1,4 @@
+// Named browser diagnostics are active in the trusted same-repository delivery helper.
 // Trusted same-repository delivery helper materializes the already uploaded bounded package.
 // Contents API delivery boundary: this commit creates the ordinary PR synchronization event required by GitHub Actions.
 import { mkdirSync, writeFileSync, unlinkSync, existsSync, readFileSync, readdirSync, rmdirSync } from 'node:fs';
