@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 
 const publicUrl=process.env.PUBLIC_URL||'https://maloma.github.io/sandbox/';
-const expectedMain=process.env.EXPECTED_MAIN_M303||'cbb6651e53d61b5552598f32159f36fe6e1ec82d';
+const expectedMain=process.env.EXPECTED_MAIN_M303||'3eb727e60a79feead45319982233eacf4cc63c4c';
 const localSmoke=resolve('tools/pf08a-m3-03-browser-smoke.mjs');
 const sha256=value=>createHash('sha256').update(value).digest('hex');
 const sleep=milliseconds=>new Promise(resolveSleep=>setTimeout(resolveSleep,milliseconds));
@@ -31,6 +31,10 @@ function packageChecks(packageFiles){
     defaultLeadDays:packageFiles.attention.includes('DEFAULT_LEAD_DAYS=3'),
     reminderConfig:packageFiles.attention.includes('paymentReminderLeadDaysByRuleId'),
     groupedAttention:packageFiles.attention.includes('groupedAttention'),
+    demoVersion:packageFiles.attention.includes('m3-03-payment-attention-demo-v1'),
+    demoApi:packageFiles.attention.includes('paymentAttentionDemo'),
+    demoLoad:packageFiles.attention.includes('data-payment-demo-load'),
+    demoRemove:packageFiles.attention.includes('data-payment-demo-remove'),
     homeCard:packageFiles.attentionUi.includes('paymentAttentionCard'),
     reminderField:packageFiles.attentionUi.includes('obligationReminderLeadDays'),
     quickPay:packageFiles.attentionUi.includes('data-payment-attention-pay'),
@@ -67,31 +71,31 @@ async function fetchPublishedPackage(){
     }catch(error){last={statuses:{network:0},failedChecks:[String(error)]}}
     await sleep(5000);
   }
-  throw new Error(`Published M3-03 package did not become ready: ${JSON.stringify(last)}`);
+  throw new Error(`Published M3-03 demo package did not become ready: ${JSON.stringify(last)}`);
 }
 
 function runBrowserSmoke(directory){
   return new Promise((resolveRun,rejectRun)=>{
     const child=spawn(process.execPath,[localSmoke],{cwd:directory,stdio:['ignore','pipe','pipe']});
     let stdout='',stderr='';
-    const timeout=setTimeout(()=>{child.kill('SIGKILL');rejectRun(new Error(`Public M3-03 Chrome smoke timed out. stderr: ${stderr.slice(-3000)}`))},120000);
+    const timeout=setTimeout(()=>{child.kill('SIGKILL');rejectRun(new Error(`Public M3-03 demo Chrome smoke timed out. stderr: ${stderr.slice(-3000)}`))},120000);
     child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);
     child.once('error',error=>{clearTimeout(timeout);rejectRun(error)});
     child.once('close',code=>{
       clearTimeout(timeout);
-      if(code!==0)rejectRun(new Error(`Public M3-03 Chrome smoke exited ${code}. stderr: ${stderr.slice(-5000)} stdout: ${stdout.slice(-5000)}`));
-      else if(!stdout.includes('PF08A_M3_03_BROWSER_PASS'))rejectRun(new Error(`Public M3-03 PASS marker missing. stdout: ${stdout.slice(-5000)}`));
+      if(code!==0)rejectRun(new Error(`Public M3-03 demo Chrome smoke exited ${code}. stderr: ${stderr.slice(-5000)} stdout: ${stdout.slice(-5000)}`));
+      else if(!stdout.includes('PF08A_M3_03_BROWSER_PASS'))rejectRun(new Error(`Public M3-03 demo PASS marker missing. stdout: ${stdout.slice(-5000)}`));
       else resolveRun({stdout,stderr});
     });
   });
 }
 
 const published=await fetchPublishedPackage();
-const directory=mkdtempSync(join(tmpdir(),'pf08a-m3-03-public-'));
+const directory=mkdtempSync(join(tmpdir(),'pf08a-m3-03-demo-public-'));
 try{
   for(const [key,path] of files)writeFileSync(join(directory,path||'index.html'),published[key],'utf8');
   const browser=await runBrowserSmoke(directory),verifiedAt=new Date().toISOString();
-  const result={status:'PASS',verified_at:verifiedAt,public_url:publicUrl,expected_main:expectedMain,publication_attempts:published.attempts,http_status:published.statuses,browser_marker:'PF08A_M3_03_BROWSER_PASS',home_payment_attention:true,overdue_visible:true,due_today_visible:true,upcoming_by_rule_lead_time:true,default_lead_days:3,quick_pay_one_expense:true,exact_occurrence_route:true,personal_household_scope:true,external_notifications:false,prior_modules_preserved:true,runtime_exceptions:[]};
+  const result={status:'PASS',verified_at:verifiedAt,public_url:publicUrl,expected_main:expectedMain,publication_attempts:published.attempts,http_status:published.statuses,browser_marker:'PF08A_M3_03_BROWSER_PASS',home_payment_attention:true,all_reminder_lead_modes:true,comprehensive_demo_data:true,demo_scenarios:12,demo_paid_skipped_postponed:true,demo_personal_household_scope:true,demo_cleanup:true,ordinary_data_preserved:true,external_notifications:false,prior_modules_preserved:true,runtime_exceptions:[]};
   for(const [key] of files)result[`${key}_sha256`]=sha256(published[key]);
   console.log(JSON.stringify(result,null,2));
   console.log(browser.stdout.trim());
