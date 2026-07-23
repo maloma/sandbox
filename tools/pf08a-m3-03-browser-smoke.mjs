@@ -22,10 +22,10 @@ const harness=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title
     const deadline=Date.now()+30000;
     while(Date.now()<deadline){
       const api=frame.contentWindow&&frame.contentWindow.__FP_TEST__;
-      if(api?.paymentAttention?.snapshot&&api?.obligations?.createRule&&api?.paymentAttentionDemo?.load&&api?.paymentAttentionDemo?.records)return api;
+      if(api?.paymentAttention?.snapshot&&api?.paymentAttentionDemo?.load&&api?.obligations?.createRule&&api?.obligationUx?.render)return api;
       await new Promise(resolve=>setTimeout(resolve,100));
     }
-    throw new Error('FamilyPilot M3-03 test API did not become ready');
+    throw new Error('FamilyPilot M3-03 compact UX test API did not become ready');
   }
 
   async function run(){
@@ -37,95 +37,84 @@ const harness=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title
     assert(category,'Expense category fixture missing');
     api.setActiveWallet(household);
 
-    const make=(name,dueAt,walletId=household)=>api.obligations.createRule({name,amount:20,dueAt,cadence:'once',walletId,categoryId:category,currency:'EUR'});
-    const overdue=make('Вчерашний платёж',Date.now()-86400000);
-    const today=make('Платёж сегодня',Date.now());
-    const upcoming=make('Через три дня',Date.now()+3*86400000);
-    const later=make('Через четыре дня',Date.now()+4*86400000);
-    assert(overdue.ok&&today.ok&&upcoming.ok&&later.ok,'Household attention fixtures failed');
-    api.paymentAttention.setLeadDays(later.rule.id,7);
+    const make=(name,dueAt,walletId=household,amount=20)=>api.obligations.createRule({name,amount,dueAt,cadence:'once',walletId,categoryId:category,currency:'EUR'});
+    const overdue=make('Просроченный интернет',Date.now()-86400000,household,29.90);
+    const today=make('Платёж сегодня',Date.now(),household,48);
+    const todaySecond=make('Второй платёж сегодня',Date.now()+3600000,household,12);
+    const upcoming=make('Оплата заранее',Date.now()+3*86400000,household,30);
+    const outside=make('Позже окна',Date.now()+5*86400000,household,9);
+    assert(overdue.ok&&today.ok&&todaySecond.ok&&upcoming.ok&&outside.ok,'Household fixtures failed');
+    api.paymentAttention.setLeadDays(upcoming.rule.id,3);
+    api.paymentAttention.setLeadDays(outside.rule.id,3);
 
     api.setActiveWallet(personal);
-    const privateRule=make('Личный платёж',Date.now(),personal);
-    assert(privateRule.ok,'Personal attention fixture failed');
+    const privateRule=make('Личный платёж',Date.now(),personal,21);
+    assert(privateRule.ok,'Personal fixture failed');
     api.setActiveWallet(household);
     api.paymentAttention.render();
+    api.obligationUx.render();
 
-    const card=doc.getElementById('paymentAttentionCard');
-    assert(card&&!card.hidden,'Home payment card is missing or hidden');
-    assert(doc.querySelector('[data-payment-attention-row="'+overdue.occurrence.id+'"]'),'Overdue payment is missing');
-    assert(doc.querySelector('[data-payment-attention-row="'+today.occurrence.id+'"]'),'Today payment is missing');
-    assert(doc.querySelector('[data-payment-attention-row="'+upcoming.occurrence.id+'"]'),'Default three-day reminder is missing');
-    assert(doc.querySelector('[data-payment-attention-row="'+later.occurrence.id+'"]'),'Custom seven-day reminder is missing');
-    assert(!doc.querySelector('[data-payment-attention-row="'+privateRule.occurrence.id+'"]'),'Personal payment leaked into household Home');
-    assert(text(card).includes('Вчера и ранее'),'Overdue grouping does not explain persistent arrears');
-    assert(text(card).includes('Сегодня'),'Today group missing');
-    assert(text(card).includes('Скоро'),'Upcoming group missing');
-    const debts=doc.querySelector('.debts');
-    assert(debts.compareDocumentPosition(card)&Node.DOCUMENT_POSITION_FOLLOWING,'Payment card is not mounted after debt context');
+    assert(!doc.getElementById('paymentAttentionCard'),'Large Home payment card must be removed');
+    const planNav=doc.querySelector('[data-screen="plans"]'),badge=planNav.querySelector('.plan-attention-badge');
+    assert(badge&&!badge.hidden&&badge.classList.contains('overdue'),'Plan navigation overdue indicator missing');
+    const planModule=doc.querySelector('[data-plan-module="obligations"]');
+    assert(planModule.classList.contains('attention-overdue'),'Obligations plan module is not highlighted');
+    assert(text(planModule).includes('просроч'),'Plan module does not explain overdue attention');
 
-    click(doc.getElementById('obligationAddBtn'));
-    assert(doc.getElementById('obligationReminderLeadDays').value==='3','New rule reminder default is not three days');
-    click(doc.querySelector('#obligationRuleModal [data-close="obligationRuleModal"]'));
+    click(planNav);
+    click(planModule);
+    assert(doc.getElementById('obligationsScreen').classList.contains('active'),'Obligations screen did not open');
+    const monthText=text(doc.getElementById('obligationMonthLabel'));
+    assert(!monthText.includes('1970'),'Obligations month remained January 1970');
+    assert(monthText.includes(String(new Date().getFullYear())),'Obligations month is not current');
 
-    click(doc.querySelector('[data-payment-attention-pay="'+today.occurrence.id+'"]'));
+    const overdueRow=doc.querySelector('[data-obligation-occurrence="'+overdue.occurrence.id+'"]');
+    assert(overdueRow&&overdueRow.classList.contains('obligation-row--overdue'),'Overdue row is not visually distinct');
+    const todayRow=doc.querySelector('[data-obligation-occurrence="'+today.occurrence.id+'"]');
+    assert(todayRow&&todayRow.classList.contains('obligation-row--due'),'Today row is not visually distinct');
+    const dayGroup=todayRow.closest('.obligation-date-group');
+    assert(dayGroup.classList.contains('is-multi'),'Multiple payments on one day are not grouped as a multi-payment day');
+    assert(text(dayGroup.querySelector('.obligation-date-heading')).includes('Запланировать'),'Day total planning amount is missing');
+    assert(!text(todayRow).includes('№'),'Payment row still exposes recurrence sequence');
+    assert(!text(todayRow).includes('Повтор'),'Payment row still exposes recurrence wording');
+    assert(!doc.querySelector('[data-obligation-occurrence="'+privateRule.occurrence.id+'"]'),'Personal payment leaked into household obligations');
+
+    const earlyCheck=doc.querySelector('[data-m302-quick-pay="'+upcoming.occurrence.id+'"]');
+    assert(earlyCheck,'Future payment does not have an early-payment checkbox');
+    click(earlyCheck);
     let state=api.getState();
-    const paid=state.obligationOccurrences.find(item=>item.id===today.occurrence.id);
-    assert(paid.status==='paid','Home quick pay did not mark occurrence paid');
-    assert(state.operations.filter(operation=>operation.links?.obligationOccurrenceId===today.occurrence.id).length===1,'Home quick pay did not create exactly one Expense');
-    assert(!doc.querySelector('[data-payment-attention-row="'+today.occurrence.id+'"]'),'Paid occurrence remained in attention list');
+    const paidEarly=state.obligationOccurrences.find(item=>item.id===upcoming.occurrence.id);
+    assert(paidEarly.status==='paid','Future occurrence was not marked paid early');
+    assert(state.operations.filter(operation=>operation.links?.obligationOccurrenceId===upcoming.occurrence.id).length===1,'Early payment did not create exactly one Expense');
+    const paidRow=doc.querySelector('[data-obligation-occurrence="'+upcoming.occurrence.id+'"]');
+    assert(paidRow&&paidRow.classList.contains('obligation-row--paid'),'Paid row is not green/complete');
 
-    click(doc.querySelector('[data-payment-attention-open="'+overdue.occurrence.id+'"]'));
-    assert(doc.getElementById('obligationsScreen').classList.contains('active'),'Attention row did not open Obligations');
-    assert(doc.getElementById('paymentAttentionDetailModal').classList.contains('open'),'Attention row did not open the exact occurrence');
-    assert(text(doc.getElementById('paymentAttentionDetailTitle')).includes('Вчерашний платёж'),'Wrong occurrence detail opened');
-
-    api.paymentAttention.setLeadDays(upcoming.rule.id,0);
-    api.paymentAttention.render();
-    assert(!doc.querySelector('[data-payment-attention-row="'+upcoming.occurrence.id+'"]'),'Zero-day rule still appears before due day');
-
-    const loaded=api.paymentAttentionDemo.load();
-    assert(loaded.ok,'Comprehensive payment demo data did not load');
-    api.setActiveWallet(household);
-    api.paymentAttention.render();
-    const records=api.paymentAttentionDemo.records(),byKey=new Map(records.map(item=>[item.key,item]));
-    const firstOccurrence=key=>byKey.get(key)?.occurrences?.[0];
-    for(const key of ['overdue','today-0','lead-1','recurring-3','lead-7','lead-14','lead-30','outside-window','paid','skipped','postponed'])assert(byKey.has(key),'Demo scenario missing: '+key);
-    assert(byKey.has('personal'),'Personal demo scenario missing');
-    assert([0,1,3,7,14,30].every(days=>records.some(item=>item.leadDays===days)),'Not all reminder lead-time modes are represented');
-    for(const key of ['overdue','today-0','lead-1','recurring-3','lead-7','lead-14','lead-30','postponed']){
-      const occurrence=firstOccurrence(key);
-      assert(occurrence&&doc.querySelector('[data-payment-attention-row="'+occurrence.id+'"]'),'Visible demo scenario is missing from Home: '+key);
-    }
-    for(const key of ['outside-window','paid','skipped','personal']){
-      const occurrence=firstOccurrence(key);
-      assert(occurrence&&!doc.querySelector('[data-payment-attention-row="'+occurrence.id+'"]'),'Hidden demo scenario leaked into household Home: '+key);
-    }
-    state=api.getState();
-    const paidDemo=state.obligationOccurrences.find(item=>item.id===firstOccurrence('paid').id);
-    const skippedDemo=state.obligationOccurrences.find(item=>item.id===firstOccurrence('skipped').id);
-    const postponedDemo=state.obligationOccurrences.find(item=>item.id===firstOccurrence('postponed').id);
-    assert(paidDemo.status==='paid'&&state.operations.filter(operation=>operation.links?.obligationOccurrenceId===paidDemo.id).length===1,'Paid demo mode is not linked to exactly one Expense');
-    assert(skippedDemo.status==='skipped','Skipped demo mode is missing');
-    assert(postponedDemo.movedFromDueAt!=null&&postponedDemo.dueAt>postponedDemo.movedFromDueAt,'Postponed demo mode is missing');
+    const ruleCards=[...doc.querySelectorAll('.obligation-rule-card')];
+    const overdueRuleCard=ruleCards.find(node=>text(node).includes('Просроченный интернет'));
+    assert(overdueRuleCard,'Rule card missing');
+    assert(!text(overdueRuleCard).includes('Каждые')&&!text(overdueRuleCard).includes('Повторяется'),'Recurrence leaked into rule list');
+    click(overdueRuleCard);
+    assert(doc.getElementById('obligationRuleDetailModal').classList.contains('open'),'Rule card did not open its detail');
+    assert(text(doc.getElementById('obligationRuleDetailContent')).includes('Правило повторения'),'Recurrence details are missing inside rule card');
+    assert(doc.querySelector('[data-ux-rule-edit]')&&doc.querySelector('[data-ux-rule-clone]')&&doc.querySelector('[data-ux-rule-delete]'),'Rule management controls are not inside rule card');
+    click(doc.querySelector('[data-ux-rule-close]'));
 
     api.setActiveWallet(personal);
-    api.paymentAttention.render();
-    assert(doc.querySelector('[data-payment-attention-row="'+firstOccurrence('personal').id+'"]'),'Personal demo payment is not visible in the personal wallet');
-    assert(!doc.querySelector('[data-payment-attention-row="'+firstOccurrence('overdue').id+'"]'),'Household demo payment leaked into the personal wallet');
-    api.setActiveWallet(household);
+    api.obligationUx.render();
+    assert(doc.querySelector('[data-obligation-occurrence="'+privateRule.occurrence.id+'"]'),'Personal payment is missing in personal scope');
+    assert(!doc.querySelector('[data-obligation-occurrence="'+overdue.occurrence.id+'"]'),'Household payment leaked into personal scope');
 
+    const demo=api.paymentAttentionDemo.load();
+    assert(demo.ok&&demo.created.length===12,'Comprehensive demo fixtures were not created');
+    assert(api.paymentAttentionDemo.records().length===12,'Demo record count is not 12');
     const removed=api.paymentAttentionDemo.remove();
-    assert(removed.rules>=11,'Demo cleanup removed too few rules');
-    state=api.getState();
-    assert(!state.obligationRules.some(rule=>String(rule.note||'').includes('marker:m3-03-payment-attention-demo:')),'Demo rules remained after cleanup');
-    assert(!state.operations.some(operation=>String(operation.note||'').includes('marker:m3-03-payment-attention-demo:')),'Demo linked operations remained after cleanup');
+    assert(removed.rules===12,'Demo rules were not fully removed');
+    assert(api.paymentAttentionDemo.records().length===0,'Demo records remain after cleanup');
 
-    assert(doc.querySelector('meta[content="planned-payment-attention-v1"]'),'M3-03 package marker missing');
-    assert(doc.querySelector('meta[content="plan-obligations-foundation-v1"]'),'M3 foundation marker missing');
+    assert(doc.querySelector('meta[content="planned-payment-attention-v2"]'),'M3-03 compact package marker missing');
     assert(runtimeErrors.length===0,'Runtime exceptions: '+runtimeErrors.join(' | '));
 
-    result.textContent=JSON.stringify({status:'PASS',marker:'${marker}',homeCard:true,overduePersistent:true,todayVisible:true,defaultReminderDays:3,customReminderDays:true,quickPayFromHome:true,oneLinkedExpense:true,exactOccurrenceOpen:true,paidRemoved:true,scopeIsolation:true,allReminderLeadModes:true,comprehensiveDemoData:true,demoPaidSkippedPostponed:true,demoCleanup:true,noExternalNotificationClaim:true,runtimeExceptions:[]},null,2);
+    result.textContent=JSON.stringify({status:'PASS',marker:'${marker}',homeCardRemoved:true,planIndicator:true,overdueHighlighted:true,currentMonth:true,dayGrouping:true,dailyTotal:true,earlyPayment:true,oneLinkedExpense:true,paidGreen:true,ruleCard:true,ruleControlsInside:true,recurrenceHiddenFromList:true,scopeIsolation:true,demoScenarios:12,demoCleanup:true,runtimeExceptions:[]},null,2);
     document.body.dataset.status='PASS';
   }
   frame.addEventListener('load',()=>run().catch(error=>{result.textContent=String(error&&error.stack||error);document.body.dataset.status='FAIL'}),{once:true});
@@ -138,4 +127,4 @@ const chromeCandidates=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable'
 const chrome=chromeCandidates.find(existsSync);if(!chrome)throw new Error('Chrome/Chromium is not installed');
 function runChrome(url){return new Promise((resolvePromise,reject)=>{const child=spawn(chrome,['--headless=new','--no-sandbox','--disable-dev-shm-usage','--disable-gpu',`--user-data-dir=${profilePath}`,'--virtual-time-budget=40000','--dump-dom',url],{stdio:['ignore','pipe','pipe']});let stdout='',stderr='';child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);child.on('error',reject);child.on('close',code=>code===0?resolvePromise({stdout,stderr}):reject(new Error(`Chrome exited ${code}\n${stderr}`)))})}
 await new Promise((resolvePromise,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolvePromise)});
-try{const address=server.address(),{stdout}=await runChrome(`http://127.0.0.1:${address.port}/${harnessName}`),match=stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/),decoded=(match?.[1]||'').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');if(!stdout.includes('data-status="PASS"')||!stdout.includes(marker))throw new Error(`M3-03 browser smoke did not pass\n${decoded||stdout.slice(-5000)}`);console.log(decoded||JSON.stringify({status:'PASS',marker},null,2))}finally{await new Promise(resolvePromise=>server.close(resolvePromise));if(existsSync(harnessPath))unlinkSync(harnessPath);rmSync(profilePath,{recursive:true,force:true})}
+try{const address=server.address(),{stdout}=await runChrome(`http://127.0.0.1:${address.port}/${harnessName}`),match=stdout.match(/<pre id="result">([\s\S]*?)<\/pre>/),decoded=(match?.[1]||'').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');if(!stdout.includes('data-status="PASS"')||!stdout.includes(marker))throw new Error(`M3-03 browser smoke did not pass\n${decoded||stdout.slice(-5000)}`);console.log(decoded||JSON.stringify({status:'PASS',marker},null,2))}finally{await new Promise(resolve=>server.close(resolve));if(existsSync(harnessPath))unlinkSync(harnessPath);rmSync(profilePath,{recursive:true,force:true})}
