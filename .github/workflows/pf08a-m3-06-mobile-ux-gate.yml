@@ -1,0 +1,56 @@
+name: PF-08A M3-06 Mobile UX Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - familypilot-scope.js
+      - src/familypilot-scope.js
+      - familypilot-mobile-payment-tap.js
+      - familypilot-operation-mobile-ui.js
+      - familypilot-operation-date-picker.js
+      - tools/pf08a-m3-06-mobile-ux-browser-smoke.mjs
+      - .github/workflows/pf08a-m3-06-mobile-ux-gate.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify-exact-head:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          show-progress: false
+
+      - name: Verify exact checked-out head
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Check syntax and mirrors
+        run: |
+          node --check familypilot-scope.js
+          node --check familypilot-mobile-payment-tap.js
+          node --check familypilot-operation-mobile-ui.js
+          node --check familypilot-operation-date-picker.js
+          node --check tools/pf08a-m3-06-mobile-ux-browser-smoke.mjs
+          cmp familypilot-scope.js src/familypilot-scope.js
+
+      - name: Verify package contract
+        run: |
+          grep -F "familypilot-mobile-payment-tap.js" familypilot-scope.js
+          grep -F "familypilot-operation-mobile-ui.js" familypilot-scope.js
+          grep -F "familypilot-operation-date-picker.js" familypilot-scope.js
+          grep -F "obligation_skip_unchecked" familypilot-mobile-payment-tap.js
+          grep -F "--fp-fixed-bottom" familypilot-operation-mobile-ui.js
+          grep -F "operationDatePickerModal" familypilot-operation-date-picker.js
+
+      - name: Browser regression — mobile obligation and operation UX
+        run: node tools/pf08a-m3-06-mobile-ux-browser-smoke.mjs
