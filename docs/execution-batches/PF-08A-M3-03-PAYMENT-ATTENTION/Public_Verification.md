@@ -6,34 +6,19 @@
 
 ## Runtime
 
-- accepted feature head: `e55f344a7cbabb57046f1dc428e58a671bef6830`;
-- implementation PR: `maloma/sandbox#50`;
-- runtime merge: `cbb6651e53d61b5552598f32159f36fe6e1ec82d`;
+- original M3-03 implementation merge: `cbb6651e53d61b5552598f32159f36fe6e1ec82d`;
 - Pages publication-trigger correction: `c25aabf741b589dbb2a6e359a97cf0f2a8fef031`;
-- original public-verification PR: `maloma/sandbox#60`;
-- comprehensive demo-data PR: `maloma/sandbox#62`;
 - comprehensive demo-data merge: `3eb727e60a79feead45319982233eacf4cc63c4c`;
-- demo public-verification PR: `maloma/sandbox#63`.
+- compact planning UX PR: `maloma/sandbox#64`;
+- accepted compact UX exact head: `556583cdb6f393da81fed5bd3d87c9986f969d92`;
+- compact planning UX merge: `23aa2c7852fd2664c757bebc7ed4fee8bfa8e54a`;
+- compact public-verification PR: `maloma/sandbox#65`.
 
 ## Verification Result
 
-Trusted original public workflow run `29976278518` completed successfully with read-only repository permissions.
+The exact-head implementation gate run `30006140503` completed successfully.
 
-Trusted comprehensive-demo public workflow run `30002204164` also completed successfully with read-only repository permissions.
-
-The verifier downloaded the actually published package with cache-busting and required HTTP `200` for:
-
-- `index.html`;
-- `familypilot-scope.js`;
-- Analytics;
-- Obligations and Obligations UI;
-- Payment Attention and Payment Attention UI;
-- Debts and Debts UI;
-- Savings and Savings UI;
-- Wallet Management and Wallet Management UI;
-- Wallet Transfers and Wallet Transfers UI.
-
-The downloaded package then passed the same Chrome scenario used for the accepted M3-03 implementation, extended with all comprehensive demo fixtures.
+The read-only public workflow run `30006363960` downloaded the actually published GitHub Pages package with cache-busting, required HTTP `200` for the HTML and all FamilyPilot modules, and ran the accepted Chrome scenario only against those downloaded files.
 
 Browser marker:
 
@@ -43,22 +28,56 @@ PF08A_M3_03_BROWSER_PASS
 
 ## Verified User Behavior
 
-- the Home screen contains the `Платежи` attention block when relevant payments exist;
-- overdue occurrences remain visible until the user resolves them;
-- payments due today are shown separately;
-- upcoming payments appear according to the reminder lead time configured for their rule;
-- the default reminder lead time is 3 days;
-- supported choices are 0, 1, 3, 7, 14 and 30 days;
-- `Оплачено` creates exactly one linked Expense through the existing obligation API;
-- selecting an attention row opens `Обязательства` and the exact occurrence;
+- the large `Платежи` card is absent from the Home screen;
+- payment attention is represented by a compact indicator on the `План` bottom-navigation item;
+- `План → Обязательства` explains whether attention is overdue, due today or upcoming;
+- overdue payment rows use a distinct red-tinted state;
+- payments due today use a distinct amber state;
+- paid rows use a distinct completed green state;
+- an invalid or empty stored obligation month no longer opens January 1970 and is repaired to the current month;
+- each date is a separate visual group;
+- a date with more than one payment shows the payment count and combined `Запланировать` amount;
+- normal payment rows do not expose recurrence sequence or recurrence wording;
+- every unresolved payment, including a future occurrence, has an immediate checkbox-style paid action;
+- early payment creates exactly one linked Expense and changes the occurrence to paid;
+- selecting a payment still opens its exact occurrence detail;
+- selecting a rule opens a dedicated rule card;
+- recurrence, reminder settings and other rule information are shown inside the rule card rather than the list;
+- edit, clone and delete/restore controls are located inside the rule card;
 - personal and household wallet scopes remain isolated;
-- existing obligation calendar, one-occurrence move, payment correction and overdue behavior remain unchanged;
+- the 12-scenario reversible demo set remains available and fully removable;
 - Analytics, Privacy, Debts, Savings, Wallet Management and Wallet Transfers remain compatible;
 - runtime exceptions: NONE.
 
+## Existing Financial Behavior Preserved
+
+- one paid occurrence creates one canonical linked Expense;
+- duplicate active payment remains rejected;
+- a user may record payment before the planned due date using the actual payment date;
+- moving an occurrence changes only that occurrence;
+- recurring schedule generation remains unchanged;
+- overdue occurrences do not disappear because a later occurrence exists;
+- ordinary records are not deleted by demo cleanup.
+
+## Notification Boundary
+
+The compact in-app indicator is implemented.
+
+The following remain intentionally absent and require a separate delivery package:
+
+- morning operating-system notification for payments due today;
+- evening operating-system notification for due payments not marked paid;
+- browser push permission;
+- service worker / Push Manager;
+- SMS;
+- email;
+- automatic or bank payment.
+
+A static page cannot reliably send morning/evening notifications while closed without a separately designed push/service-worker delivery mechanism.
+
 ## Comprehensive Demo Data
 
-The public demo prototype now provides a reversible set of 12 scenarios relative to the current date:
+The public development prototype still contains 12 reversible scenarios relative to the current date:
 
 1. overdue payment;
 2. due today with a 0-day reminder;
@@ -73,34 +92,36 @@ The public demo prototype now provides a reversible set of 12 scenarios relative
 11. skipped payment;
 12. one postponed occurrence.
 
-Verified controls:
+Controls:
 
-- automatic one-time demo loading for the demo household;
 - `План → Обязательства → Демо платежей`;
 - `Обновить демо` recreates dates relative to today;
-- `Удалить демо` removes only marked demo rules, occurrences and linked demo operations;
-- ordinary user-created rules, payments and operations are preserved;
-- full cleanup leaves no marked demo financial operation behind.
+- `Удалить демо` removes only marked demo rules, occurrences and linked demo operations.
 
 ## Excluded and Confirmed Absent
 
-- push notifications;
-- browser Notification permission requests;
-- SMS or email;
-- bank execution or automatic payment;
-- new access permissions;
-- uploaded workflow artifacts.
-
-## Publication Correction
-
-The first original public check correctly failed because GitHub Pages was configured to redeploy only after changes to HTML, README or the Pages workflow. M3-03 added external JavaScript modules without changing `index.html`, so the published site still returned `404` for both Payment Attention files.
-
-The Pages path filters were corrected to redeploy when FamilyPilot runtime modules or source mirrors change. The original and comprehensive-demo trusted public checks subsequently passed.
+- uploaded workflow artifacts;
+- credentials;
+- production-data migration;
+- real banking action;
+- irreversible operation.
 
 ## Rollback
 
-To remove only the comprehensive demo fixtures, revert demo merge `3eb727e60a79feead45319982233eacf4cc63c4c`.
+To remove only the compact UX correction while preserving the base M3-03 module and demo fixtures, revert:
 
-To remove the complete M3-03 runtime package, revert runtime merge `cbb6651e53d61b5552598f32159f36fe6e1ec82d`.
+```text
+23aa2c7852fd2664c757bebc7ed4fee8bfa8e54a
+```
 
-The package adds no production data migration, credential, real banking action or irreversible operation.
+To remove only the comprehensive demo fixtures, revert:
+
+```text
+3eb727e60a79feead45319982233eacf4cc63c4c
+```
+
+To remove the complete M3-03 runtime package, revert:
+
+```text
+cbb6651e53d61b5552598f32159f36fe6e1ec82d
+```
