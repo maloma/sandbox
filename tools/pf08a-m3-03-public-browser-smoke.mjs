@@ -20,9 +20,38 @@ const files=[
   ['transfers','familypilot-wallet-transfers.js'],['transfersUi','familypilot-wallet-transfers-ui.js']
 ];
 
+function packageChecks(packageFiles){
+  return{
+    htmlRuntimeBridge:packageFiles.html.includes('pf08a-wf02-runtime-bridge:start')&&packageFiles.html.includes('window.__FP_RUNTIME__'),
+    scopeReady:packageFiles.scope.includes('__FP_M3_03_READY__'),
+    scopeLoadsDomain:packageFiles.scope.includes('familypilot-payment-attention.js'),
+    scopeLoadsUi:packageFiles.scope.includes('familypilot-payment-attention-ui.js'),
+    analytics:packageFiles.analytics.includes('FamilyPilotAnalyticsState'),
+    obligations:packageFiles.obligations.includes('FamilyPilotObligations'),
+    defaultLeadDays:packageFiles.attention.includes('DEFAULT_LEAD_DAYS=3'),
+    reminderConfig:packageFiles.attention.includes('paymentReminderLeadDaysByRuleId'),
+    groupedAttention:packageFiles.attention.includes('groupedAttention'),
+    homeCard:packageFiles.attentionUi.includes('paymentAttentionCard'),
+    reminderField:packageFiles.attentionUi.includes('obligationReminderLeadDays'),
+    quickPay:packageFiles.attentionUi.includes('data-payment-attention-pay'),
+    exactRoute:packageFiles.attentionUi.includes("showScreen('obligations')"),
+    testApi:packageFiles.attentionUi.includes('window.__FP_TEST__.paymentAttention'),
+    noNotificationPermission:!packageFiles.attentionUi.includes('Notification.requestPermission'),
+    noNotificationApi:!packageFiles.attentionUi.includes('new Notification'),
+    noPushManager:!packageFiles.attentionUi.includes('PushManager'),
+    debts:packageFiles.debts.includes('FamilyPilotDebts'),
+    savings:packageFiles.savings.includes('FamilyPilotSavingsGoals'),
+    wallets:packageFiles.wallets.includes('FamilyPilotWalletManagement'),
+    transfers:packageFiles.transfers.includes("TRANSFER_KIND='transfer'"),
+    priorMarkers:['savings-goal-config-v1','debt-chains-principal-v1','plan-obligations-foundation-v1','hidden-capital-disclosure-v1','compact-analytics-states-v1'].every(marker=>packageFiles.html.includes(marker)),
+    noRuntimeFetch:!packageFiles.html.includes("fetch('./src/familypilot.html"),
+    noDocumentWrite:!packageFiles.html.includes('document.write(source)')
+  };
+}
+
 async function fetchPublishedPackage(){
-  let last={status:0,body:''};
-  for(let attempt=1;attempt<=18;attempt+=1){
+  let last={statuses:{},failedChecks:['not_checked']};
+  for(let attempt=1;attempt<=30;attempt+=1){
     const token=`${expectedMain}-${attempt}-${Date.now()}`;
     try{
       const responses=await Promise.all(files.map(([,path])=>path
@@ -31,42 +60,14 @@ async function fetchPublishedPackage(){
       const bodies=await Promise.all(responses.map(response=>response.text()));
       const packageFiles=Object.fromEntries(files.map(([key],index)=>[key,bodies[index]]));
       const statuses=Object.fromEntries(files.map(([key],index)=>[key,responses[index].status]));
-      last={status:statuses.html,body:packageFiles.html};
-      const ready=responses.every(response=>response.status===200)
-        &&packageFiles.html.includes('pf08a-wf02-runtime-bridge:start')
-        &&packageFiles.html.includes('window.__FP_RUNTIME__')
-        &&packageFiles.scope.includes('__FP_M3_03_READY__')
-        &&packageFiles.scope.includes('familypilot-payment-attention.js')
-        &&packageFiles.scope.includes('familypilot-payment-attention-ui.js')
-        &&packageFiles.analytics.includes('FamilyPilotAnalyticsState')
-        &&packageFiles.obligations.includes('FamilyPilotObligations')
-        &&packageFiles.attention.includes('DEFAULT_LEAD_DAYS=3')
-        &&packageFiles.attention.includes('paymentReminderLeadDaysByRuleId')
-        &&packageFiles.attention.includes('groupedAttention')
-        &&packageFiles.attentionUi.includes('paymentAttentionCard')
-        &&packageFiles.attentionUi.includes('obligationReminderLeadDays')
-        &&packageFiles.attentionUi.includes('data-payment-attention-pay')
-        &&packageFiles.attentionUi.includes("showScreen('obligations')")
-        &&packageFiles.attentionUi.includes('window.__FP_TEST__.paymentAttention')
-        &&!packageFiles.attentionUi.includes('Notification.requestPermission')
-        &&!packageFiles.attentionUi.includes('new Notification')
-        &&!packageFiles.attentionUi.includes('PushManager')
-        &&packageFiles.debts.includes('FamilyPilotDebts')
-        &&packageFiles.savings.includes('FamilyPilotSavingsGoals')
-        &&packageFiles.wallets.includes('FamilyPilotWalletManagement')
-        &&packageFiles.transfers.includes("TRANSFER_KIND='transfer'")
-        &&packageFiles.html.includes('savings-goal-config-v1')
-        &&packageFiles.html.includes('debt-chains-principal-v1')
-        &&packageFiles.html.includes('plan-obligations-foundation-v1')
-        &&packageFiles.html.includes('hidden-capital-disclosure-v1')
-        &&packageFiles.html.includes('compact-analytics-states-v1')
-        &&!packageFiles.html.includes("fetch('./src/familypilot.html")
-        &&!packageFiles.html.includes('document.write(source)');
-      if(ready)return{attempts:attempt,statuses,...packageFiles};
-    }catch(error){last={status:0,body:String(error)}}
+      const checks=packageChecks(packageFiles);
+      const failedChecks=Object.entries(checks).filter(([,passed])=>!passed).map(([name])=>name);
+      last={statuses,failedChecks};
+      if(responses.every(response=>response.status===200)&&failedChecks.length===0)return{attempts:attempt,statuses,...packageFiles};
+    }catch(error){last={statuses:{network:0},failedChecks:[String(error)]}}
     await sleep(5000);
   }
-  throw new Error(`Published M3-03 package did not become ready. Last status ${last.status}: ${last.body.slice(0,1200)}`);
+  throw new Error(`Published M3-03 package did not become ready: ${JSON.stringify(last)}`);
 }
 
 function runBrowserSmoke(directory){
@@ -90,26 +91,7 @@ const directory=mkdtempSync(join(tmpdir(),'pf08a-m3-03-public-'));
 try{
   for(const [key,path] of files)writeFileSync(join(directory,path||'index.html'),published[key],'utf8');
   const browser=await runBrowserSmoke(directory),verifiedAt=new Date().toISOString();
-  const result={
-    status:'PASS',
-    verified_at:verifiedAt,
-    public_url:publicUrl,
-    expected_main:expectedMain,
-    publication_attempts:published.attempts,
-    http_status:published.statuses,
-    browser_marker:'PF08A_M3_03_BROWSER_PASS',
-    home_payment_attention:true,
-    overdue_visible:true,
-    due_today_visible:true,
-    upcoming_by_rule_lead_time:true,
-    default_lead_days:3,
-    quick_pay_one_expense:true,
-    exact_occurrence_route:true,
-    personal_household_scope:true,
-    external_notifications:false,
-    prior_modules_preserved:true,
-    runtime_exceptions:[]
-  };
+  const result={status:'PASS',verified_at:verifiedAt,public_url:publicUrl,expected_main:expectedMain,publication_attempts:published.attempts,http_status:published.statuses,browser_marker:'PF08A_M3_03_BROWSER_PASS',home_payment_attention:true,overdue_visible:true,due_today_visible:true,upcoming_by_rule_lead_time:true,default_lead_days:3,quick_pay_one_expense:true,exact_occurrence_route:true,personal_household_scope:true,external_notifications:false,prior_modules_preserved:true,runtime_exceptions:[]};
   for(const [key] of files)result[`${key}_sha256`]=sha256(published[key]);
   console.log(JSON.stringify(result,null,2));
   console.log(browser.stdout.trim());
