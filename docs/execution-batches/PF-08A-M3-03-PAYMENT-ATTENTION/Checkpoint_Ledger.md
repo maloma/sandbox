@@ -115,4 +115,31 @@ Append-only rule: preserve every record and append later transitions with monoto
 - **Terminal State:** `PF-08A-M3-03 — COMPLETED / INTEGRATED / PUBLIC PASS` after the evidence-head read-only gate and PR merge.
 - **Record Integrity:** VALID.
 
+---
+
+## Record 008 — Comprehensive Demo Data Added and Publicly Verified
+
+- **Ordering Marker:** 008
+- **Checkpoint:** CP-05
+- **Status:** COMPLETED
+- **Founder Direction:** `сформируй демо-данные для проверки всех режимов`.
+- **Implementation PR:** `maloma/sandbox#62`.
+- **Accepted Exact Head:** `1aba4d40a62b953c44c65e310519900a526ddf3d`.
+- **Demo Merge:** `3eb727e60a79feead45319982233eacf4cc63c4c`.
+- **Exact-Head M3-03 Gate:** run `30001940990` — SUCCESS.
+- **Public Verification PR:** `maloma/sandbox#63`.
+- **Trusted Public Run:** `30002204164` — SUCCESS.
+- **Demo Version:** `m3-03-payment-attention-demo-v1`.
+- **Coverage:** 12 relative-date scenarios covering overdue, today, lead times 1/3/7/14/30, recurring, outside-window, personal scope, paid, skipped and single-occurrence postponed states.
+- **Reminder Choices Covered:** 0/1/3/7/14/30 days.
+- **Paid Demo Contract:** exactly one linked Expense.
+- **Scope Contract:** household and Anna personal wallet fixtures remain isolated.
+- **Controls:** automatic one-time demo seed; `Обновить демо`; `Удалить демо`.
+- **Cleanup:** removes only marked demo rules, occurrences and linked demo operations; ordinary records remain untouched.
+- **External Notifications:** NONE.
+- **Runtime Exceptions:** NONE.
+- **Artifacts:** NONE.
+- **Rollback:** revert demo merge `3eb727e60a79feead45319982233eacf4cc63c4c` without removing the base M3-03 package.
+- **Record Integrity:** VALID.
+
 # END OF TERMINAL LEDGER
