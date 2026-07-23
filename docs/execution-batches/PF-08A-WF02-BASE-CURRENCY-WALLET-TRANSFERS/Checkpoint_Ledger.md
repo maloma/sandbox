@@ -1,7 +1,7 @@
 # Checkpoint Ledger — PF-08A-WF02-BASE-CURRENCY-WALLET-TRANSFERS
 
 **Document Type:** Append-Only Checkpoint Ledger  
-**Status:** Active  
+**Status:** Completed  
 **Repository:** `maloma/sandbox`  
 **Branch:** `agent/pf08a-wf02-base-currency-transfers`  
 **Created:** 2026-07-22
@@ -120,3 +120,31 @@ Append-only rule: preserve every record and append later transitions with monoto
 - **Workflow Expansion:** NONE; existing expected regression families only.
 - **Next:** one final meaningful verification cycle.
 - **Record Integrity:** VALID.
+
+---
+
+## Record 008 — Exact-Head Acceptance, Merge and Public Verification
+
+- **Ordering Marker:** 008
+- **Checkpoint:** CP-04
+- **Status:** COMPLETED
+- **Accepted PR Head:** `760d271f998de29f0e4063d0c7a430696c90730b`.
+- **Exact-Head PR Gates:** FamilyPilot Trusted, A3 Trusted, A3 Compact, PRIV Trusted and Hidden Capital — PASS.
+- **Runtime Pull Request:** `maloma/sandbox#47`.
+- **Runtime Merge:** `4a20cf720314a9d4fe6b8e410d22aa26411c78e1`.
+- **Public Verification Branch:** `agent/pf08a-wf02-public-verification`.
+- **Public Verifier Commit:** `87cbff24b419ce1a3147f6d3170fee9bdb3b10f8`.
+- **Public Workflow Run:** `29968201587` — SUCCESS.
+- **Public URL:** `https://maloma.github.io/sandbox/`.
+- **HTTP Contract:** all thirteen requested public package files returned `200` as a mandatory verifier condition.
+- **Browser Marker:** `PF08A_WF02_BROWSER_PASS`.
+- **Public Browser Result:** one canonical TransferEvent, two linked movements, stable IDs, accessible base-currency wallets, no Income/Expense, correct Operations presentation, correction history, Capital recalculation, scope isolation, reload idempotency, prior-module preservation and runtime exceptions NONE.
+- **Evidence:** `docs/execution-batches/PF-08A-WF02-BASE-CURRENCY-WALLET-TRANSFERS/Public_Verification.md`.
+- **Rollback:** revert runtime merge `4a20cf720314a9d4fe6b8e410d22aa26411c78e1`.
+- **Artifacts:** NONE.
+- **Storage Impact:** NONE.
+- **Protected Boundary Crossed:** No.
+- **Result:** WF-02 runtime implementation and public package verification complete.
+- **Record Integrity:** VALID.
+
+# END OF FILE
