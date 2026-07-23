@@ -3,12 +3,10 @@ name: PF-08A FamilyPilot Module Regression
 on:
   push:
     branches:
-      - agent/pf08a-m3-01-plan-obligations
-      - agent/pf08a-m2-01-debt-chains-principal
-      - agent/pf08a-m4-01-savings-goal-integration
-      - agent/pf08a-wf01-base-currency-wallet-management
+      - agent/pf08a-wf02-base-currency-transfers
     paths:
       - src/familypilot.html
+      - src/familypilot-scope.js
       - index.html
       - familypilot-scope.js
       - familypilot-obligations.js
@@ -19,6 +17,8 @@ on:
       - familypilot-savings-goals-ui.js
       - familypilot-wallet-management.js
       - familypilot-wallet-management-ui.js
+      - familypilot-wallet-transfers.js
+      - familypilot-wallet-transfers-ui.js
       - tools/pf08a-m3-01-apply-plan-obligations.mjs
       - tools/pf08a-m3-01-correct-today-payment-time.mjs
       - tools/pf08a-m3-01-correct-browser-test-api.mjs
@@ -35,52 +35,24 @@ on:
       - tools/pf08a-wf01-domain-test.cjs
       - tools/pf08a-wf01-verify-integration.mjs
       - tools/pf08a-wf01-browser-smoke.mjs
+      - tools/pf08a-wf02-domain-test.cjs
+      - tools/pf08a-wf02-verify-integration.mjs
+      - tools/pf08a-wf02-browser-smoke.mjs
       - .github/workflows/pf08a-m3-01-plan-obligations.yml
-      - docs/execution-batches/PF-08A-WF01-BASE-CURRENCY-WALLET-MANAGEMENT/**
-  pull_request:
-    branches: [main]
-    paths:
-      - src/familypilot.html
-      - index.html
-      - familypilot-scope.js
-      - familypilot-obligations.js
-      - familypilot-obligations-ui-v2.js
-      - familypilot-debts.js
-      - familypilot-debts-ui.js
-      - familypilot-savings-goals.js
-      - familypilot-savings-goals-ui.js
-      - familypilot-wallet-management.js
-      - familypilot-wallet-management-ui.js
-      - tools/pf08a-m3-01-apply-plan-obligations.mjs
-      - tools/pf08a-m3-01-correct-today-payment-time.mjs
-      - tools/pf08a-m3-01-correct-browser-test-api.mjs
-      - tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
-      - tools/pf08a-m3-01-verify-plan-obligations.mjs
-      - tools/pf08a-m3-01-domain-test.cjs
-      - tools/pf08a-m3-01-browser-smoke.mjs
-      - tools/pf08a-m2-01-domain-test.cjs
-      - tools/pf08a-m2-01-verify-debt-integration.mjs
-      - tools/pf08a-m2-01-browser-smoke.mjs
-      - tools/pf08a-m4-01-domain-test.cjs
-      - tools/pf08a-m4-01-verify-integration.mjs
-      - tools/pf08a-m4-01-browser-smoke.mjs
-      - tools/pf08a-wf01-domain-test.cjs
-      - tools/pf08a-wf01-verify-integration.mjs
-      - tools/pf08a-wf01-browser-smoke.mjs
-      - .github/workflows/pf08a-m3-01-plan-obligations.yml
-      - docs/execution-batches/PF-08A-WF01-BASE-CURRENCY-WALLET-MANAGEMENT/**
+      - .github/workflows/pf08a-m3-01-trusted-pr-gate.yml
+      - docs/execution-batches/PF-08A-WF02-BASE-CURRENCY-WALLET-TRANSFERS/**
 
 permissions:
   contents: write
 
 concurrency:
-  group: pf08a-family-pilot-${{ github.ref }}
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  implement:
-    if: github.event_name == 'push'
+  generate-and-verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -94,12 +66,14 @@ jobs:
             familypilot-debts.js familypilot-debts-ui.js \
             familypilot-savings-goals.js familypilot-savings-goals-ui.js \
             familypilot-wallet-management.js familypilot-wallet-management-ui.js \
+            familypilot-wallet-transfers.js familypilot-wallet-transfers-ui.js \
             tools/pf08a-m3-01-apply-plan-obligations.mjs tools/pf08a-m3-01-correct-today-payment-time.mjs \
             tools/pf08a-m3-01-correct-browser-test-api.mjs tools/pf08a-m3-01-finalize-runtime-artifacts.mjs \
             tools/pf08a-m3-01-verify-plan-obligations.mjs tools/pf08a-m3-01-domain-test.cjs tools/pf08a-m3-01-browser-smoke.mjs \
             tools/pf08a-m2-01-domain-test.cjs tools/pf08a-m2-01-verify-debt-integration.mjs tools/pf08a-m2-01-browser-smoke.mjs \
             tools/pf08a-m4-01-domain-test.cjs tools/pf08a-m4-01-verify-integration.mjs tools/pf08a-m4-01-browser-smoke.mjs \
-            tools/pf08a-wf01-domain-test.cjs tools/pf08a-wf01-verify-integration.mjs tools/pf08a-wf01-browser-smoke.mjs; do node --check "$file"; done
+            tools/pf08a-wf01-domain-test.cjs tools/pf08a-wf01-verify-integration.mjs tools/pf08a-wf01-browser-smoke.mjs \
+            tools/pf08a-wf02-domain-test.cjs tools/pf08a-wf02-verify-integration.mjs tools/pf08a-wf02-browser-smoke.mjs; do node --check "$file"; done
 
       - name: Run domain tests
         run: |
@@ -107,8 +81,9 @@ jobs:
           node tools/pf08a-m2-01-domain-test.cjs
           node tools/pf08a-m4-01-domain-test.cjs
           node tools/pf08a-wf01-domain-test.cjs
+          node tools/pf08a-wf02-domain-test.cjs
 
-      - name: Apply compatibility and finalization
+      - name: Build deterministic runtime
         run: |
           if ! grep -Fq 'plan-obligations-foundation-v1' src/familypilot.html; then node tools/pf08a-m3-01-apply-plan-obligations.mjs; fi
           node tools/pf08a-m3-01-correct-today-payment-time.mjs
@@ -121,6 +96,7 @@ jobs:
           node tools/pf08a-m2-01-verify-debt-integration.mjs
           node tools/pf08a-m4-01-verify-integration.mjs
           node tools/pf08a-wf01-verify-integration.mjs
+          node tools/pf08a-wf02-verify-integration.mjs
 
       - name: Run browser regressions
         run: |
@@ -130,57 +106,13 @@ jobs:
           node tools/pf08a-m2-01-browser-smoke.mjs
           node tools/pf08a-m4-01-browser-smoke.mjs
           node tools/pf08a-wf01-browser-smoke.mjs
+          node tools/pf08a-wf02-browser-smoke.mjs
 
       - name: Commit verified generated runtime artifacts
         run: |
-          if git diff --quiet -- src/familypilot.html index.html; then echo "Artifacts already committed."; exit 0; fi
+          if git diff --quiet -- src/familypilot.html index.html; then echo "Verified runtime artifacts are already committed."; exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/familypilot.html index.html
-          git commit -m "Generate verified FamilyPilot runtime"
+          git commit -m "Generate verified WF-02 runtime artifacts"
           git push origin HEAD:${{ github.ref_name }}
-
-  verify:
-    if: github.event_name == 'pull_request'
-    permissions: {contents: read}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Require package markers
-        run: |
-          grep -Fq 'plan-obligations-foundation-v1' src/familypilot.html
-          grep -Fq 'debt-chains-principal-v1' src/familypilot.html
-          grep -Fq 'savings-goal-config-v1' src/familypilot.html
-          grep -Fq 'base-currency-wallet-management-v1' src/familypilot.html
-
-      - name: Check domain behavior
-        run: |
-          node tools/pf08a-m3-01-domain-test.cjs
-          node tools/pf08a-m2-01-domain-test.cjs
-          node tools/pf08a-m4-01-domain-test.cjs
-          node tools/pf08a-wf01-domain-test.cjs
-
-      - name: Recreate final runtime artifacts
-        run: |
-          node tools/pf08a-m3-01-correct-browser-test-api.mjs
-          node tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
-
-      - name: Require generated artifacts committed
-        run: git diff --exit-code -- src/familypilot.html index.html
-
-      - name: Verify integration contracts
-        run: |
-          node tools/pf08a-m3-01-verify-plan-obligations.mjs
-          node tools/pf08a-m2-01-verify-debt-integration.mjs
-          node tools/pf08a-m4-01-verify-integration.mjs
-          node tools/pf08a-wf01-verify-integration.mjs
-
-      - name: Run browser regressions
-        run: |
-          node tools/pf08a-a3-01-browser-smoke.mjs
-          node tools/pf08a-priv01-browser-smoke.mjs
-          node tools/pf08a-m3-01-browser-smoke.mjs
-          node tools/pf08a-m2-01-browser-smoke.mjs
-          node tools/pf08a-m4-01-browser-smoke.mjs
-          node tools/pf08a-wf01-browser-smoke.mjs
