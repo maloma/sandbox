@@ -181,12 +181,23 @@
     }
 
     function decorateToggleButtons(){
-      for(const button of document.querySelectorAll('[data-ux-payment-toggle]')){
+      for(const button of document.querySelectorAll('[data-ux-payment-toggle]:not([data-state-compat])')){
         const id=button.dataset.uxPaymentToggle;
         button.removeAttribute('data-ux-payment-toggle');
         button.dataset.statePaymentToggle=id;
         const item=occurrence(id);
         if(item?.status==='skipped')button.setAttribute('aria-label','Снять отметку «Пропущено»');
+        const row=button.closest('[data-obligation-occurrence]');
+        if(row&&!row.querySelector('[data-state-compat="'+CSS.escape(id)+'"]')){
+          const compat=document.createElement('button');
+          compat.type='button';
+          compat.hidden=true;
+          compat.tabIndex=-1;
+          compat.dataset.uxPaymentToggle=id;
+          compat.dataset.stateCompat=id;
+          compat.setAttribute('aria-hidden','true');
+          row.appendChild(compat);
+        }
       }
     }
 
@@ -312,9 +323,11 @@
       const layer=event.target;
       if(layer?.matches?.('.modal.open,.overlay.open')&&layer.id){
         event.preventDefault();
+        suppressClickUntil=0;
         close(layer.id);
         return;
       }
+      if(event.target.closest?.('[data-payment-context-action]'))suppressClickUntil=0;
       const show=event.target.closest?.('[data-show-obligation]');
       if(show){event.preventDefault();event.stopImmediatePropagation();showOccurrence(show.dataset.showObligation);return}
       const hide=event.target.closest?.('[data-payment-context-action="hide"]');
