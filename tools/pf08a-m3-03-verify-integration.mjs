@@ -5,7 +5,7 @@ const scope=readFileSync('familypilot-scope.js','utf8');
 const sourceScope=readFileSync('src/familypilot-scope.js','utf8');
 const domain=readFileSync('familypilot-payment-attention.js','utf8');
 const ui=readFileSync('familypilot-payment-attention-ui.js','utf8');
-const trusted=readFileSync('.github/workflows/pf08a-m3-01-trusted-pr-gate.yml','utf8');
+const trusted=readFileSync('.github/workflows/pf08a-m3-03-payment-attention.yml','utf8');
 const fail=message=>{throw new Error(message)};
 if(source!==published)fail('Published and source runtime artifacts differ');
 if(scope!==sourceScope)fail('Source and root scope modules differ');
