@@ -6,6 +6,7 @@ on:
       - agent/pf08a-m3-03-payment-attention
     paths:
       - tools/pf08a-m3-03-bootstrap.mjs
+      - tools/.m3-03-payload/**
       - .github/workflows/pf08a-m3-03-bootstrap.yml
 
 permissions:
