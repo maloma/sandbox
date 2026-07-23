@@ -12,7 +12,7 @@
     }
     window.__FP_MOBILE_PAYMENT_TAP__=true;
     const state=runtime.state,save=runtime.save,now=runtime.now;
-    let active=null,suppressedPointerClick={id:'',until:0};
+    let active=null,forwardingContext=false,suppressedPointerClick={id:'',until:0};
     const occurrence=id=>(state.obligationOccurrences||[]).find(item=>item.id===id)||null;
 
     const style=document.createElement('style');
@@ -20,7 +20,8 @@
     style.textContent='.obligation-row{grid-template-columns:minmax(0,1fr) 60px!important}.obligation-pay-check{width:58px!important;height:58px!important;min-width:58px!important;min-height:58px!important;border-radius:17px!important;touch-action:manipulation!important}';
     document.head.appendChild(style);
 
-    function proxy(id){
+    function stateToggle(id){return document.querySelector(`[data-obligation-occurrence="${CSS.escape(id)}"] [data-state-payment-toggle]`)}
+    function paymentProxy(id){
       const row=document.querySelector(`[data-obligation-occurrence="${CSS.escape(id)}"]`);
       return row?.querySelector(`[data-state-compat="${CSS.escape(id)}"]`)||row?.querySelector('[data-ux-payment-toggle]')||null;
     }
@@ -31,14 +32,20 @@
       if(unpaid){unpaid.disabled=item.status==='planned';unpaid.textContent=item.status==='planned'?'Уже не оплачено':'Не оплачено'}
       if(skipped){skipped.disabled=item.status==='skipped';skipped.textContent=item.status==='skipped'?'Уже пропущено':'Пропущено'}
     }
-    function openContext(id){const target=proxy(id);if(!target)return;target.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));queueMicrotask(()=>updateContext(id))}
+    function openContext(id){
+      const target=stateToggle(id);if(!target)return;
+      forwardingContext=true;
+      target.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));
+      forwardingContext=false;
+      queueMicrotask(()=>updateContext(id));
+    }
     function restoreSkipped(id){
       const item=occurrence(id);if(!item||item.status!=='skipped')return false;
       item.revisions=Array.isArray(item.revisions)?item.revisions:[];
       item.revisions.push({id:`mobile-rev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`,sequence:item.revisions.length+1,changedAt:now(),changedByMemberId:state.currentMemberId,source:'obligation_skip_unchecked',changes:[{field:'status',oldValue:'skipped',newValue:'planned'},{field:'skippedAt',oldValue:item.skippedAt,newValue:null}]});
       item.status='planned';item.skippedAt=null;item.lastEditedAt=now();save();runtime.renderAll();runtime.toast('Отметка «Пропущено» снята.');return true;
     }
-    function shortAction(id){const item=occurrence(id);if(!item)return;if(item.status==='skipped'){restoreSkipped(id);return}proxy(id)?.click()}
+    function shortAction(id){const item=occurrence(id);if(!item)return;if(item.status==='skipped'){restoreSkipped(id);return}paymentProxy(id)?.click()}
     function suppressNextPointerClick(id,duration=700){suppressedPointerClick={id,until:Date.now()+duration}}
     function finish(event,cancelled=false){
       const current=active;if(!current||event.pointerId!==current.pointerId)return;
@@ -59,7 +66,12 @@
     window.addEventListener('pointermove',event=>{if(active&&event.pointerId===active.pointerId&&Math.hypot(Number(event.clientX)-active.x,Number(event.clientY)-active.y)>MOVE_LIMIT){clearTimeout(active.timer);active.timer=0}},true);
     window.addEventListener('pointerup',event=>finish(event,false),true);
     window.addEventListener('pointercancel',event=>finish(event,true),true);
-    window.addEventListener('contextmenu',event=>{const button=event.target.closest?.('[data-state-payment-toggle]');if(!button)return;event.preventDefault();event.stopImmediatePropagation();clearTimeout(active?.timer);active=null;suppressNextPointerClick(button.dataset.statePaymentToggle,900);openContext(button.dataset.statePaymentToggle)},true);
+    window.addEventListener('contextmenu',event=>{
+      const button=event.target.closest?.('[data-state-payment-toggle]');if(!button)return;
+      if(forwardingContext)return;
+      event.preventDefault();event.stopImmediatePropagation();clearTimeout(active?.timer);active=null;
+      suppressNextPointerClick(button.dataset.statePaymentToggle,900);openContext(button.dataset.statePaymentToggle);
+    },true);
     window.addEventListener('click',event=>{
       const button=event.target.closest?.('[data-state-payment-toggle]');if(!button)return;
       event.preventDefault();event.stopImmediatePropagation();
@@ -70,7 +82,7 @@
       shortAction(id);
     },true);
 
-    const testApi={restoreSkipped,targetSize:id=>{const node=document.querySelector(`[data-obligation-occurrence="${CSS.escape(id)}"] [data-state-payment-toggle]`),rect=node?.getBoundingClientRect();return rect?{width:rect.width,height:rect.height}:null}};
+    const testApi={restoreSkipped,targetSize:id=>{const node=stateToggle(id),rect=node?.getBoundingClientRect();return rect?{width:rect.width,height:rect.height}:null}};
     if(new URLSearchParams(location.search).has('test')){
       const install=(attempt=0)=>{if(window.__FP_TEST__){window.__FP_TEST__.mobilePaymentTap=testApi;return}if(attempt<READY_LIMIT)setTimeout(()=>install(attempt+1),25)};install();
     }
