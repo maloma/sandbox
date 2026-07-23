@@ -22,7 +22,7 @@ const harness=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title
     const deadline=Date.now()+30000;
     while(Date.now()<deadline){
       const api=frame.contentWindow&&frame.contentWindow.__FP_TEST__;
-      if(api?.paymentAttention?.snapshot&&api?.obligations?.createRule)return api;
+      if(api?.paymentAttention?.snapshot&&api?.obligations?.createRule&&api?.paymentAttentionDemo?.load&&api?.paymentAttentionDemo?.records)return api;
       await new Promise(resolve=>setTimeout(resolve,100));
     }
     throw new Error('FamilyPilot M3-03 test API did not become ready');
