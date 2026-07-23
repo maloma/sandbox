@@ -1,0 +1,80 @@
+name: PF-08A M3-03 Payment Attention Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - familypilot-analytics-state.js
+      - src/familypilot-analytics-state.js
+      - familypilot-payment-attention.js
+      - familypilot-payment-attention-ui.js
+      - tools/pf08a-m3-03-domain-test.cjs
+      - tools/pf08a-m3-03-verify-integration.mjs
+      - tools/pf08a-m3-03-browser-smoke.mjs
+      - docs/execution-batches/PF-08A-M3-03-PAYMENT-ATTENTION/**
+      - .github/workflows/pf08a-m3-03-payment-attention.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pf08a-m3-03-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+jobs:
+  verify-exact-head:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact checked-out head
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Check syntax
+        run: |
+          for file in \
+            familypilot-analytics-state.js \
+            familypilot-payment-attention.js familypilot-payment-attention-ui.js \
+            tools/pf08a-m3-03-domain-test.cjs tools/pf08a-m3-03-verify-integration.mjs tools/pf08a-m3-03-browser-smoke.mjs; do node --check "$file"; done
+
+      - name: Run domain tests
+        run: |
+          node tools/pf08a-m3-01-domain-test.cjs
+          node tools/pf08a-m3-03-domain-test.cjs
+          node tools/pf08a-m2-01-domain-test.cjs
+          node tools/pf08a-m4-01-domain-test.cjs
+          node tools/pf08a-wf01-domain-test.cjs
+          node tools/pf08a-wf02-domain-test.cjs
+
+      - name: Recreate deterministic runtime
+        run: |
+          if ! grep -Fq 'plan-obligations-foundation-v1' src/familypilot.html; then node tools/pf08a-m3-01-apply-plan-obligations.mjs; fi
+          node tools/pf08a-m3-01-correct-today-payment-time.mjs
+          node tools/pf08a-m3-01-correct-browser-test-api.mjs
+          node tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
+          git diff --exit-code -- src/familypilot.html index.html
+
+      - name: Verify integration contracts
+        run: |
+          node tools/pf08a-m3-01-verify-plan-obligations.mjs
+          node tools/pf08a-m3-03-verify-integration.mjs
+          node tools/pf08a-m2-01-verify-debt-integration.mjs
+          node tools/pf08a-m4-01-verify-integration.mjs
+          node tools/pf08a-wf01-verify-integration.mjs
+          node tools/pf08a-wf02-verify-integration.mjs
+
+      - name: Run browser regressions
+        run: |
+          node tools/pf08a-a3-01-browser-smoke.mjs
+          node tools/pf08a-priv01-browser-smoke.mjs
+          node tools/pf08a-m3-01-browser-smoke.mjs
+          node tools/pf08a-m3-03-browser-smoke.mjs
+          node tools/pf08a-m2-01-browser-smoke.mjs
+          node tools/pf08a-m4-01-browser-smoke.mjs
+          node tools/pf08a-wf01-browser-smoke.mjs
+          node tools/pf08a-wf02-browser-smoke.mjs
