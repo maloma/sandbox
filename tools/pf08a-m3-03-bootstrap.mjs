@@ -1,3 +1,4 @@
+// Contents API delivery boundary: this commit creates the ordinary push event required by GitHub Actions.
 import { mkdirSync, writeFileSync, unlinkSync, existsSync, readFileSync, readdirSync, rmdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { gunzipSync } from 'node:zlib';
