@@ -97,8 +97,8 @@ const harness=`<!doctype html>
     assert(doc.querySelector('.obligation-date-heading'),'Per-date group heading missing');
     assert(text(doc.querySelector('.obligation-date-heading')).includes('1 платёж'),'Per-date count missing');
 
-    // Quick pay from row creates one linked Expense.
-    click(doc.querySelector('[data-m302-quick-pay="'+first.id+'"]'));
+    // Right-side quick payment toggle creates one linked Expense.
+    click(doc.querySelector('[data-ux-payment-toggle="'+first.id+'"]'));
     state=api.getState();
     let paid=state.obligationOccurrences.find(item=>item.id===first.id);
     assert(paid.status==='paid','Quick payment did not mark occurrence paid');

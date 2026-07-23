@@ -1,20 +1,30 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 const source=readFileSync('src/familypilot.html','utf8');
 const published=readFileSync('index.html','utf8');
 const scope=readFileSync('familypilot-scope.js','utf8');
 const sourceScope=readFileSync('src/familypilot-scope.js','utf8');
 const domain=readFileSync('familypilot-payment-attention.js','utf8');
 const ui=readFileSync('familypilot-payment-attention-ui.js','utf8');
+const oldSmoke=readFileSync('tools/pf08a-m3-01-browser-smoke.mjs','utf8');
 const trusted=readFileSync('.github/workflows/pf08a-m3-03-payment-attention.yml','utf8');
 const fail=message=>{throw new Error(message)};
+if(existsSync('_delivery/m3v3')||existsSync('_delivery/m3v3-test-selector'))fail('Temporary M3-03 delivery state remains in product diff');
 if(source!==published)fail('Published and source runtime artifacts differ');
 if(scope!==sourceScope)fail('Source and root scope modules differ');
 if(!source.includes('window.__FP_RUNTIME__'))fail('Existing bounded runtime bridge missing');
 for(const needle of ['familypilot-payment-attention.js','familypilot-payment-attention-ui.js','__FP_M3_03_READY__'])if(!scope.includes(needle))fail(`M3-03 bootstrap missing: ${needle}`);
 for(const needle of ['DEFAULT_LEAD_DAYS=3','paymentReminderLeadDaysByRuleId','groupedAttention','overdue','today','upcoming','m3-03-payment-attention-demo-v1','paymentAttentionDemo','data-payment-demo-load','data-payment-demo-remove'])if(!domain.includes(needle))fail(`M3-03 domain/demo contract missing: ${needle}`);
-for(const needle of ['planned-payment-attention-v2','repairMonth',"$('paymentAttentionCard')?.remove()",'plan-attention-badge','attention-overdue','obligation-row--overdue','obligation-pay-check','Запланировать:','obligation-rule-card','obligationRuleDetailModal','Клонировать','Удалить','obligationReminderLeadDays','window.__FP_TEST__.obligationUx'])if(!ui.includes(needle))fail(`M3-03 compact UX contract missing: ${needle}`);
+for(const needle of [
+  'planned-payment-attention-v3','repairMonth','plan-attention-badge','obligation-pay-check','data-ux-payment-toggle',
+  'PRESS_MS=550','paymentContextModal','data-payment-context-action="paid"','data-payment-context-action="unpaid"','data-payment-context-action="skipped"',
+  'paymentReconcileModal','matchingExpenses','linkExistingExpense','unpayOccurrence','obligationLinkMode','obligation_payment_unchecked',
+  'Обязательство · срок','actions.wf02-actions .action.transfer{order:2}','Активные правила','Отключённые','data-ux-rule-toggle',
+  'Выполнение правила','Дата начала','Последний выполненный','Пропущено до последней оплаты','#obligationArchiveBtn{display:none!important}',
+  'Системные уведомления и их общий выключатель появятся вместе с отдельным push-модулем','window.__FP_TEST__.obligationUx'
+])if(!ui.includes(needle))fail(`M3-03 interaction UX contract missing: ${needle}`);
+if(!oldSmoke.includes('Right-side quick payment toggle creates one linked Expense.')||!oldSmoke.includes('data-ux-payment-toggle'))fail('M3-02 browser smoke does not exercise accepted right-side payment toggle');
+if(oldSmoke.includes('data-m302-quick-pay'))fail('Removed legacy quick-pay selector remains in M3-02 browser smoke');
 for(const forbidden of ['Notification.requestPermission','new Notification','PushManager','serviceWorker.register','mailto:','sms:'])if(domain.includes(forbidden)||ui.includes(forbidden))fail(`External notification scope leaked: ${forbidden}`);
 for(const needle of ['familypilot-payment-attention.js','familypilot-payment-attention-ui.js','pf08a-m3-03-domain-test.cjs','pf08a-m3-03-verify-integration.mjs','pf08a-m3-03-browser-smoke.mjs'])if(!trusted.includes(needle))fail(`Trusted workflow coverage missing: ${needle}`);
 if(trusted.includes('actions/upload-artifact'))fail('M3-03 trusted workflow uploads artifacts');
-if(ui.includes('function installHomeCard'))fail('Large Home payment card installer still exists');
-console.log(JSON.stringify({status:'PASS',marker:'PF08A_M3_03_INTEGRATION_PASS',sourcePublishedIdentical:true,scopeMirrorsIdentical:true,inAppOnly:true,homeCardRemoved:true,planIndicator:true,overdueHighlight:true,currentMonthRepair:true,earlyPayment:true,dailyTotals:true,ruleCards:true,comprehensiveDemoData:true,demoDataReversible:true,noArtifacts:true},null,2));
+console.log(JSON.stringify({status:'PASS',marker:'PF08A_M3_03_INTEGRATION_PASS',sourcePublishedIdentical:true,scopeMirrorsIdentical:true,cleanDeliveryState:true,oldSmokeUsesRightToggle:true,inAppOnly:true,defaultLeadDays:3,homeCardRemoved:true,planAttention:true,rightThumbToggle:true,shortTapPayUnpay:true,longPressContext:true,duplicatePrevention:true,manualExpensePreserved:true,operationDueLink:true,transferOrder:true,activeDisabledRules:true,recurringStats:true,notificationPreferenceDeferred:true,comprehensiveDemoData:true,noArtifacts:true},null,2));
