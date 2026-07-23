@@ -30,8 +30,8 @@ jobs:
       - name: Verify exact checked-out head
         run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
 
-      - name: Verify published M3-03 FamilyPilot demo package
+      - name: Verify published compact M3-03 FamilyPilot package
         env:
           PUBLIC_URL: https://maloma.github.io/sandbox/
-          EXPECTED_MAIN_M303: 3eb727e60a79feead45319982233eacf4cc63c4c
+          EXPECTED_MAIN_M303: 23aa2c7852fd2664c757bebc7ed4fee8bfa8e54a
         run: node tools/pf08a-m3-03-public-browser-smoke.mjs
