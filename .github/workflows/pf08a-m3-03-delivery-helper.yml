@@ -10,6 +10,8 @@ on:
 
 permissions:
   contents: write
+  issues: write
+  pull-requests: write
 
 concurrency:
   group: pf08a-m3-03-delivery-${{ github.event.pull_request.number }}
@@ -82,19 +84,24 @@ jobs:
         run: node tools/pf08a-m3-01-browser-smoke.mjs
 
       - name: Browser regression — Payment attention
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set +e
           node tools/pf08a-m3-03-browser-smoke.mjs > /tmp/pf08a-m3-03-browser.log 2>&1
           status=$?
           cat /tmp/pf08a-m3-03-browser.log
           if [ "$status" -ne 0 ]; then
-            mkdir -p docs/execution-batches/PF-08A-M3-03-PAYMENT-ATTENTION
-            cp /tmp/pf08a-m3-03-browser.log docs/execution-batches/PF-08A-M3-03-PAYMENT-ATTENTION/Browser_Failure.log
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "Materialize M3-03 package for browser correction"
-            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+            {
+              echo '### M3-03 browser failure'
+              echo
+              echo 'Exact output from the bounded payment-attention browser smoke:'
+              echo
+              echo '```text'
+              tail -n 120 /tmp/pf08a-m3-03-browser.log
+              echo '```'
+            } > /tmp/pf08a-m3-03-comment.md
+            gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/pf08a-m3-03-comment.md
             exit "$status"
           fi
           rm -f /tmp/pf08a-m3-03-browser.log
