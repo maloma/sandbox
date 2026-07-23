@@ -48,14 +48,14 @@ jobs:
 
       - name: Verify package contract
         run: |
-          grep -F "familypilot-partial-payments.js" familypilot-scope.js
-          grep -F "familypilot-partial-payments-render-sync.js" familypilot-scope.js
-          grep -F "Частичная оплата" familypilot-partial-payments.js
-          grep -F "obligationAllocationOccurrenceId" familypilot-partial-payments.js
-          grep -F "Плановый расход" familypilot-partial-payments.js
-          grep -F "Снять отметку и удалить связанные операции" familypilot-partial-payments.js
-          grep -F "obligation-row--partial" familypilot-partial-payments-render-sync.js
-          grep -F "window.__FP_TEST__.renderAll=()=>runtime.renderAll()" familypilot-partial-payments-render-sync.js
+          grep -qF "familypilot-partial-payments.js" familypilot-scope.js
+          grep -qF "familypilot-partial-payments-render-sync.js" familypilot-scope.js
+          grep -qF "Частичная оплата" familypilot-partial-payments.js
+          grep -qF "obligationAllocationOccurrenceId" familypilot-partial-payments.js
+          grep -qF "Плановый расход" familypilot-partial-payments.js
+          grep -qF "Снять отметку и удалить связанные операции" familypilot-partial-payments.js
+          grep -qF "obligation-row--partial" familypilot-partial-payments-render-sync.js
+          grep -qF "window.__FP_TEST__.renderAll=()=>runtime.renderAll()" familypilot-partial-payments-render-sync.js
 
       - name: Browser regression — partial and cumulative payments
         run: node tools/pf08a-m3-07-partial-payments-browser-smoke.mjs
