@@ -6,6 +6,9 @@ on:
     paths:
       - 'index.html'
       - 'debt.html'
+      - 'familypilot-*.js'
+      - 'src/familypilot.html'
+      - 'src/familypilot-*.js'
       - '.nojekyll'
       - 'README.md'
       - '.github/workflows/pages.yml'
