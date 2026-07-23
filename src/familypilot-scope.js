@@ -80,7 +80,7 @@
   root.FamilyPilotScope=Object.freeze({activeOperations,activeMovements,canAccessWallet,accessibleWallets,defaultWallet,activeWallet,isPersonalWallet,isTransfer,visibleOperations,householdCapitalOperations,householdCapitalMovements,walletMovements,totals,movementTotals,capitalSnapshot,scopeDescriptor});
 })(typeof window!=='undefined'?window:globalThis);
 
-(function bootstrapFamilyPilotWF02(root){
+(function bootstrapFamilyPilotPackages(root){
   'use strict';
   if(typeof document==='undefined'||!root||root.__FP_WF02_BOOTSTRAP__)return;
   root.__FP_WF02_BOOTSTRAP__=true;
@@ -108,10 +108,13 @@
     const script=document.createElement('script');
     script.src=`./${path}`;
     script.async=false;
-    script.dataset.familyPilotPackage='wf02';
+    script.dataset.familyPilotPackage='runtime-extension';
     script.addEventListener('load',()=>{script.dataset.loaded='true';ready()},{once:true});
-    script.addEventListener('error',()=>{root.__FP_WF02_BOOTSTRAP_ERROR__=`Failed to load ${path}`},{once:true});
+    script.addEventListener('error',()=>{root.__FP_PACKAGE_BOOTSTRAP_ERROR__=`Failed to load ${path}`},{once:true});
     document.head.appendChild(script);
+  }
+  function loadPaymentAttention(){
+    loadScript('familypilot-payment-attention.js',()=>loadScript('familypilot-payment-attention-ui.js',()=>{root.__FP_M3_03_READY__=true}));
   }
   function loadUiWhenBaseRuntimeReady(){
     if(testMode&&!root.__FP_TEST__){
@@ -119,7 +122,7 @@
       setTimeout(loadUiWhenBaseRuntimeReady,25);
       return;
     }
-    loadScript('familypilot-wallet-transfers-ui.js',()=>{root.__FP_WF02_READY__=true});
+    loadScript('familypilot-wallet-transfers-ui.js',()=>{root.__FP_WF02_READY__=true;loadPaymentAttention()});
   }
   function mount(){
     ensurePackageMarker();

@@ -53,7 +53,7 @@ const harness=`<!doctype html>
 
     click(doc.querySelector('[data-screen="plans"]'));
     assert(doc.getElementById('plansScreen').classList.contains('active'),'Plan root did not open');
-    assert(doc.querySelectorAll('#plansScreen .plan-module[disabled]').length===2,'Debts and Savings must remain honest unavailable entries');
+    const debtPlanModule=doc.querySelector('[data-plan-module="debts"]'),savingsPlanModule=doc.querySelector('[data-plan-module="savings"]');assert(debtPlanModule&&!debtPlanModule.disabled,'Debts must remain active after M2 integration');assert(savingsPlanModule&&!savingsPlanModule.disabled,'Savings must remain active after M4 integration');assert(doc.querySelectorAll('#plansScreen .plan-module[disabled]').length===0,'All accepted Plan modules must remain active after M4 integration');
     click(doc.querySelector('[data-plan-module="obligations"]'));
     assert(doc.getElementById('obligationsScreen').classList.contains('active'),'Obligations screen did not open');
     assert(!doc.getElementById('obligationSummary'),'Forbidden summary container remains in runtime DOM');
