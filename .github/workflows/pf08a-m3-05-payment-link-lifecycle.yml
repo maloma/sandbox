@@ -1,0 +1,56 @@
+name: PF-08A M3-05 Payment Link Lifecycle Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - familypilot-scope.js
+      - src/familypilot-scope.js
+      - familypilot-payment-link-lifecycle.js
+      - tools/pf08a-m3-05-browser-smoke.mjs
+      - .github/workflows/pf08a-m3-05-payment-link-lifecycle.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify-exact-head:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          show-progress: false
+
+      - name: Verify exact checked-out head
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Check syntax and mirrors
+        run: |
+          node --check familypilot-scope.js
+          node --check familypilot-payment-link-lifecycle.js
+          node --check tools/pf08a-m3-05-browser-smoke.mjs
+          cmp familypilot-scope.js src/familypilot-scope.js
+
+      - name: Verify lifecycle contract
+        run: |
+          grep -F "familypilot-payment-link-lifecycle.js" familypilot-scope.js
+          grep -F "obligationPaymentLinkMemoryByOccurrenceId" familypilot-payment-link-lifecycle.js
+          grep -F "paymentUnpayModal" familypilot-payment-link-lifecycle.js
+          grep -F "Снять отметку и удалить операцию" familypilot-payment-link-lifecycle.js
+          grep -F "Снять отметку, операцию оставить" familypilot-payment-link-lifecycle.js
+          grep -F "obligation-row[hidden]" familypilot-payment-link-lifecycle.js
+          grep -F "INTERNAL_VOID_STATUS='voided'" familypilot-payment-link-lifecycle.js
+          grep -F "obligation_payment_unchecked" familypilot-payment-link-lifecycle.js
+          ! grep -F "status='trash'" familypilot-payment-link-lifecycle.js
+          ! grep -F "Notification.requestPermission" familypilot-payment-link-lifecycle.js
+
+      - name: Browser regression — payment link lifecycle
+        run: node tools/pf08a-m3-05-browser-smoke.mjs
