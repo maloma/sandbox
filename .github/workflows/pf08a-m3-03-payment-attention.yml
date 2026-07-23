@@ -30,7 +30,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
+          fetch-depth: 1
+          show-progress: false
 
       - name: Verify exact checked-out head
         run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
@@ -68,13 +69,26 @@ jobs:
           node tools/pf08a-wf01-verify-integration.mjs
           node tools/pf08a-wf02-verify-integration.mjs
 
-      - name: Run browser regressions
-        run: |
-          node tools/pf08a-a3-01-browser-smoke.mjs
-          node tools/pf08a-priv01-browser-smoke.mjs
-          node tools/pf08a-m3-01-browser-smoke.mjs
-          node tools/pf08a-m3-03-browser-smoke.mjs
-          node tools/pf08a-m2-01-browser-smoke.mjs
-          node tools/pf08a-m4-01-browser-smoke.mjs
-          node tools/pf08a-wf01-browser-smoke.mjs
-          node tools/pf08a-wf02-browser-smoke.mjs
+      - name: Browser regression — Analytics
+        run: node tools/pf08a-a3-01-browser-smoke.mjs
+
+      - name: Browser regression — Privacy
+        run: node tools/pf08a-priv01-browser-smoke.mjs
+
+      - name: Browser regression — Obligations foundation
+        run: node tools/pf08a-m3-01-browser-smoke.mjs
+
+      - name: Browser regression — Payment interaction
+        run: node tools/pf08a-m3-03-browser-smoke.mjs
+
+      - name: Browser regression — Debts
+        run: node tools/pf08a-m2-01-browser-smoke.mjs
+
+      - name: Browser regression — Savings
+        run: node tools/pf08a-m4-01-browser-smoke.mjs
+
+      - name: Browser regression — Wallet management
+        run: node tools/pf08a-wf01-browser-smoke.mjs
+
+      - name: Browser regression — Wallet transfers
+        run: node tools/pf08a-wf02-browser-smoke.mjs
