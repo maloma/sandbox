@@ -13,6 +13,7 @@
     window.__FP_PARTIAL_PAYMENTS_RENDER_SYNC__=true;
     const state=runtime.state,scopeApi=runtime.scopeApi,esc=runtime.esc,money=runtime.money,now=runtime.now;
     const occurrence=id=>(state.obligationOccurrences||[]).find(item=>item.id===id)||null;
+    const operation=id=>(state.operations||[]).find(item=>item.id===id)||null;
     const wallet=id=>(state.wallets||[]).find(item=>item.id===id)||null;
     const currency=item=>item?.currency||wallet(item?.walletId)?.nativeCurrency||state.household?.baseCurrency||'EUR';
     const list=document.getElementById('obligationList');
@@ -83,7 +84,11 @@
       const install=(n=0)=>{
         if(window.__FP_TEST__){
           window.__FP_TEST__.renderAll=()=>runtime.renderAll();
-          window.__FP_TEST__.partialPayments=Object.freeze({...payments,render:sync});
+          window.__FP_TEST__.partialPayments=Object.freeze({
+            ...payments,
+            render:sync,
+            attachOperation:(occurrenceId,candidate)=>payments.attachOperation(occurrenceId,operation(candidate?.id)||candidate)
+          });
           return;
         }
         if(n<READY_LIMIT)setTimeout(()=>install(n+1),25);
