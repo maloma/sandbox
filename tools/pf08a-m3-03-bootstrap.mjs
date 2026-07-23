@@ -1,3 +1,4 @@
+// The bounded attention-row deep-link correction is active in the trusted delivery helper.
 // Click-handler context reporting is enabled for the isolated M3-03 browser failure.
 // Exact browser failure reporting to PR #50 is enabled.
 // Preserve the materialized package and exact browser log when the bounded M3-03 smoke fails.
