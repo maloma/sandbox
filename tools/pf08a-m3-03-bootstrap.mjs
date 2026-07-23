@@ -1,4 +1,5 @@
-// Contents API delivery boundary: this commit creates the ordinary push event required by GitHub Actions.
+// Trusted same-repository delivery helper materializes the already uploaded bounded package.
+// Contents API delivery boundary: this commit creates the ordinary PR synchronization event required by GitHub Actions.
 import { mkdirSync, writeFileSync, unlinkSync, existsSync, readFileSync, readdirSync, rmdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { gunzipSync } from 'node:zlib';
