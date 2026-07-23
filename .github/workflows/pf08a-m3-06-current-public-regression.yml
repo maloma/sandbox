@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - tools/pf08a-m3-06-current-public-browser-smoke.mjs
       - .github/workflows/pf08a-m3-06-current-public-regression.yml
 
 permissions:
@@ -37,4 +38,4 @@ jobs:
         env:
           PUBLIC_URL: https://maloma.github.io/sandbox/
           EXPECTED_MAIN_M306: a6f7702936d55c3cbf94a780b9f49158629659ba
-        run: node tools/pf08a-m3-06-public-browser-smoke.mjs
+        run: node tools/pf08a-m3-06-current-public-browser-smoke.mjs
