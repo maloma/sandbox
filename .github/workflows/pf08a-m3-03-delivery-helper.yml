@@ -34,6 +34,20 @@ jobs:
       - name: Materialize existing bounded package
         run: node tools/pf08a-m3-03-bootstrap.mjs
 
+      - name: Apply bounded attention deep-link correction
+        run: |
+          node <<'NODE'
+          const fs=require('node:fs');
+          const file='familypilot-payment-attention-ui.js';
+          let source=fs.readFileSync(file,'utf8');
+          const anchor='function openOccurrence(id){';
+          const replacement="function openOccurrence(id){showScreen('obligations');runtime.renderAll();";
+          const count=source.split(anchor).length-1;
+          if(count!==1)throw new Error(`Expected one attention openOccurrence anchor, found ${count}`);
+          source=source.replace(anchor,replacement);
+          fs.writeFileSync(file,source);
+          NODE
+
       - name: Check syntax
         run: |
           for file in \
@@ -93,24 +107,10 @@ jobs:
           cat /tmp/pf08a-m3-03-browser.log
           if [ "$status" -ne 0 ]; then
             {
-              echo '### M3-03 browser failure and click-handler context'
-              echo
-              echo 'Exact browser output:'
+              echo '### M3-03 browser failure after deep-link correction'
               echo
               echo '```text'
-              tail -n 80 /tmp/pf08a-m3-03-browser.log
-              echo '```'
-              echo
-              echo 'Relevant UI lines:'
-              echo
-              echo '```text'
-              grep -nE 'attention|obligation|showScreen|data-' familypilot-payment-attention-ui.js | tail -n 120
-              echo '```'
-              echo
-              echo 'Relevant smoke-test lines:'
-              echo
-              echo '```text'
-              nl -ba tools/pf08a-m3-03-browser-smoke.mjs | sed -n '45,80p'
+              tail -n 100 /tmp/pf08a-m3-03-browser.log
               echo '```'
             } > /tmp/pf08a-m3-03-comment.md
             gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/pf08a-m3-03-comment.md
