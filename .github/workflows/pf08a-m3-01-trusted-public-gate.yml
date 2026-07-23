@@ -4,9 +4,9 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - tools/pf08a-wf02-public-browser-smoke.mjs
-      - docs/execution-batches/PF-08A-WF02-BASE-CURRENCY-WALLET-TRANSFERS/Public_Verification.md
-      - docs/execution-batches/PF-08A-WF02-BASE-CURRENCY-WALLET-TRANSFERS/Checkpoint_Ledger.md
+      - tools/pf08a-m3-03-public-browser-smoke.mjs
+      - docs/execution-batches/PF-08A-M3-03-PAYMENT-ATTENTION/Public_Verification.md
+      - docs/execution-batches/PF-08A-M3-03-PAYMENT-ATTENTION/Checkpoint_Ledger.md
       - .github/workflows/pf08a-m3-01-trusted-public-gate.yml
 
 permissions:
@@ -30,8 +30,8 @@ jobs:
       - name: Verify exact checked-out head
         run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
 
-      - name: Verify published WF-02 FamilyPilot package
+      - name: Verify published M3-03 FamilyPilot package
         env:
           PUBLIC_URL: https://maloma.github.io/sandbox/
-          EXPECTED_MAIN_WF02: 4a20cf720314a9d4fe6b8e410d22aa26411c78e1
-        run: node tools/pf08a-wf02-public-browser-smoke.mjs
+          EXPECTED_MAIN_M303: cbb6651e53d61b5552598f32159f36fe6e1ec82d
+        run: node tools/pf08a-m3-03-public-browser-smoke.mjs
