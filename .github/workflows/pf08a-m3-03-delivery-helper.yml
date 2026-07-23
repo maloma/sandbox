@@ -130,8 +130,9 @@ jobs:
       - name: Browser regression — Wallet transfers
         run: node tools/pf08a-wf02-browser-smoke.mjs
 
-      - name: Commit verified package to PR branch
+      - name: Commit verified product package to PR branch
         run: |
+          git restore --source=HEAD -- .github/workflows
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
