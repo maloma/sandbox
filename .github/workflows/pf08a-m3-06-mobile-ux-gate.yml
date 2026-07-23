@@ -49,7 +49,7 @@ jobs:
           grep -F "familypilot-operation-mobile-ui.js" familypilot-scope.js
           grep -F "familypilot-operation-date-picker.js" familypilot-scope.js
           grep -F "obligation_skip_unchecked" familypilot-mobile-payment-tap.js
-          grep -F "--fp-fixed-bottom" familypilot-operation-mobile-ui.js
+          grep -F -- "--fp-fixed-bottom" familypilot-operation-mobile-ui.js
           grep -F "operationDatePickerModal" familypilot-operation-date-picker.js
 
       - name: Browser regression — mobile obligation and operation UX
