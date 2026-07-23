@@ -1,0 +1,65 @@
+name: PF-08A M4-01 Planned Income Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - familypilot-scope.js
+      - src/familypilot-scope.js
+      - familypilot-planned-income.js
+      - familypilot-planned-income-ui.js
+      - tools/pf08a-m4-01-planned-income-browser-smoke.mjs
+      - .github/workflows/pf08a-m4-01-planned-income-gate.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify-exact-head:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+
+      - name: Verify exact checked-out head
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Check syntax and mirrors
+        run: |
+          node --check familypilot-scope.js
+          node --check familypilot-planned-income.js
+          node --check familypilot-planned-income-ui.js
+          node --check tools/pf08a-m4-01-planned-income-browser-smoke.mjs
+          cmp familypilot-scope.js src/familypilot-scope.js
+
+      - name: Verify separate-module contract
+        run: |
+          grep -qF "familypilot-planned-income.js" familypilot-scope.js
+          grep -qF "familypilot-planned-income-ui.js" familypilot-scope.js
+          grep -qF "Плановые приходы" familypilot-planned-income-ui.js
+          grep -qF "Отдельно от обязательств" familypilot-planned-income-ui.js
+          grep -qF "kind:'income'" familypilot-planned-income.js
+          grep -qF "Плановый приход" familypilot-planned-income-ui.js
+          grep -qF "Скрытые приходы" familypilot-planned-income-ui.js
+          grep -qF "Отключённые" familypilot-planned-income-ui.js
+          grep -qF "plannedIncomeOccurrenceId" familypilot-planned-income.js
+
+      - name: Browser regression — complete obligation history
+        run: node tools/pf08a-m3-08-rule-history-browser-smoke.mjs
+
+      - name: Browser regression — separate planned incomes
+        run: node tools/pf08a-m4-01-planned-income-browser-smoke.mjs
