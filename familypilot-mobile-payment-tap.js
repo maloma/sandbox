@@ -12,7 +12,7 @@
     }
     window.__FP_MOBILE_PAYMENT_TAP__=true;
     const state=runtime.state,save=runtime.save,now=runtime.now;
-    let active=null,suppressUntil=0;
+    let active=null,suppressedPointerClick={id:'',until:0};
     const occurrence=id=>(state.obligationOccurrences||[]).find(item=>item.id===id)||null;
 
     const style=document.createElement('style');
@@ -39,9 +39,10 @@
       item.status='planned';item.skippedAt=null;item.lastEditedAt=now();save();runtime.renderAll();runtime.toast('Отметка «Пропущено» снята.');return true;
     }
     function shortAction(id){const item=occurrence(id);if(!item)return;if(item.status==='skipped'){restoreSkipped(id);return}proxy(id)?.click()}
+    function suppressNextPointerClick(id,duration=700){suppressedPointerClick={id,until:Date.now()+duration}}
     function finish(event,cancelled=false){
       const current=active;if(!current||event.pointerId!==current.pointerId)return;
-      clearTimeout(current.timer);active=null;suppressUntil=Date.now()+700;
+      clearTimeout(current.timer);active=null;suppressNextPointerClick(current.id);
       if(cancelled||current.long)return;
       if(Math.hypot(Number(event.clientX)-current.x,Number(event.clientY)-current.y)>MOVE_LIMIT)return;
       event.preventDefault();event.stopImmediatePropagation();shortAction(current.id);
@@ -51,15 +52,23 @@
       const button=event.target.closest?.('[data-state-payment-toggle]');if(!button||event.button>0)return;
       const id=button.dataset.statePaymentToggle;
       active={pointerId:event.pointerId,id,x:Number(event.clientX),y:Number(event.clientY),long:false,timer:0};
-      active.timer=setTimeout(()=>{if(!active||active.pointerId!==event.pointerId)return;active.long=true;suppressUntil=Date.now()+900;openContext(id);navigator.vibrate?.(20)},LONG_MS);
+      active.timer=setTimeout(()=>{if(!active||active.pointerId!==event.pointerId)return;active.long=true;suppressNextPointerClick(id,900);openContext(id);navigator.vibrate?.(20)},LONG_MS);
       try{button.setPointerCapture?.(event.pointerId)}catch{}
       event.stopImmediatePropagation();
     },true);
     window.addEventListener('pointermove',event=>{if(active&&event.pointerId===active.pointerId&&Math.hypot(Number(event.clientX)-active.x,Number(event.clientY)-active.y)>MOVE_LIMIT){clearTimeout(active.timer);active.timer=0}},true);
     window.addEventListener('pointerup',event=>finish(event,false),true);
     window.addEventListener('pointercancel',event=>finish(event,true),true);
-    window.addEventListener('contextmenu',event=>{const button=event.target.closest?.('[data-state-payment-toggle]');if(!button)return;event.preventDefault();event.stopImmediatePropagation();clearTimeout(active?.timer);active=null;suppressUntil=Date.now()+900;openContext(button.dataset.statePaymentToggle)},true);
-    window.addEventListener('click',event=>{const button=event.target.closest?.('[data-state-payment-toggle]');if(!button)return;event.preventDefault();event.stopImmediatePropagation();if(Date.now()<suppressUntil)return;shortAction(button.dataset.statePaymentToggle)},true);
+    window.addEventListener('contextmenu',event=>{const button=event.target.closest?.('[data-state-payment-toggle]');if(!button)return;event.preventDefault();event.stopImmediatePropagation();clearTimeout(active?.timer);active=null;suppressNextPointerClick(button.dataset.statePaymentToggle,900);openContext(button.dataset.statePaymentToggle)},true);
+    window.addEventListener('click',event=>{
+      const button=event.target.closest?.('[data-state-payment-toggle]');if(!button)return;
+      event.preventDefault();event.stopImmediatePropagation();
+      const id=button.dataset.statePaymentToggle;
+      const duplicatedPointerClick=event.detail>0&&suppressedPointerClick.id===id&&Date.now()<suppressedPointerClick.until;
+      if(duplicatedPointerClick)return;
+      suppressedPointerClick={id:'',until:0};
+      shortAction(id);
+    },true);
 
     const testApi={restoreSkipped,targetSize:id=>{const node=document.querySelector(`[data-obligation-occurrence="${CSS.escape(id)}"] [data-state-payment-toggle]`),rect=node?.getBoundingClientRect();return rect?{width:rect.width,height:rect.height}:null}};
     if(new URLSearchParams(location.search).has('test')){
