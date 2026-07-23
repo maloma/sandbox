@@ -114,7 +114,10 @@
     document.head.appendChild(script);
   }
   function loadPaymentAttention(){
-    loadScript('familypilot-payment-attention.js',()=>loadScript('familypilot-payment-attention-ui.js',()=>{root.__FP_M3_03_READY__=true}));
+    loadScript('familypilot-payment-attention.js',()=>loadScript('familypilot-payment-attention-ui.js',()=>{
+      root.__FP_M3_03_READY__=true;
+      loadScript('familypilot-obligation-state-ui.js',()=>{root.__FP_M3_04_READY__=true});
+    }));
   }
   function loadUiWhenBaseRuntimeReady(){
     if(testMode&&!root.__FP_TEST__){
