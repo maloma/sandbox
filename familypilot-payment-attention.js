@@ -86,7 +86,7 @@
 (function(){
   'use strict';
 
-  if(window.__FP_M3_03_DEMO__)return;
+  if(typeof window==='undefined'||window.__FP_M3_03_DEMO__)return;
   const READY_LIMIT=1200;
   const VERSION='m3-03-payment-attention-demo-v1';
   const MARKER='marker:m3-03-payment-attention-demo:';
