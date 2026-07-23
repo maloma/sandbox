@@ -82,7 +82,22 @@ jobs:
         run: node tools/pf08a-m3-01-browser-smoke.mjs
 
       - name: Browser regression — Payment attention
-        run: node tools/pf08a-m3-03-browser-smoke.mjs
+        run: |
+          set +e
+          node tools/pf08a-m3-03-browser-smoke.mjs > /tmp/pf08a-m3-03-browser.log 2>&1
+          status=$?
+          cat /tmp/pf08a-m3-03-browser.log
+          if [ "$status" -ne 0 ]; then
+            mkdir -p docs/execution-batches/PF-08A-M3-03-PAYMENT-ATTENTION
+            cp /tmp/pf08a-m3-03-browser.log docs/execution-batches/PF-08A-M3-03-PAYMENT-ATTENTION/Browser_Failure.log
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "Materialize M3-03 package for browser correction"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+            exit "$status"
+          fi
+          rm -f /tmp/pf08a-m3-03-browser.log
 
       - name: Browser regression — Debts
         run: node tools/pf08a-m2-01-browser-smoke.mjs
