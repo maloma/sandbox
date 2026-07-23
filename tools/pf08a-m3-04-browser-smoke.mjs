@@ -50,7 +50,7 @@ const harness=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title
     const create=(name,dueAt)=>api.obligations.createRule({name,amount:25,dueAt,cadence:'once',walletId:wallet,categoryId:category,currency:'EUR'});
     const skipped=create('Проверка пропущенного',Date.now());
     const overdue=create('Проверка скрытия',Date.now()-86400000);
-    const recurring=api.obligations.createRule({name:'Проверка карточки правила',amount:40,dueAt:Date.now()+86400000,cadence:'recurring',intervalValue:1,intervalUnit:'month',endingMode:'count',paymentCount:3,walletId:wallet,categoryId:category,currency:'EUR'});
+    const recurring=api.obligations.createRule({name:'Проверка карточки правила',amount:40,dueAt:Date.now()+40*86400000,cadence:'recurring',intervalValue:1,intervalUnit:'month',endingMode:'count',paymentCount:3,walletId:wallet,categoryId:category,currency:'EUR'});
     assert(skipped.ok&&overdue.ok&&recurring.ok,'Obligation fixtures failed');
     api.obligations.skip(skipped.occurrence.id);
     api.obligations.openList();
