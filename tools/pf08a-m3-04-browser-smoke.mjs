@@ -128,7 +128,11 @@ let serverAddress;
 try{
   await new Promise((resolvePromise,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',()=>{serverAddress=server.address();resolvePromise()})});
   const dom=await runChrome(`http://127.0.0.1:${serverAddress.port}/${harnessName}`);
-  if(!dom.includes('data-status="PASS"')||!dom.includes(marker))throw new Error('M3-04 browser smoke did not pass: '+dom.slice(-6000));
+  if(!dom.includes('data-status="PASS"')||!dom.includes(marker)){
+    const match=dom.match(/<pre id="result">([\s\S]*?)<\/pre>/i);
+    const detail=(match?.[1]||'No browser assertion detail').replace(/<[^>]+>/g,' ').replace(/&quot;/g,'"').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();
+    throw new Error('M3-04 browser smoke did not pass: '+detail.slice(-1600));
+  }
   console.log(marker);
 }finally{
   if(server.listening)await new Promise(resolvePromise=>server.close(resolvePromise));
