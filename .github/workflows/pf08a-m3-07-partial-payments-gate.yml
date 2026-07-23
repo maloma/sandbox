@@ -7,6 +7,7 @@ on:
       - familypilot-scope.js
       - src/familypilot-scope.js
       - familypilot-partial-payments.js
+      - familypilot-partial-payment-settlement.js
       - familypilot-partial-payments-render-sync.js
       - tools/pf08a-m3-07-partial-payments-browser-smoke.mjs
       - .github/workflows/pf08a-m3-07-partial-payments-gate.yml
@@ -42,6 +43,7 @@ jobs:
         run: |
           node --check familypilot-scope.js
           node --check familypilot-partial-payments.js
+          node --check familypilot-partial-payment-settlement.js
           node --check familypilot-partial-payments-render-sync.js
           node --check tools/pf08a-m3-07-partial-payments-browser-smoke.mjs
           cmp familypilot-scope.js src/familypilot-scope.js
@@ -49,11 +51,13 @@ jobs:
       - name: Verify package contract
         run: |
           grep -qF "familypilot-partial-payments.js" familypilot-scope.js
+          grep -qF "familypilot-partial-payment-settlement.js" familypilot-scope.js
           grep -qF "familypilot-partial-payments-render-sync.js" familypilot-scope.js
           grep -qF "Частичная оплата" familypilot-partial-payments.js
           grep -qF "obligationAllocationOccurrenceId" familypilot-partial-payments.js
           grep -qF "Плановый расход" familypilot-partial-payments.js
           grep -qF "Снять отметку и удалить связанные операции" familypilot-partial-payments.js
+          grep -qF "explicitFullSettlement" familypilot-partial-payment-settlement.js
           grep -qF "obligation-row--partial" familypilot-partial-payments-render-sync.js
           grep -qF "window.__FP_TEST__.renderAll=()=>runtime.renderAll()" familypilot-partial-payments-render-sync.js
 
