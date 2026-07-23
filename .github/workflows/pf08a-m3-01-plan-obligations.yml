@@ -1,23 +1,56 @@
-name: PF-08A M3-03 Verified Package Delivery
+name: PF-08A FamilyPilot Module Regression
 
 on:
   push:
     branches:
-      - agent/pf08a-m3-03-payment-attention
+      - agent/pf08a-wf02-base-currency-transfers
     paths:
+      - src/familypilot.html
+      - src/familypilot-scope.js
+      - index.html
+      - familypilot-scope.js
+      - familypilot-obligations.js
+      - familypilot-obligations-ui-v2.js
+      - familypilot-debts.js
+      - familypilot-debts-ui.js
+      - familypilot-savings-goals.js
+      - familypilot-savings-goals-ui.js
+      - familypilot-wallet-management.js
+      - familypilot-wallet-management-ui.js
+      - familypilot-wallet-transfers.js
+      - familypilot-wallet-transfers-ui.js
+      - tools/pf08a-m3-01-apply-plan-obligations.mjs
+      - tools/pf08a-m3-01-correct-today-payment-time.mjs
+      - tools/pf08a-m3-01-correct-browser-test-api.mjs
+      - tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
+      - tools/pf08a-m3-01-verify-plan-obligations.mjs
+      - tools/pf08a-m3-01-domain-test.cjs
+      - tools/pf08a-m3-01-browser-smoke.mjs
+      - tools/pf08a-m2-01-domain-test.cjs
+      - tools/pf08a-m2-01-verify-debt-integration.mjs
+      - tools/pf08a-m2-01-browser-smoke.mjs
+      - tools/pf08a-m4-01-domain-test.cjs
+      - tools/pf08a-m4-01-verify-integration.mjs
+      - tools/pf08a-m4-01-browser-smoke.mjs
+      - tools/pf08a-wf01-domain-test.cjs
+      - tools/pf08a-wf01-verify-integration.mjs
+      - tools/pf08a-wf01-browser-smoke.mjs
+      - tools/pf08a-wf02-domain-test.cjs
+      - tools/pf08a-wf02-verify-integration.mjs
+      - tools/pf08a-wf02-browser-smoke.mjs
       - .github/workflows/pf08a-m3-01-plan-obligations.yml
-      - tools/.m3-03-payload/**
-      - tools/pf08a-m3-03-bootstrap.mjs
+      - .github/workflows/pf08a-m3-01-trusted-pr-gate.yml
+      - docs/execution-batches/PF-08A-WF02-BASE-CURRENCY-WALLET-TRANSFERS/**
 
 permissions:
   contents: write
 
 concurrency:
-  group: pf08a-m3-03-delivery-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  materialize-verify-commit:
+  generate-and-verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -26,33 +59,40 @@ jobs:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
 
-      - name: Materialize final package
-        run: node tools/pf08a-m3-03-bootstrap.mjs
-
       - name: Check syntax
         run: |
           for file in \
             familypilot-obligations.js familypilot-obligations-ui-v2.js \
-            familypilot-payment-attention.js familypilot-payment-attention-ui.js \
             familypilot-debts.js familypilot-debts-ui.js \
             familypilot-savings-goals.js familypilot-savings-goals-ui.js \
             familypilot-wallet-management.js familypilot-wallet-management-ui.js \
             familypilot-wallet-transfers.js familypilot-wallet-transfers-ui.js \
-            tools/pf08a-m3-03-domain-test.cjs tools/pf08a-m3-03-verify-integration.mjs tools/pf08a-m3-03-browser-smoke.mjs; do node --check "$file"; done
+            tools/pf08a-m3-01-apply-plan-obligations.mjs tools/pf08a-m3-01-correct-today-payment-time.mjs \
+            tools/pf08a-m3-01-correct-browser-test-api.mjs tools/pf08a-m3-01-finalize-runtime-artifacts.mjs \
+            tools/pf08a-m3-01-verify-plan-obligations.mjs tools/pf08a-m3-01-domain-test.cjs tools/pf08a-m3-01-browser-smoke.mjs \
+            tools/pf08a-m2-01-domain-test.cjs tools/pf08a-m2-01-verify-debt-integration.mjs tools/pf08a-m2-01-browser-smoke.mjs \
+            tools/pf08a-m4-01-domain-test.cjs tools/pf08a-m4-01-verify-integration.mjs tools/pf08a-m4-01-browser-smoke.mjs \
+            tools/pf08a-wf01-domain-test.cjs tools/pf08a-wf01-verify-integration.mjs tools/pf08a-wf01-browser-smoke.mjs \
+            tools/pf08a-wf02-domain-test.cjs tools/pf08a-wf02-verify-integration.mjs tools/pf08a-wf02-browser-smoke.mjs; do node --check "$file"; done
 
       - name: Run domain tests
         run: |
           node tools/pf08a-m3-01-domain-test.cjs
-          node tools/pf08a-m3-03-domain-test.cjs
           node tools/pf08a-m2-01-domain-test.cjs
           node tools/pf08a-m4-01-domain-test.cjs
           node tools/pf08a-wf01-domain-test.cjs
           node tools/pf08a-wf02-domain-test.cjs
 
+      - name: Build deterministic runtime
+        run: |
+          if ! grep -Fq 'plan-obligations-foundation-v1' src/familypilot.html; then node tools/pf08a-m3-01-apply-plan-obligations.mjs; fi
+          node tools/pf08a-m3-01-correct-today-payment-time.mjs
+          node tools/pf08a-m3-01-correct-browser-test-api.mjs
+          node tools/pf08a-m3-01-finalize-runtime-artifacts.mjs
+
       - name: Verify integration contracts
         run: |
           node tools/pf08a-m3-01-verify-plan-obligations.mjs
-          node tools/pf08a-m3-03-verify-integration.mjs
           node tools/pf08a-m2-01-verify-debt-integration.mjs
           node tools/pf08a-m4-01-verify-integration.mjs
           node tools/pf08a-wf01-verify-integration.mjs
@@ -63,16 +103,16 @@ jobs:
           node tools/pf08a-a3-01-browser-smoke.mjs
           node tools/pf08a-priv01-browser-smoke.mjs
           node tools/pf08a-m3-01-browser-smoke.mjs
-          node tools/pf08a-m3-03-browser-smoke.mjs
           node tools/pf08a-m2-01-browser-smoke.mjs
           node tools/pf08a-m4-01-browser-smoke.mjs
           node tools/pf08a-wf01-browser-smoke.mjs
           node tools/pf08a-wf02-browser-smoke.mjs
 
-      - name: Commit verified package
+      - name: Commit verified generated runtime artifacts
         run: |
+          if git diff --quiet -- src/familypilot.html index.html; then echo "Verified runtime artifacts are already committed."; exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Generate verified M3-03 payment attention package"
+          git add src/familypilot.html index.html
+          git commit -m "Generate verified WF-02 runtime artifacts"
           git push origin HEAD:${{ github.ref_name }}
