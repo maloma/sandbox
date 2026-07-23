@@ -84,11 +84,48 @@ const harness=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title
     api.paymentAttention.render();
     assert(!doc.querySelector('[data-payment-attention-row="'+upcoming.occurrence.id+'"]'),'Zero-day rule still appears before due day');
 
+    const loaded=api.paymentAttentionDemo.load();
+    assert(loaded.ok,'Comprehensive payment demo data did not load');
+    api.setActiveWallet(household);
+    api.paymentAttention.render();
+    const records=api.paymentAttentionDemo.records(),byKey=new Map(records.map(item=>[item.key,item]));
+    const firstOccurrence=key=>byKey.get(key)?.occurrences?.[0];
+    for(const key of ['overdue','today-0','lead-1','recurring-3','lead-7','lead-14','lead-30','outside-window','paid','skipped','postponed'])assert(byKey.has(key),'Demo scenario missing: '+key);
+    assert(byKey.has('personal'),'Personal demo scenario missing');
+    assert([0,1,3,7,14,30].every(days=>records.some(item=>item.leadDays===days)),'Not all reminder lead-time modes are represented');
+    for(const key of ['overdue','today-0','lead-1','recurring-3','lead-7','lead-14','lead-30','postponed']){
+      const occurrence=firstOccurrence(key);
+      assert(occurrence&&doc.querySelector('[data-payment-attention-row="'+occurrence.id+'"]'),'Visible demo scenario is missing from Home: '+key);
+    }
+    for(const key of ['outside-window','paid','skipped','personal']){
+      const occurrence=firstOccurrence(key);
+      assert(occurrence&&!doc.querySelector('[data-payment-attention-row="'+occurrence.id+'"]'),'Hidden demo scenario leaked into household Home: '+key);
+    }
+    state=api.getState();
+    const paidDemo=state.obligationOccurrences.find(item=>item.id===firstOccurrence('paid').id);
+    const skippedDemo=state.obligationOccurrences.find(item=>item.id===firstOccurrence('skipped').id);
+    const postponedDemo=state.obligationOccurrences.find(item=>item.id===firstOccurrence('postponed').id);
+    assert(paidDemo.status==='paid'&&state.operations.filter(operation=>operation.links?.obligationOccurrenceId===paidDemo.id).length===1,'Paid demo mode is not linked to exactly one Expense');
+    assert(skippedDemo.status==='skipped','Skipped demo mode is missing');
+    assert(postponedDemo.movedFromDueAt!=null&&postponedDemo.dueAt>postponedDemo.movedFromDueAt,'Postponed demo mode is missing');
+
+    api.setActiveWallet(personal);
+    api.paymentAttention.render();
+    assert(doc.querySelector('[data-payment-attention-row="'+firstOccurrence('personal').id+'"]'),'Personal demo payment is not visible in the personal wallet');
+    assert(!doc.querySelector('[data-payment-attention-row="'+firstOccurrence('overdue').id+'"]'),'Household demo payment leaked into the personal wallet');
+    api.setActiveWallet(household);
+
+    const removed=api.paymentAttentionDemo.remove();
+    assert(removed.rules>=11,'Demo cleanup removed too few rules');
+    state=api.getState();
+    assert(!state.obligationRules.some(rule=>String(rule.note||'').includes('marker:m3-03-payment-attention-demo:')),'Demo rules remained after cleanup');
+    assert(!state.operations.some(operation=>String(operation.note||'').includes('marker:m3-03-payment-attention-demo:')),'Demo linked operations remained after cleanup');
+
     assert(doc.querySelector('meta[content="planned-payment-attention-v1"]'),'M3-03 package marker missing');
     assert(doc.querySelector('meta[content="plan-obligations-foundation-v1"]'),'M3 foundation marker missing');
     assert(runtimeErrors.length===0,'Runtime exceptions: '+runtimeErrors.join(' | '));
 
-    result.textContent=JSON.stringify({status:'PASS',marker:'${marker}',homeCard:true,overduePersistent:true,todayVisible:true,defaultReminderDays:3,customReminderDays:true,quickPayFromHome:true,oneLinkedExpense:true,exactOccurrenceOpen:true,paidRemoved:true,scopeIsolation:true,noExternalNotificationClaim:true,runtimeExceptions:[]},null,2);
+    result.textContent=JSON.stringify({status:'PASS',marker:'${marker}',homeCard:true,overduePersistent:true,todayVisible:true,defaultReminderDays:3,customReminderDays:true,quickPayFromHome:true,oneLinkedExpense:true,exactOccurrenceOpen:true,paidRemoved:true,scopeIsolation:true,allReminderLeadModes:true,comprehensiveDemoData:true,demoPaidSkippedPostponed:true,demoCleanup:true,noExternalNotificationClaim:true,runtimeExceptions:[]},null,2);
     document.body.dataset.status='PASS';
   }
   frame.addEventListener('load',()=>run().catch(error=>{result.textContent=String(error&&error.stack||error);document.body.dataset.status='FAIL'}),{once:true});
