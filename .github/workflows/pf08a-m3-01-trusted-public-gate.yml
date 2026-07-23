@@ -11,8 +11,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
 
 concurrency:
   group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
@@ -35,23 +33,5 @@ jobs:
       - name: Verify published M3-03 FamilyPilot package
         env:
           PUBLIC_URL: https://maloma.github.io/sandbox/
-          EXPECTED_MAIN_M303: cbb6651e53d61b5552598f32159f36fe6e1ec82d
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set +e
-          node tools/pf08a-m3-03-public-browser-smoke.mjs > /tmp/m3-03-public.log 2>&1
-          status=$?
-          cat /tmp/m3-03-public.log
-          if [ "$status" -ne 0 ]; then
-            {
-              echo '### M3-03 public verification failure'
-              echo
-              echo 'The published-package verifier reported:'
-              echo
-              echo '```text'
-              tail -n 120 /tmp/m3-03-public.log
-              echo '```'
-            } > /tmp/m3-03-public-comment.md
-            gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/m3-03-public-comment.md
-            exit "$status"
-          fi
+          EXPECTED_MAIN_M303: c25aabf741b589dbb2a6e359a97cf0f2a8fef031
+        run: node tools/pf08a-m3-03-public-browser-smoke.mjs
