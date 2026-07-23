@@ -142,4 +142,32 @@ Append-only rule: preserve every record and append later transitions with monoto
 - **Rollback:** revert demo merge `3eb727e60a79feead45319982233eacf4cc63c4c` without removing the base M3-03 package.
 - **Record Integrity:** VALID.
 
+---
+
+## Record 009 — Compact Plan Attention UX Corrected and Publicly Verified
+
+- **Ordering Marker:** 009
+- **Checkpoint:** CP-06
+- **Status:** COMPLETED
+- **Founder Findings:** overdue rows lacked salience; the Home payment card was oversized; early payment was undiscoverable; day totals and rule-card management were insufficient; the saved month could resolve to January 1970.
+- **Implementation PR:** `maloma/sandbox#64`.
+- **Accepted Exact Head:** `556583cdb6f393da81fed5bd3d87c9986f969d92`.
+- **Implementation Merge:** `23aa2c7852fd2664c757bebc7ed4fee8bfa8e54a`.
+- **Exact-Head Gate:** run `30006140503` — SUCCESS.
+- **Public Verification PR:** `maloma/sandbox#65`.
+- **Trusted Public Run:** `30006363960` — SUCCESS.
+- **Home Surface:** large payment card removed.
+- **Attention Route:** compact `План` navigation indicator and highlighted `Обязательства` module.
+- **List UX:** overdue red, due-today amber, paid green, separate day cards, daily payment count and combined `Запланировать` amount.
+- **Early Payment:** every unresolved occurrence, including a future occurrence, exposes the same one-linked-Expense paid action.
+- **Rule UX:** rule list shows next payment only; recurrence and edit/clone/delete controls are inside the rule card.
+- **Month Repair:** missing, zero, invalid or implausible saved month is repaired to the current month instead of January 1970.
+- **Scope Contract:** household and personal views remain isolated.
+- **Demo Contract:** all 12 reversible scenarios remain available.
+- **Notification Boundary:** morning/evening system notifications remain a separate push/service-worker delivery package; no fake closed-app delivery was introduced.
+- **Runtime Exceptions:** NONE.
+- **Artifacts:** NONE.
+- **Rollback:** revert compact UX merge `23aa2c7852fd2664c757bebc7ed4fee8bfa8e54a` while preserving the base M3-03 module and demo fixtures.
+- **Record Integrity:** VALID.
+
 # END OF TERMINAL LEDGER
