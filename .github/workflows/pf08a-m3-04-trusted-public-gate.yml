@@ -1,0 +1,36 @@
+name: PF-08A M3-04 Trusted Public Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - tools/pf08a-m3-04-public-browser-smoke.mjs
+      - .github/workflows/pf08a-m3-04-trusted-public-gate.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify-public-package:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+          show-progress: false
+
+      - name: Verify exact checked-out head
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Verify published M3-04 FamilyPilot package
+        env:
+          PUBLIC_URL: https://maloma.github.io/sandbox/
+          EXPECTED_MAIN_M304: 8cfcbe8060647bfc50d576ab32120baeb65fb7ed
+        run: node tools/pf08a-m3-04-public-browser-smoke.mjs
