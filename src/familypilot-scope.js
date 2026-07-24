@@ -118,7 +118,8 @@
       root.__FP_M3_03_READY__=true;
       loadScript('familypilot-obligation-state-ui.js',()=>{
         root.__FP_M3_04_READY__=true;
-        loadScript('familypilot-partial-payments.js',()=>loadScript('familypilot-partial-payment-settlement.js',()=>loadScript('familypilot-partial-payments-render-sync.js',()=>{
+        loadScript('familypilot-partial-payments.js',()=>loadScript('familypilot-partial-payment-settlement.js',()=>loadScript('familypilot-partial-payments-render-sync.js',()=>loadScript('familypilot-partial-payment-entry-ui.js',()=>{
+          root.__FP_M3_07A_READY__=true;
           root.__FP_M3_07_MODEL_READY__=true;
           loadScript('familypilot-payment-link-lifecycle.js',()=>{
             root.__FP_M3_05_READY__=true;
@@ -131,7 +132,7 @@
               });
             })));
           });
-        })));
+        }))));
       });
     }));
   }
@@ -145,7 +146,7 @@
   }
   function mount(){
     ensurePackageMarker();
-    loadScript('familypilot-wallet-transfers.js',loadUiWhenBaseRuntimeReady);
+    loadScript('familypilot-viewport-anchor.js',()=>loadScript('familypilot-wallet-transfers.js',loadUiWhenBaseRuntimeReady));
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});
   else queueMicrotask(mount);
