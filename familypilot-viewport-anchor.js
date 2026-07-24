@@ -24,26 +24,28 @@
     function sync(){
       if(syncing)return;syncing=true;
       requestAnimationFrame(()=>{
-        document.documentElement.style.setProperty('--fp-visual-shift','0px');
-        const navVisible=getComputedStyle(nav).display!=='none';
-        const navHeight=navVisible?Math.ceil(nav.getBoundingClientRect().height):0;
-        document.documentElement.style.setProperty('--fp-nav-height',`${navHeight}px`);
-        const vv=window.visualViewport;
-        const visualBottom=vv?vv.offsetTop+vv.height:window.innerHeight;
-        const rect=nav.getBoundingClientRect();
-        const shift=Math.round(visualBottom-rect.bottom);
-        document.documentElement.style.setProperty('--fp-visual-shift',`${Number.isFinite(shift)?shift:0}px`);
-        const dockVisible=getComputedStyle(dock).display!=='none'&&!dock.classList.contains('hidden');
-        const dockHeight=dockVisible?Math.ceil(dock.getBoundingClientRect().height):0;
-        const total=Math.max(0,navHeight+dockHeight);
-        document.documentElement.style.setProperty('--fp-fixed-bottom',`${total}px`);
-        app.style.paddingBottom=`calc(${total}px + 16px + env(safe-area-inset-bottom))`;
-        syncing=false;
+        try{
+          document.documentElement.style.setProperty('--fp-visual-shift','0px');
+          const navVisible=getComputedStyle(nav).display!=='none';
+          const navHeight=navVisible?Math.ceil(nav.getBoundingClientRect().height):0;
+          document.documentElement.style.setProperty('--fp-nav-height',`${navHeight}px`);
+          const vv=window.visualViewport;
+          const visualBottom=vv?vv.offsetTop+vv.height:window.innerHeight;
+          const rect=nav.getBoundingClientRect();
+          const shift=Math.round(visualBottom-rect.bottom);
+          document.documentElement.style.setProperty('--fp-visual-shift',`${Number.isFinite(shift)?shift:0}px`);
+          const dockVisible=getComputedStyle(dock).display!=='none'&&!dock.classList.contains('hidden');
+          const dockHeight=dockVisible?Math.ceil(dock.getBoundingClientRect().height):0;
+          const total=Math.max(0,navHeight+dockHeight);
+          document.documentElement.style.setProperty('--fp-fixed-bottom',`${total}px`);
+          app.style.paddingBottom=`calc(${total}px + 16px + env(safe-area-inset-bottom))`;
+        }finally{syncing=false}
       });
     }
 
     sync();
-    new MutationObserver(sync).observe(document.body,{subtree:true,attributes:true,attributeFilter:['class','style']});
+    new MutationObserver(sync).observe(dock,{attributes:true,attributeFilter:['class']});
+    new MutationObserver(sync).observe(nav,{attributes:true,attributeFilter:['class']});
     for(const target of [window,window.visualViewport].filter(Boolean)){
       target.addEventListener('resize',sync,{passive:true});
       target.addEventListener('scroll',sync,{passive:true});
