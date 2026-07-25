@@ -1,0 +1,64 @@
+name: PF-08A M3-07B R01 Exact Reconciliation Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - familypilot-partial-payment-entry-ui.js
+      - tools/pf08a-m3-07b-r01-browser-smoke.mjs
+      - tools/pf08a-m3-07a-ux-browser-smoke.mjs
+      - tools/pf08a-m3-07b-browser-smoke.mjs
+      - .github/workflows/pf08a-m3-07b-r01-gate.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify-exact-head:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+
+      - name: Verify exact checked-out head
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Check syntax and contract
+        run: |
+          node --check familypilot-partial-payment-entry-ui.js
+          node --check tools/pf08a-m3-07b-r01-browser-smoke.mjs
+          node --check tools/pf08a-m3-07a-ux-browser-smoke.mjs
+          node --check tools/pf08a-m3-07b-browser-smoke.mjs
+          grep -qF "exactMatches" familypilot-partial-payment-entry-ui.js
+          grep -qF "partialReconciliationModal" familypilot-partial-payment-entry-ui.js
+          grep -qF "data-partial-reconcile-start" familypilot-partial-payment-entry-ui.js
+          grep -qF "Math.abs(dayNumber(op.occurredAt)-targetDay)<=2" familypilot-partial-payment-entry-ui.js
+
+      - name: Browser verification — exact reconciliation
+        run: node tools/pf08a-m3-07b-r01-browser-smoke.mjs
+
+      - name: Browser regression — M3-07A UX
+        run: node tools/pf08a-m3-07a-ux-browser-smoke.mjs
+
+      - name: Browser regression — partial date and modal layer
+        run: node tools/pf08a-m3-07b-browser-smoke.mjs
+
+      - name: Browser regression — partial payments
+        run: node tools/pf08a-m3-07-partial-payments-browser-smoke.mjs
+
+      - name: Browser regression — mobile operations
+        run: node tools/pf08a-m3-06-mobile-ux-browser-smoke.mjs
