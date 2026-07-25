@@ -1,0 +1,52 @@
+name: PF-08A M3-07B Partial Date and Modal Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - familypilot-partial-payment-entry-ui.js
+      - familypilot-operation-date-picker.js
+      - familypilot-viewport-anchor.js
+      - tools/pf08a-m3-07b-browser-smoke.mjs
+      - .github/workflows/pf08a-m3-07b-gate.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify-exact-head:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+
+      - name: Verify exact checked-out head
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Check syntax and contract
+        run: |
+          node --check familypilot-partial-payment-entry-ui.js
+          node --check familypilot-operation-date-picker.js
+          node --check familypilot-viewport-anchor.js
+          node --check tools/pf08a-m3-07b-browser-smoke.mjs
+          grep -qF "partialPaymentDate" familypilot-partial-payment-entry-ui.js
+          grep -qF "partialPaymentDateDisplay" familypilot-operation-date-picker.js
+          grep -qF "body>.modal,body>.overlay" familypilot-viewport-anchor.js
+          grep -qF "removeHomeTransfer" familypilot-viewport-anchor.js
+
+      - name: Browser regression — partial date and modal layer
+        run: node tools/pf08a-m3-07b-browser-smoke.mjs
