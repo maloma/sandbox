@@ -48,8 +48,8 @@
       const amount=Number(operation?.amount)||0;
       if(operation?.kind==='income')result.income+=amount;
       if(operation?.kind==='expense')result.expense+=amount;
-      if(operation?.kind === 'debt_inflow')result.debtInflow+=amount;
-      if(operation?.kind === 'debt_outflow')result.debtOutflow+=amount;
+      if(operation?.kind==='debt_inflow')result.debtInflow+=amount;
+      if(operation?.kind==='debt_outflow')result.debtOutflow+=amount;
       return result;
     },{income:0,expense:0,debtInflow:0,debtOutflow:0});
   }
@@ -118,7 +118,7 @@
       root.__FP_M3_03_READY__=true;
       loadScript('familypilot-obligation-state-ui.js',()=>{
         root.__FP_M3_04_READY__=true;
-        loadScript('familypilot-partial-payment-removal-v2.js',()=>loadScript('familypilot-partial-payments.js',()=>loadScript('familypilot-partial-payment-settlement.js',()=>loadScript('familypilot-partial-payments-render-sync.js',()=>loadScript('familypilot-overpayment-resolution.js',()=>loadScript('familypilot-partial-payment-entry-ui.js',()=>{
+        loadScript('familypilot-partial-payment-removal-v2.js',()=>loadScript('familypilot-partial-payments.js',()=>loadScript('familypilot-obligation-wallet-isolation.js',()=>loadScript('familypilot-partial-payment-settlement.js',()=>loadScript('familypilot-partial-payments-render-sync.js',()=>loadScript('familypilot-overpayment-resolution.js',()=>loadScript('familypilot-partial-payment-entry-ui.js',()=>loadScript('familypilot-partial-state-visuals.js',()=>{
           root.__FP_M3_07A_READY__=true;
           root.__FP_M3_07_MODEL_READY__=true;
           loadScript('familypilot-payment-link-lifecycle.js',()=>{
@@ -132,7 +132,7 @@
               });
             }))));
           });
-        }))))));
+        }))))))));
       });
     }));
   }
