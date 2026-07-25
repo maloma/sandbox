@@ -5,8 +5,8 @@
   function boot(attempt=0){
     const runtime=window.__FP_RUNTIME__;
     if(!runtime||!window.__FP_M3_05_READY__){if(attempt<READY_LIMIT)setTimeout(()=>boot(attempt+1),25);return}
-    const source=document.getElementById('dateInput');
-    if(!source){if(attempt<READY_LIMIT)setTimeout(()=>boot(attempt+1),25);return}
+    const manual=document.getElementById('dateInput'),partial=document.getElementById('partialPaymentDate');
+    if(!manual){if(attempt<READY_LIMIT)setTimeout(()=>boot(attempt+1),25);return}
     window.__FP_OPERATION_DATE_PICKER__=true;
     const $=runtime.$,open=runtime.open,close=runtime.close;
     const pad=value=>String(value).padStart(2,'0');
@@ -14,7 +14,8 @@
     const valueOf=date=>`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
     const parse=value=>{const date=new Date(value);return Number.isNaN(date.getTime())?new Date():date};
     const displayValue=date=>new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(date);
-    let selected=new Date(),month=new Date(selected.getFullYear(),selected.getMonth(),1);
+    const sources=new Map();
+    let activeSourceId='dateInput',selected=new Date(),month=new Date(selected.getFullYear(),selected.getMonth(),1);
 
     const style=document.createElement('style');
     style.id='familypilot-operation-date-picker-style';
@@ -30,43 +31,58 @@
     `;
     document.head.appendChild(style);
 
-    source.classList.add('operation-date-native-source');
-    source.hidden=true;source.tabIndex=-1;source.setAttribute('aria-hidden','true');
-    let display=document.getElementById('dateInputDisplay');
-    if(!display){display=document.createElement('button');display.id='dateInputDisplay';display.type='button';display.className='operation-date-display';display.dataset.openOperationDate='true';source.after(display)}
-    const label=source.closest('.field')?.querySelector('label');if(label)label.htmlFor='dateInputDisplay';
+    function registerSource(source,displayId){
+      if(!source)return;
+      source.classList.add('operation-date-native-source');source.hidden=true;source.tabIndex=-1;source.setAttribute('aria-hidden','true');
+      let display=document.getElementById(displayId);
+      if(!display){display=document.createElement('button');display.id=displayId;display.type='button';display.className='operation-date-display';display.dataset.openOperationDate=source.id;source.after(display)}
+      else display.dataset.openOperationDate=source.id;
+      const label=source.closest('.field')?.querySelector('label');if(label)label.htmlFor=displayId;
+      sources.set(source.id,{source,display});
+    }
+    registerSource(manual,'dateInputDisplay');
+    registerSource(partial,'partialPaymentDateDisplay');
 
     let modal=document.getElementById('operationDatePickerModal');
     if(!modal){
       modal=document.createElement('div');modal.id='operationDatePickerModal';modal.className='modal';
-      modal.innerHTML=`<div class="sheet"><div class="sheet-head"><h2>Дата операции</h2><button class="close" type="button" data-operation-date-close>Закрыть</button></div><div class="fp-date-month-head"><button type="button" data-operation-month="-1" aria-label="Предыдущий месяц">‹</button><div id="operationDateMonthTitle" class="fp-date-month-title"></div><button type="button" data-operation-month="1" aria-label="Следующий месяц">›</button></div><div class="fp-date-legend"><span class="today"><i></i>Сегодня</span><span class="selected"><i></i>Выбрано</span></div><div class="fp-date-weekdays"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span></div><div id="operationDateGrid" class="fp-date-grid"></div><div class="field"><label for="operationDateTime">Время</label><input id="operationDateTime" type="time" step="60"></div><div class="fp-date-actions"><button class="btn secondary" type="button" data-operation-date-today>Сегодня</button><button class="btn secondary" type="button" data-operation-date-close>Отмена</button><button class="btn primary" type="button" data-operation-date-apply>Применить</button></div></div>`;
+      modal.innerHTML=`<div class="sheet"><div class="sheet-head"><h2 id="operationDatePickerTitle">Дата операции</h2><button class="close" type="button" data-operation-date-close>Закрыть</button></div><div class="fp-date-month-head"><button type="button" data-operation-month="-1" aria-label="Предыдущий месяц">‹</button><div id="operationDateMonthTitle" class="fp-date-month-title"></div><button type="button" data-operation-month="1" aria-label="Следующий месяц">›</button></div><div class="fp-date-legend"><span class="today"><i></i>Сегодня</span><span class="selected"><i></i>Выбрано</span></div><div class="fp-date-weekdays"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span></div><div id="operationDateGrid" class="fp-date-grid"></div><div class="field"><label for="operationDateTime">Время</label><input id="operationDateTime" type="time" step="60"></div><div class="fp-date-actions"><button class="btn secondary" type="button" data-operation-date-today>Сегодня</button><button class="btn secondary" type="button" data-operation-date-close>Отмена</button><button class="btn primary" type="button" data-operation-date-apply>Применить</button></div></div>`;
       document.body.appendChild(modal);
     }
 
-    function syncDisplay(){display.textContent=displayValue(parse(source.value||valueOf(new Date())))}
+    function active(){return sources.get(activeSourceId)||sources.get('dateInput')}
+    function syncDisplay(id=activeSourceId){const item=sources.get(id);if(item)item.display.textContent=displayValue(parse(item.source.value||valueOf(new Date())))}
+    function syncAll(){for(const id of sources.keys())syncDisplay(id)}
     function render(){
       $('operationDateMonthTitle').textContent=new Intl.DateTimeFormat('ru-RU',{month:'long',year:'numeric'}).format(month);
       const firstWeekday=(month.getDay()+6)%7,start=new Date(month.getFullYear(),month.getMonth(),1-firstWeekday),today=new Date();
       $('operationDateGrid').innerHTML=Array.from({length:42},(_,index)=>{const day=new Date(start.getFullYear(),start.getMonth(),start.getDate()+index),classes=['fp-date-day'];if(day.getMonth()!==month.getMonth())classes.push('other-month');if(sameDay(day,today))classes.push('is-today');if(sameDay(day,selected))classes.push('is-selected');return`<button type="button" class="${classes.join(' ')}" data-operation-date-day="${day.getFullYear()}-${pad(day.getMonth()+1)}-${pad(day.getDate())}">${day.getDate()}</button>`}).join('');
       $('operationDateTime').value=`${pad(selected.getHours())}:${pad(selected.getMinutes())}`;
     }
-    function openPicker(){selected=parse(source.value||valueOf(new Date()));month=new Date(selected.getFullYear(),selected.getMonth(),1);render();open('operationDatePickerModal')}
-    function apply(){const parts=String($('operationDateTime').value||'00:00').split(':');selected.setHours(Number(parts[0]||0),Number(parts[1]||0),0,0);source.value=valueOf(selected);source.dispatchEvent(new Event('input',{bubbles:true}));source.dispatchEvent(new Event('change',{bubbles:true}));syncDisplay();close('operationDatePickerModal')}
+    function openPicker(sourceId='dateInput'){
+      if(!sources.has(sourceId))sourceId='dateInput';activeSourceId=sourceId;
+      const item=active();selected=parse(item.source.value||valueOf(new Date()));month=new Date(selected.getFullYear(),selected.getMonth(),1);
+      $('operationDatePickerTitle').textContent=sourceId==='partialPaymentDate'?'Дата оплаты':'Дата операции';render();open('operationDatePickerModal');
+    }
+    function apply(){
+      const parts=String($('operationDateTime').value||'00:00').split(':');selected.setHours(Number(parts[0]||0),Number(parts[1]||0),0,0);
+      const item=active();item.source.value=valueOf(selected);item.source.dispatchEvent(new Event('input',{bubbles:true}));item.source.dispatchEvent(new Event('change',{bubbles:true}));syncDisplay(activeSourceId);close('operationDatePickerModal');
+    }
 
-    document.addEventListener('pointerdown',event=>{if(event.target===source){event.preventDefault();source.blur();openPicker()}},true);
+    document.addEventListener('pointerdown',event=>{const source=[...sources.values()].find(item=>event.target===item.source);if(source){event.preventDefault();source.source.blur();openPicker(source.source.id)}},true);
     document.addEventListener('click',event=>{
       const opener=event.target.closest?.('[data-open-operation-date]'),day=event.target.closest?.('[data-operation-date-day]'),monthButton=event.target.closest?.('[data-operation-month]'),today=event.target.closest?.('[data-operation-date-today]'),applyButton=event.target.closest?.('[data-operation-date-apply]'),closer=event.target.closest?.('[data-operation-date-close]');
-      if(opener){event.preventDefault();event.stopImmediatePropagation();openPicker();return}
+      if(opener){event.preventDefault();event.stopImmediatePropagation();openPicker(opener.dataset.openOperationDate||'dateInput');return}
       if(day){event.preventDefault();const [y,m,d]=day.dataset.operationDateDay.split('-').map(Number);selected.setFullYear(y,m-1,d);month=new Date(y,m-1,1);render();return}
       if(monthButton){event.preventDefault();month=new Date(month.getFullYear(),month.getMonth()+Number(monthButton.dataset.operationMonth),1);render();return}
       if(today){event.preventDefault();const current=new Date();selected.setFullYear(current.getFullYear(),current.getMonth(),current.getDate());month=new Date(current.getFullYear(),current.getMonth(),1);render();return}
       if(applyButton){event.preventDefault();apply();return}
       if(closer){event.preventDefault();close('operationDatePickerModal')}
     },true);
-    const entry=document.getElementById('entryModal');if(entry)new MutationObserver(()=>{if(entry.classList.contains('open'))syncDisplay()}).observe(entry,{attributes:true,attributeFilter:['class']});
-    syncDisplay();
+    for(const modalId of ['entryModal','partialPaymentModal']){const host=document.getElementById(modalId);if(host)new MutationObserver(()=>{if(host.classList.contains('open'))syncAll()}).observe(host,{attributes:true,attributeFilter:['class']})}
+    syncAll();
 
-    const testApi={openPicker,render,sourceHidden:()=>source.hidden&&getComputedStyle(source).display==='none',selectedDay:()=>document.querySelector('#operationDateGrid .is-selected')?.dataset.operationDateDay||'',todayDay:()=>document.querySelector('#operationDateGrid .is-today')?.dataset.operationDateDay||'',classes:()=>({selected:document.querySelector('#operationDateGrid .is-selected')?.className||'',today:document.querySelector('#operationDateGrid .is-today')?.className||''})};
+    const testApi={openPicker,render,sourceHidden:(id='dateInput')=>{const item=sources.get(id);return!!item&&item.source.hidden&&getComputedStyle(item.source).display==='none'},displayValue:id=>sources.get(id)?.display.textContent||'',selectedDay:()=>document.querySelector('#operationDateGrid .is-selected')?.dataset.operationDateDay||'',todayDay:()=>document.querySelector('#operationDateGrid .is-today')?.dataset.operationDateDay||'',classes:()=>({selected:document.querySelector('#operationDateGrid .is-selected')?.className||'',today:document.querySelector('#operationDateGrid .is-today')?.className||''})};
     if(new URLSearchParams(location.search).has('test')){const install=(n=0)=>{if(window.__FP_TEST__){window.__FP_TEST__.operationDatePicker=testApi;return}if(n<READY_LIMIT)setTimeout(()=>install(n+1),25)};install()}
     window.__FP_OPERATION_DATE_PICKER_READY__=true;
   }
