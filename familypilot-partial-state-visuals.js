@@ -41,7 +41,8 @@
           const indicator=document.createElement('span');
           indicator.className=`partial-time-indicator ${timeStatus==='due'?'today':'overdue'}`;
           indicator.textContent=timeStatus==='due'?'Сегодня':'Просрочено';
-          status?.after(indicator);
+          if(status)status.insertAdjacentElement('afterend',indicator);
+          else (row.querySelector('.obligation-row-main>span:first-child')||row.firstElementChild||row).appendChild(indicator);
         }
       }
     }
