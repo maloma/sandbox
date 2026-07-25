@@ -12,15 +12,18 @@
       return;
     }
     window.__FP_PARTIAL_PAYMENT_ENTRY_UI__=true;
-    const $=runtime.$;
-    let showAll=false,lastOpen=false,refreshing=false;
+    const $=runtime.$,state=runtime.state,save=runtime.save,now=runtime.now;
+    let showAll=false,lastOpen=false,refreshing=false,pendingCreate=null;
+    const pad=value=>String(value).padStart(2,'0');
+    const localDateTime=value=>{const date=new Date(value);return`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`};
+    const parseDate=value=>{const parsed=new Date(value).getTime();return Number.isFinite(parsed)?parsed:NaN};
 
     const style=document.createElement('style');
     style.id='familypilot-partial-payment-entry-style';
     style.textContent=`
       .partial-payment-entry-card{margin-top:14px;padding:13px;border:1px solid color-mix(in srgb,#d99a00 46%,var(--line));border-radius:16px;background:color-mix(in srgb,#d99a00 7%,var(--card2))}
       .partial-payment-entry-card h3{margin:0 0 4px;font-size:15px}.partial-payment-entry-card>small{display:block;margin-bottom:11px;color:var(--muted);font-size:11px;line-height:1.35}
-      .partial-payment-entry-card .field{margin-top:0}.partial-payment-entry-card .sheet-actions{margin-top:10px}.partial-payment-entry-card [data-partial-create]{width:100%}
+      .partial-payment-entry-card .field{margin-top:10px}.partial-payment-entry-card .field:first-of-type{margin-top:0}.partial-payment-entry-card .sheet-actions{margin-top:10px}.partial-payment-entry-card [data-partial-create]{width:100%}
       .partial-linked-section{margin-top:14px}.partial-linked-section h3{margin:0 0 7px;font-size:13px}.partial-linked-section[hidden]{display:none!important}
       .partial-existing-details{margin-top:14px;border:1px solid var(--line);border-radius:16px;background:var(--card2);overflow:hidden}
       .partial-existing-details[hidden]{display:none!important}.partial-existing-details>summary{list-style:none;cursor:pointer;min-height:56px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:900}
@@ -31,11 +34,13 @@
     `;
     document.head.appendChild(style);
 
-    const sheet=modal.querySelector('.sheet'),head=sheet?.querySelector('.sheet-head'),summary=$('partialPaymentSummary'),linkedList=$('partialLinkedList'),candidateSection=$('partialCandidateSection'),candidateList=$('partialCandidateList'),field=$('partialPaymentAmount')?.closest('.field'),error=$('partialPaymentError'),actions=sheet?.querySelector('.sheet-actions');
-    if(!sheet||!head||!summary||!linkedList||!candidateSection||!candidateList||!field||!error||!actions){window.__FP_PARTIAL_PAYMENT_ENTRY_UI_ERROR__='Partial payment modal structure unavailable';return}
+    const sheet=modal.querySelector('.sheet'),summary=$('partialPaymentSummary'),linkedList=$('partialLinkedList'),candidateSection=$('partialCandidateSection'),candidateList=$('partialCandidateList'),field=$('partialPaymentAmount')?.closest('.field'),error=$('partialPaymentError'),actions=sheet?.querySelector('.sheet-actions');
+    if(!sheet||!summary||!linkedList||!candidateSection||!candidateList||!field||!error||!actions){window.__FP_PARTIAL_PAYMENT_ENTRY_UI_ERROR__='Partial payment modal structure unavailable';return}
 
     const linkedSection=document.createElement('section');linkedSection.id='partialLinkedSection';linkedSection.className='partial-linked-section';linkedSection.innerHTML='<h3>Уже оплачено частями</h3>';linkedSection.appendChild(linkedList);
-    const entryCard=document.createElement('section');entryCard.id='partialPaymentEntryCard';entryCard.className='partial-payment-entry-card';entryCard.innerHTML='<h3>Новая оплата</h3><small>Укажите сумму, которую оплатили сейчас. FamilyPilot создаст расход и сразу свяжет его с этим обязательством.</small>';entryCard.append(field,error,actions);
+    const entryCard=document.createElement('section');entryCard.id='partialPaymentEntryCard';entryCard.className='partial-payment-entry-card';entryCard.innerHTML='<h3>Новая оплата</h3><small>Укажите сумму и фактическую дату оплаты. После записи FamilyPilot проверит возможные совпадения среди операций.</small>';
+    const dateField=document.createElement('div');dateField.className='field';dateField.innerHTML='<label for="partialPaymentDate">Дата и время оплаты</label><input id="partialPaymentDate" type="datetime-local">';
+    entryCard.append(field,dateField,error,actions);
     const existingDetails=document.createElement('details');existingDetails.id='partialExistingOperationDetails';existingDetails.className='partial-existing-details';existingDetails.innerHTML='<summary><span class="partial-existing-copy"><strong>Оплата уже записана в «Операциях»</strong><small id="partialExistingOperationHint">Показать возможные совпадения</small></span></summary>';existingDetails.appendChild(candidateSection);
     summary.after(linkedSection,entryCard,existingDetails);
     const label=field.querySelector('label');if(label)label.textContent='Сколько оплачено сейчас';
@@ -51,7 +56,7 @@
       if(refreshing)return;refreshing=true;
       try{
         const isOpen=modal.classList.contains('open');
-        if(isOpen&&!lastOpen){showAll=false;existingDetails.open=false}
+        if(isOpen&&!lastOpen){showAll=false;existingDetails.open=false;$('partialPaymentDate').value=localDateTime(now())}
         lastOpen=isOpen;
         const linked=[...linkedList.children].filter(node=>node.nodeType===1);setHidden(linkedSection,!linked.length);
         const rows=candidateRows(),available=!candidateSection.hidden&&rows.length>0;setHidden(existingDetails,!available);
@@ -61,8 +66,24 @@
       }finally{refreshing=false}
     }
 
+    function beginCreate(){
+      const occurredAt=parseDate($('partialPaymentDate')?.value);
+      pendingCreate={occurredAt,before:new Set((state.operations||[]).map(operation=>operation.id))};
+    }
+    function finishCreate(){
+      const pending=pendingCreate;pendingCreate=null;if(!pending||!Number.isFinite(pending.occurredAt))return;
+      setTimeout(()=>{
+        const created=(state.operations||[]).filter(operation=>!pending.before.has(operation.id)&&operation.kind==='expense'&&operation.links?.sourceModule==='obligations').sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0))[0];
+        if(!created||Number(created.occurredAt)===pending.occurredAt)return;
+        const oldValue=created.occurredAt;created.occurredAt=pending.occurredAt;created.revisions=Array.isArray(created.revisions)?created.revisions:[];created.revisions.push({id:`partial-date-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`,sequence:created.revisions.length+1,changedAt:now(),changedByMemberId:state.currentMemberId,source:'partial_payment_date_selected',changes:[{field:'occurredAt',oldValue,newValue:pending.occurredAt}]});created.lastEditedAt=now();save();runtime.renderAll();
+      },0);
+    }
+
     existingDetails.addEventListener('toggle',refresh);
     moreButton.addEventListener('click',event=>{event.preventDefault();showAll=!showAll;refresh()});
+    createButton?.addEventListener('pointerdown',beginCreate,true);
+    createButton?.addEventListener('pointerup',finishCreate,true);
+    createButton?.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){beginCreate();setTimeout(finishCreate,0)}},true);
     new MutationObserver(refresh).observe(modal,{attributes:true,attributeFilter:['class']});
     new MutationObserver(refresh).observe(linkedList,{childList:true});
     new MutationObserver(refresh).observe(candidateList,{childList:true});
@@ -70,7 +91,7 @@
     refresh();
 
     if(new URLSearchParams(location.search).has('test')){
-      const api={refresh,candidateLimit:PREVIEW_LIMIT,details:()=>({open:existingDetails.open,hidden:existingDetails.hidden,count:candidateRows().length,visible:candidateRows().filter(row=>!row.hidden).length}),openDetails:()=>{existingDetails.open=true;refresh()},showAll:()=>{showAll=true;refresh()}};
+      const api={refresh,candidateLimit:PREVIEW_LIMIT,details:()=>({open:existingDetails.open,hidden:existingDetails.hidden,count:candidateRows().length,visible:candidateRows().filter(row=>!row.hidden).length}),openDetails:()=>{existingDetails.open=true;refresh()},showAll:()=>{showAll=true;refresh()},dateValue:()=>$('partialPaymentDate')?.value||'',setDate:value=>{$('partialPaymentDate').value=value}};
       const install=(n=0)=>{if(window.__FP_TEST__){window.__FP_TEST__.partialPaymentEntryUi=api;return}if(n<READY_LIMIT)setTimeout(()=>install(n+1),25)};install();
     }
     window.__FP_PARTIAL_PAYMENT_ENTRY_UI_READY__=true;
