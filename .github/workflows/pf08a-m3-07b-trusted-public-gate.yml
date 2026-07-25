@@ -18,7 +18,7 @@ jobs:
   verify-public-package:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 14
     steps:
       - name: Quiet exact-head checkout
         env:
@@ -34,8 +34,8 @@ jobs:
       - name: Verify exact checked-out head
         run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
 
-      - name: Verify published M3-07B R04 package
+      - name: Verify published M3-07B R05 package
         env:
           PUBLIC_URL: https://maloma.github.io/sandbox/
-          EXPECTED_MAIN_M307B: 0f9a1dab974ae37e0b053b8ef5952aefd6b7100f
+          EXPECTED_MAIN_M307B: e7cd3590f2ab8e940d4805b33df80c4799c28f35
         run: node tools/pf08a-m3-07b-public-browser-smoke.mjs
