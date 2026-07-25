@@ -1,0 +1,70 @@
+name: PF-08A M3-07B R04 Linked Operation Lifecycle Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - familypilot-linked-obligation-operation-lifecycle.js
+      - familypilot-scope.js
+      - src/familypilot-scope.js
+      - tools/pf08a-m3-07b-r04-browser-smoke.mjs
+      - .github/workflows/pf08a-m3-07b-r04-gate.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify-exact-head:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+
+      - name: Verify exact checked-out head
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+
+      - name: Check syntax, mirror and lifecycle contract
+        run: |
+          node --check familypilot-linked-obligation-operation-lifecycle.js
+          node --check familypilot-scope.js
+          node --check tools/pf08a-m3-07b-r04-browser-smoke.mjs
+          cmp familypilot-scope.js src/familypilot-scope.js
+          grep -qF "familypilot-linked-obligation-operation-lifecycle.js" familypilot-scope.js
+          grep -qF "linked_obligation_operation_user_delete" familypilot-linked-obligation-operation-lifecycle.js
+          grep -qF "obligationLinkPreservedInTrash" familypilot-linked-obligation-operation-lifecycle.js
+          grep -qF "linked_obligation_operation_restored" familypilot-linked-obligation-operation-lifecycle.js
+
+      - name: Browser verification — linked operation lifecycle
+        run: node tools/pf08a-m3-07b-r04-browser-smoke.mjs
+
+      - name: Browser regression — remembered partial group
+        run: node tools/pf08a-m3-07b-r03-browser-smoke.mjs
+
+      - name: Browser regression — connected removal
+        run: node tools/pf08a-m3-07b-r02-browser-smoke.mjs
+
+      - name: Browser regression — payment lifecycle
+        run: node tools/pf08a-m3-05-browser-smoke.mjs
+
+      - name: Browser regression — partial payments
+        run: node tools/pf08a-m3-07-partial-payments-browser-smoke.mjs
+
+      - name: Browser regression — exact reconciliation
+        run: node tools/pf08a-m3-07b-r01-browser-smoke.mjs
+
+      - name: Browser regression — mobile operations
+        run: node tools/pf08a-m3-06-mobile-ux-browser-smoke.mjs
