@@ -17,14 +17,24 @@
       body>.bottom{position:fixed!important;left:50%!important;right:auto!important;top:auto!important;bottom:0!important;transform:translate3d(-50%,var(--fp-visual-shift,0px),0)!important;width:min(100%,520px)!important;z-index:600!important;will-change:transform;isolation:isolate}
       body>#actionDock{position:fixed!important;left:50%!important;right:auto!important;top:auto!important;bottom:var(--fp-nav-height,62px)!important;transform:translate3d(-50%,var(--fp-visual-shift,0px),0)!important;width:min(100%,520px)!important;z-index:590!important;will-change:transform;isolation:isolate}
       body>.bottom,body>#actionDock{margin:0!important}
+      body>.modal,body>.overlay{z-index:900!important}
+      body>.modal.open,body>.overlay.open{position:fixed!important;inset:0!important}
+      body>.modal .sheet,body>.overlay .panel{max-height:calc(100dvh - 10px)!important;padding-bottom:calc(24px + env(safe-area-inset-bottom))!important}
     `;
     document.head.appendChild(style);
+
+    function removeHomeTransfer(){
+      const actions=dock.querySelector('.actions');
+      actions?.querySelector('[data-open-transfer]')?.remove();
+      actions?.classList.remove('wf02-actions');
+    }
 
     let syncing=false;
     function sync(){
       if(syncing)return;syncing=true;
       requestAnimationFrame(()=>{
         try{
+          removeHomeTransfer();
           document.documentElement.style.setProperty('--fp-visual-shift','0px');
           const navVisible=getComputedStyle(nav).display!=='none';
           const navHeight=navVisible?Math.ceil(nav.getBoundingClientRect().height):0;
@@ -44,7 +54,7 @@
     }
 
     sync();
-    new MutationObserver(sync).observe(dock,{attributes:true,attributeFilter:['class']});
+    new MutationObserver(sync).observe(dock,{attributes:true,childList:true,subtree:true,attributeFilter:['class']});
     new MutationObserver(sync).observe(nav,{attributes:true,attributeFilter:['class']});
     for(const target of [window,window.visualViewport].filter(Boolean)){
       target.addEventListener('resize',sync,{passive:true});
@@ -53,7 +63,7 @@
     document.addEventListener('focusin',sync,true);
     document.addEventListener('focusout',()=>setTimeout(sync,120),true);
 
-    const api={sync,parents:()=>({nav:nav.parentElement===document.body,dock:dock.parentElement===document.body}),positions:()=>({nav:nav.getBoundingClientRect(),dock:dock.getBoundingClientRect(),visualBottom:(window.visualViewport?.offsetTop||0)+(window.visualViewport?.height||window.innerHeight)})};
+    const api={sync,removeHomeTransfer,parents:()=>({nav:nav.parentElement===document.body,dock:dock.parentElement===document.body}),positions:()=>({nav:nav.getBoundingClientRect(),dock:dock.getBoundingClientRect(),visualBottom:(window.visualViewport?.offsetTop||0)+(window.visualViewport?.height||window.innerHeight)}),modalLayer:id=>{const modal=document.getElementById(id);return modal?{modal:Number(getComputedStyle(modal).zIndex)||0,nav:Number(getComputedStyle(nav).zIndex)||0}:null},homeTransferVisible:()=>!!dock.querySelector('[data-open-transfer]')};
     if(new URLSearchParams(location.search).has('test')){
       const install=(n=0)=>{if(window.__FP_TEST__){window.__FP_TEST__.viewportAnchor=api;return}if(n<READY_LIMIT)setTimeout(()=>install(n+1),25)};install();
     }
