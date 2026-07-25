@@ -51,7 +51,7 @@
     decorate();
 
     if(new URLSearchParams(location.search).has('test')){
-      const api={decorate,stateFor:id=>{const item=occurrence(id),summary=payments.summary(id),timeStatus=item?obligations.occurrenceDisplayStatus(item,now()):null;return{partial:summary.status==='partial',timeStatus,rowClass:document.querySelector(`[data-obligation-occurrence="${CSS.escape(id)}"]`)?.className||'',indicator:document.querySelector(`[data-obligation-occurrence="${CSS.escape(id)}"] .partial-time-indicator`)?.textContent||''}};
+      const api={decorate,stateFor:id=>{const item=occurrence(id),summary=payments.summary(id),timeStatus=item?obligations.occurrenceDisplayStatus(item,now()):null;return{partial:summary.status==='partial',timeStatus,rowClass:document.querySelector(`[data-obligation-occurrence="${CSS.escape(id)}"]`)?.className||'',indicator:document.querySelector(`[data-obligation-occurrence="${CSS.escape(id)}"] .partial-time-indicator`)?.textContent||''}}};
       const install=(n=0)=>{if(window.__FP_TEST__){window.__FP_TEST__.partialStateVisuals=api;return}if(n<READY_LIMIT)setTimeout(()=>install(n+1),25)};install();
     }
     window.__FP_PARTIAL_STATE_VISUALS_READY__=true;
