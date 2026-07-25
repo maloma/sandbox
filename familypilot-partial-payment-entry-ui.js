@@ -50,7 +50,7 @@
     if(!sheet||!summary||!linkedList||!candidateSection||!candidateList||!field||!error||!actions){window.__FP_PARTIAL_PAYMENT_ENTRY_UI_ERROR__='Partial payment modal structure unavailable';return}
 
     const linkedSection=document.createElement('section');linkedSection.id='partialLinkedSection';linkedSection.className='partial-linked-section';linkedSection.innerHTML='<h3>Уже оплачено частями</h3>';linkedSection.appendChild(linkedList);
-    const entryCard=document.createElement('section');entryCard.id='partialPaymentEntryCard';entryCard.className='partial-payment-entry-card';entryCard.innerHTML='<h3>Новая оплата</h3><small>Укажите сумму и фактическую дату оплаты. После нажатия FamilyPilot проверит точные совпадения среди операций.</small>';
+    const entryCard=document.createElement('section');entryCard.id='partialPaymentEntryCard';entryCard.className='partial-payment-entry-card';entryCard.innerHTML='<h3>Новая оплата</h3><small>Укажите сумму и фактическую дату оплаты. После нажатия FamilyPilot проверит точные совпадения среди операций этого кошелька.</small>';
     const dateField=document.createElement('div');dateField.className='field';dateField.innerHTML='<label for="partialPaymentDate">Дата и время оплаты</label><input id="partialPaymentDate" type="datetime-local">';
     entryCard.append(field,dateField,error,actions);
     const existingDetails=document.createElement('details');existingDetails.id='partialExistingOperationDetails';existingDetails.className='partial-existing-details';existingDetails.hidden=true;existingDetails.innerHTML='<summary>Оплата уже записана в «Операциях»</summary>';existingDetails.appendChild(candidateSection);
@@ -86,9 +86,9 @@
 
     function exactMatches(id,amount,occurredAt){
       const item=occurrence(id),itemRule=rule(item?.ruleId),categoryId=item?.categoryId||itemRule?.categoryId;
-      if(!item||!categoryId||!Number.isFinite(amount)||!Number.isFinite(occurredAt))return[];
+      if(!item||!item.walletId||!categoryId||!Number.isFinite(amount)||!Number.isFinite(occurredAt))return[];
       const targetDay=dayNumber(occurredAt);
-      return(state.operations||[]).filter(op=>op.status==='active'&&op.kind==='expense'&&!allocationOccurrenceId(op)&&op.categoryId===categoryId&&sameCents(op.amount,amount)&&Math.abs(dayNumber(op.occurredAt)-targetDay)<=2).sort((a,b)=>Math.abs(dayNumber(a.occurredAt)-targetDay)-Math.abs(dayNumber(b.occurredAt)-targetDay)||Number(b.occurredAt||0)-Number(a.occurredAt||0));
+      return(state.operations||[]).filter(op=>op.status==='active'&&op.kind==='expense'&&!allocationOccurrenceId(op)&&op.walletId===item.walletId&&op.categoryId===categoryId&&sameCents(op.amount,amount)&&Math.abs(dayNumber(op.occurredAt)-targetDay)<=2).sort((a,b)=>Math.abs(dayNumber(a.occurredAt)-targetDay)-Math.abs(dayNumber(b.occurredAt)-targetDay)||Number(b.occurredAt||0)-Number(a.occurredAt||0));
     }
 
     function resultToast(result,linked=false){
@@ -144,7 +144,7 @@
 
     function renderMatches(matches){
       const item=occurrence(pending?.occurrenceId),code=item?.currency||wallet(item?.walletId)?.nativeCurrency||state.household?.baseCurrency||'EUR';
-      $('partialReconciliationCopy').textContent=matches.length===1?'Найден расход с такой же суммой и категорией в пределах двух дней. Это оплата, которую вы сейчас записываете?':`Найдено ${matches.length} расходов с такой же суммой и категорией в пределах двух дней. Выберите нужный или создайте новую операцию.`;
+      $('partialReconciliationCopy').textContent=matches.length===1?'В этом кошельке найден расход с такой же суммой и категорией в пределах двух дней. Это оплата, которую вы сейчас записываете?':`В этом кошельке найдено ${matches.length} расходов с такой же суммой и категорией в пределах двух дней. Выберите нужный или создайте новую операцию.`;
       $('partialReconciliationList').innerHTML=matches.map(op=>`<div class="partial-reconcile-item"><span><strong>${money(op.amount,code)}</strong><small>${formatDateTime(op.occurredAt)} · ${esc(wallet(op.walletId)?.name||'Кошелёк')}<br>${op.note?esc(op.note):'Без комментария'}</small></span><button class="btn secondary" type="button" data-partial-reconcile-link="${esc(op.id)}">Связать</button></div>`).join('');
     }
 
