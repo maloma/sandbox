@@ -106,10 +106,10 @@
 
     function renderOverpayment(){
       if(!pending)return false;
-      const item=occurrence(pending.occurrenceId),itemRule=rule(item?.ruleId),code=item?.currency||wallet(item?.walletId)?.nativeCurrency||state.household?.baseCurrency||'EUR',preview=resolver.preview(pending.occurrenceId,pending.amount),carry=$('[data-partial-overpayment="carry"]');
+      const item=occurrence(pending.occurrenceId),itemRule=rule(item?.ruleId),code=item?.currency||wallet(item?.walletId)?.nativeCurrency||state.household?.baseCurrency||'EUR',preview=resolver.preview(pending.occurrenceId,pending.amount),carry=document.querySelector('[data-partial-overpayment="carry"]');
       $('partialOverpaymentSummary').innerHTML=`<strong>${esc(itemRule?.name||'Обязательство')}</strong><small>Осталось: ${money(preview.remaining,code)} · Введено: ${money(pending.amount,code)} · Переплата: ${money(preview.overpaid,code)}</small>`;
       $('partialOverpaymentCopy').textContent=pending.sourceOperationId?'Вы выбрали существующую операцию. При переносе она будет заменена двумя отдельными операциями только после вашего подтверждения.':'Выберите, что сделать с переплатой.';
-      carry.disabled=!preview.canCarry;carry.hidden=!preview.canCarry;
+      if(carry){carry.disabled=!preview.canCarry;carry.hidden=!preview.canCarry}
       return true;
     }
 
