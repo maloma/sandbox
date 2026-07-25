@@ -48,8 +48,8 @@
       const amount=Number(operation?.amount)||0;
       if(operation?.kind==='income')result.income+=amount;
       if(operation?.kind==='expense')result.expense+=amount;
-      if(operation?.kind==='debt_inflow')result.debtInflow+=amount;
-      if(operation?.kind==='debt_outflow')result.debtOutflow+=amount;
+      if(operation?.kind === 'debt_inflow')result.debtInflow+=amount;
+      if(operation?.kind === 'debt_outflow')result.debtOutflow+=amount;
       return result;
     },{income:0,expense:0,debtInflow:0,debtOutflow:0});
   }
