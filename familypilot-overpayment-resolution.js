@@ -67,21 +67,21 @@
       if(!item)return{ok:false,error:'Платёж не найден.'};
       if(!Number.isFinite(value)||value<=0)return{ok:false,error:'Введите корректную сумму.'};
       const remaining=Number(data.remaining||0),overpaid=Math.max(0,value-remaining);
-      if(overpaid<=EPSILON)return{ok:false,error:'Переплата не обнаружена.'};
-      if(action==='correct')return{ok:true,action,correctedAmount:remaining,remaining};
 
       const source=sourceOperationId?operation(sourceOperationId):null;
       if(sourceOperationId&&(!source||source.status!=='active'||source.kind!=='expense'||linkedOccurrenceId(source)))return{ok:false,error:'Выбранная операция больше недоступна.'};
 
       if(action==='leave'){
-        const result=source?payments.attachOperation(occurrenceId,source,'overpayment_left_as_entered'):createAt(occurrenceId,value,occurredAt,'overpayment_left_as_entered');
+        const result=source?payments.attachOperation(occurrenceId,source,overpaid>EPSILON?'overpayment_left_as_entered':'partial_payment_reconciled_existing'):createAt(occurrenceId,value,occurredAt,overpaid>EPSILON?'overpayment_left_as_entered':'partial_payment_created_after_reconciliation');
         if(!result.ok)return result;
         return{ok:true,action,operation:result.operation,summary:payments.summary(occurrenceId),overpaid};
       }
 
+      if(overpaid<=EPSILON)return{ok:false,error:'Переплата не обнаружена.'};
+      if(action==='correct')return{ok:true,action,correctedAmount:remaining,remaining};
       if(action!=='carry')return{ok:false,error:'Неизвестное действие с переплатой.'};
-      const next=nextOccurrence(occurrenceId);if(!next)return{ok:false,error:'Следующий платёж недоступен для переноса переплаты.'};
 
+      const next=nextOccurrence(occurrenceId);if(!next)return{ok:false,error:'Следующий платёж недоступен для переноса переплаты.'};
       const sourceSnapshot=source?JSON.parse(JSON.stringify(source)):null;
       const createdIds=[];
       try{
