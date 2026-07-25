@@ -59,7 +59,7 @@
     function voidSource(op){
       const oldStatus=op.status;
       op.status='voided';op.systemVoidedAt=now();op.systemVoidReason='overpayment_source_replaced_for_carry_forward';op.deletedAt=null;op.deletedByMemberId=null;op.trashExpiresAt=null;
-      addRevision(op,'overpayment_source_replaced_for_carry_forward',[{field:'status',oldValue,newValue:'voided'}]);
+      addRevision(op,'overpayment_source_replaced_for_carry_forward',[{field:'status',oldValue:oldStatus,newValue:'voided'}]);
     }
 
     function resolve({occurrenceId,amount,occurredAt,action,sourceOperationId=null}){
