@@ -34,8 +34,8 @@ jobs:
       - name: Verify exact checked-out head
         run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
 
-      - name: Verify published M3-07B package
+      - name: Verify published M3-07B R01 package
         env:
           PUBLIC_URL: https://maloma.github.io/sandbox/
-          EXPECTED_MAIN_M307B: ede56a3f40ce772005eee2f93a129679670cf52b
+          EXPECTED_MAIN_M307B: d833515187d8d609eafb2460b9047554430127fa
         run: node tools/pf08a-m3-07b-public-browser-smoke.mjs
