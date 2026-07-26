@@ -3,6 +3,7 @@ name: PF-08A M4-03 Budget Designer Gate
 on:
   pull_request:
     paths:
+      - 'familypilot-m4-03-forecast-correction.js'
       - 'familypilot-m4-03-budget-designer.js'
       - 'familypilot-m4-03-budget-designer-ui.js'
       - 'familypilot-viewport-anchor.js'
@@ -33,6 +34,7 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
       - name: Verify syntax
         run: |
+          node --check familypilot-m4-03-forecast-correction.js
           node --check familypilot-m4-03-budget-designer.js
           node --check familypilot-m4-03-budget-designer-ui.js
           node --check familypilot-viewport-anchor.js
