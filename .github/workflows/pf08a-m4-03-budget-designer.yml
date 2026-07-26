@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
       - 'familypilot-m4-03-forecast-correction.js'
+      - 'familypilot-m4-03-budget-safety-correction.js'
       - 'familypilot-m4-03-budget-designer.js'
       - 'familypilot-m4-03-budget-designer-ui.js'
       - 'familypilot-viewport-anchor.js'
       - 'tools/pf08a-m4-03-budget-designer-browser-smoke-v2.mjs'
       - 'tools/pf08a-m4-03-budget-designer-browser-smoke-v3.mjs'
+      - 'tools/pf08a-m4-03-budget-designer-browser-smoke-v4.mjs'
       - '.github/workflows/pf08a-m4-03-budget-designer.yml'
 
 permissions:
@@ -35,10 +37,12 @@ jobs:
       - name: Verify syntax
         run: |
           node --check familypilot-m4-03-forecast-correction.js
+          node --check familypilot-m4-03-budget-safety-correction.js
           node --check familypilot-m4-03-budget-designer.js
           node --check familypilot-m4-03-budget-designer-ui.js
           node --check familypilot-viewport-anchor.js
           node --check tools/pf08a-m4-03-budget-designer-browser-smoke-v2.mjs
           node --check tools/pf08a-m4-03-budget-designer-browser-smoke-v3.mjs
+          node --check tools/pf08a-m4-03-budget-designer-browser-smoke-v4.mjs
       - name: Verify budget designer behavior
-        run: node tools/pf08a-m4-03-budget-designer-browser-smoke-v3.mjs
+        run: node tools/pf08a-m4-03-budget-designer-browser-smoke-v4.mjs
