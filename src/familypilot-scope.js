@@ -115,6 +115,9 @@
     script.addEventListener('error',()=>{root.__FP_PACKAGE_BOOTSTRAP_ERROR__=`Failed to load ${path}`},{once:true});
     document.head.appendChild(script);
   }
+  function loadM403(){
+    loadScript('familypilot-m4-03-savings-accounts.js',()=>loadScript('familypilot-m4-03-savings-accounts-ui.js',()=>{root.__FP_M4_03_PACKAGE_LOADED__=true}));
+  }
   function loadPaymentAttention(){
     loadScript('familypilot-payment-attention.js',()=>loadScript('familypilot-payment-attention-ui.js',()=>{
       root.__FP_M3_03_READY__=true;
@@ -130,7 +133,7 @@
               root.__FP_M3_07_READY__=true;
               loadScript('familypilot-rule-history.js',()=>{
                 root.__FP_M3_08_READY__=true;
-                loadScript('familypilot-planned-income.js',()=>loadScript('familypilot-planned-income-amount-model.js',()=>loadScript('familypilot-planned-income-ui.js',()=>loadScript('familypilot-planned-income-amount-ui.js',()=>{root.__FP_M4_01_READY__=true;root.__FP_M4_02_READY__=true}))));
+                loadScript('familypilot-planned-income.js',()=>loadScript('familypilot-planned-income-amount-model.js',()=>loadScript('familypilot-planned-income-ui.js',()=>loadScript('familypilot-planned-income-amount-ui.js',()=>{root.__FP_M4_01_READY__=true;root.__FP_M4_02_READY__=true;loadM403()}))));
               });
             }))));
           });
