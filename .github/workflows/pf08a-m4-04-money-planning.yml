@@ -6,6 +6,7 @@ on:
       - 'familypilot-wallet-management.js'
       - 'familypilot-scope.js'
       - 'src/familypilot-scope.js'
+      - 'familypilot-m4-03-additive-reserve-ui.js'
       - 'familypilot-m4-04-compatibility.js'
       - 'familypilot-m4-04-money-planning.js'
       - 'familypilot-m4-04-money-planning-ui.js'
@@ -42,6 +43,7 @@ jobs:
           cmp -s familypilot-scope.js src/familypilot-scope.js
           node --check familypilot-wallet-management.js
           node --check familypilot-scope.js
+          node --check familypilot-m4-03-additive-reserve-ui.js
           node --check familypilot-m4-04-compatibility.js
           node --check familypilot-m4-04-money-planning.js
           node --check familypilot-m4-04-money-planning-ui.js
