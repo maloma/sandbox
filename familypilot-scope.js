@@ -73,7 +73,7 @@
   function capitalSnapshot(state){
     const selected=activeWallet(state);
     if(!selected)return{wallet:null,scope:'household',currency:state?.household?.baseCurrency||'EUR',opening:0,income:0,expense:0,debtInflow:0,debtOutflow:0,transferInflow:0,transferOutflow:0,adjustment:0,change:0,capital:0};
-    if(isPersonalWallet(selected))return walletCapitalSnapshot(state,selected.id);
+    if(isPersonalWallet(selected)){const result=walletCapitalSnapshot(state,selected.id);return{...result,scope:'personal'}}
     const operations=householdCapitalOperations(state),movements=householdCapitalMovements(state),includedIds=new Set(wallets(state).filter(wallet=>!wallet.archivedAt&&wallet.includedInHouseholdCapital===true).map(wallet=>wallet.id)),adjustments=activeAdjustments(state).filter(item=>includedIds.has(item.walletId)),opening=Number(state?.household?.openingCapital)||0;
     const additionalOpening=wallets(state).filter(wallet=>wallet.type!=='household_default'&&wallet.includedInHouseholdCapital===true).reduce((sum,wallet)=>sum+(Number(wallet.openingBalance)||0),0);
     return snapshot(state,selected,operations,movements,adjustments,opening+additionalOpening,'household',state?.household?.baseCurrency||selected.nativeCurrency||'EUR');
