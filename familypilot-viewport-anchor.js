@@ -13,7 +13,7 @@
     script.addEventListener('error',()=>{window.__FP_M4_03_BUDGET_BOOTSTRAP_ERROR__=`Failed to load ${path}`},{once:true});
     document.head.appendChild(script);
   }
-  loadScript('familypilot-m4-03-budget-designer.js',()=>loadScript('familypilot-m4-03-budget-designer-ui.js',()=>{window.__FP_M4_03_BUDGET_PACKAGE_LOADED__=true}));
+  loadScript('familypilot-m4-03-forecast-correction.js',()=>loadScript('familypilot-m4-03-budget-designer.js',()=>loadScript('familypilot-m4-03-budget-designer-ui.js',()=>{window.__FP_M4_03_BUDGET_PACKAGE_LOADED__=true})));
 
   function boot(attempt=0){
     const nav=document.querySelector('.bottom'),dock=document.getElementById('actionDock'),app=document.querySelector('.app');
