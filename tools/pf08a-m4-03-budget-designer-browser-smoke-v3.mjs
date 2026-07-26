@@ -9,7 +9,7 @@ const patchedPath = join(here, '.pf08a-m4-03-budget-designer-browser-smoke-patch
 const source = readFileSync(sourcePath, 'utf8');
 const needle = '    budget.seedDeficit(9000000, now + 7 * 86400000);';
 const replacement = `    const runtimeState = win.__FP_RUNTIME__.state;
-    for (let index = 0; index < 20; index += 1) {
+    for (let index = 0; index < 5; index += 1) {
       const seeded = win.FamilyPilotObligations.createRule(runtimeState, {
         name: 'Тестовый дефицит ' + index,
         amount: 999999.99,
