@@ -7,10 +7,11 @@ on:
       - 'familypilot-scope.js'
       - 'src/familypilot-scope.js'
       - 'familypilot-m4-03-additive-reserve-ui.js'
-      - 'familypilot-m4-04-compatibility.js'
       - 'familypilot-m4-04-money-planning.js'
       - 'familypilot-m4-04-money-planning-ui.js'
       - 'familypilot-viewport-anchor.js'
+      - 'tools/pf08a-m2-01-verify-debt-integration.mjs'
+      - 'tools/pf08a-wf01-verify-integration.mjs'
       - 'tools/pf08a-m4-04-money-planning-browser-smoke.mjs'
       - 'tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs'
       - 'tools/pf08a-m4-04-money-planning-browser-smoke-v3.mjs'
@@ -44,10 +45,11 @@ jobs:
           node --check familypilot-wallet-management.js
           node --check familypilot-scope.js
           node --check familypilot-m4-03-additive-reserve-ui.js
-          node --check familypilot-m4-04-compatibility.js
           node --check familypilot-m4-04-money-planning.js
           node --check familypilot-m4-04-money-planning-ui.js
           node --check familypilot-viewport-anchor.js
+          node --check tools/pf08a-m2-01-verify-debt-integration.mjs
+          node --check tools/pf08a-wf01-verify-integration.mjs
           node --check tools/pf08a-m4-04-money-planning-browser-smoke.mjs
           node --check tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs
           node --check tools/pf08a-m4-04-money-planning-browser-smoke-v3.mjs
