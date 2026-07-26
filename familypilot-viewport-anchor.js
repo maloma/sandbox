@@ -15,7 +15,7 @@
   }
   loadScript('familypilot-m4-03-forecast-correction.js',()=>loadScript('familypilot-m4-03-budget-safety-correction.js',()=>loadScript('familypilot-m4-03-budget-designer.js',()=>loadScript('familypilot-m4-03-budget-designer-ui.js',()=>loadScript('familypilot-m4-03-additive-reserve-ui.js',()=>loadScript('familypilot-m4-04-money-planning.js',()=>{
     window.DAY=window.FamilyPilotMoneyPlanning?.DAY||86400000;
-    loadScript('familypilot-m4-04-money-planning-ui.js',()=>loadScript('familypilot-m4-04-compatibility.js',()=>{window.__FP_M4_03_BUDGET_PACKAGE_LOADED__=true;window.__FP_M4_04_PACKAGE_LOADED__=true}));
+    loadScript('familypilot-m4-04-money-planning-ui.js',()=>{window.__FP_M4_03_BUDGET_PACKAGE_LOADED__=true;window.__FP_M4_04_PACKAGE_LOADED__=true});
   }))))));
 
   function boot(attempt=0){
