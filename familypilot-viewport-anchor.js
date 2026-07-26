@@ -4,6 +4,17 @@
   window.__FP_VIEWPORT_ANCHOR__=true;
   const READY_LIMIT=1200;
 
+  function loadScript(path,ready){
+    const existing=[...document.scripts].find(script=>script.src&&script.src.endsWith(`/${path}`));
+    if(existing){if(existing.dataset.loaded==='true')ready?.();else existing.addEventListener('load',()=>ready?.(),{once:true});return}
+    const script=document.createElement('script');
+    script.src=`./${path}`;script.async=false;script.dataset.familyPilotPackage='m4-03-budget-designer';
+    script.addEventListener('load',()=>{script.dataset.loaded='true';ready?.()},{once:true});
+    script.addEventListener('error',()=>{window.__FP_M4_03_BUDGET_BOOTSTRAP_ERROR__=`Failed to load ${path}`},{once:true});
+    document.head.appendChild(script);
+  }
+  loadScript('familypilot-m4-03-budget-designer.js',()=>loadScript('familypilot-m4-03-budget-designer-ui.js',()=>{window.__FP_M4_03_BUDGET_PACKAGE_LOADED__=true}));
+
   function boot(attempt=0){
     const nav=document.querySelector('.bottom'),dock=document.getElementById('actionDock'),app=document.querySelector('.app');
     if(!nav||!dock||!app){if(attempt<READY_LIMIT)setTimeout(()=>boot(attempt+1),25);return}
