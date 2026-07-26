@@ -1,0 +1,40 @@
+name: PF-08A Transfer Entry Retirement Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - familypilot-scope.js
+      - src/familypilot-scope.js
+      - tools/pf08a-wf02-browser-smoke.mjs
+      - .github/workflows/pf08a-transfer-retirement-gate.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify-exact-head:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+      - name: Verify exact checked-out head
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+      - name: Verify scope mirrors
+        run: cmp -s familypilot-scope.js src/familypilot-scope.js
+      - name: Verify transfer entry retirement and compatibility
+        run: node tools/pf08a-wf02-browser-smoke.mjs

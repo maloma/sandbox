@@ -86,17 +86,19 @@
   root.__FP_WF02_BOOTSTRAP__=true;
 
   const testMode=new URLSearchParams(location.search).has('test');
-  const testApiDeadline=Date.now()+30000;
+  const runtimeDeadline=Date.now()+30000;
 
   function ensurePackageMarker(){
     const selector='meta[name="familypilot-package"][content="base-currency-wallet-transfers-v1"]';
-    if(document.head&&!document.head.querySelector(selector)){
-      const marker=document.createElement('meta');
+    let marker=document.head?.querySelector(selector);
+    if(document.head&&!marker){
+      marker=document.createElement('meta');
       marker.name='familypilot-package';
       marker.content='base-currency-wallet-transfers-v1';
       marker.dataset.runtimeMount='familypilot-scope';
       document.head.appendChild(marker);
     }
+    return marker;
   }
   function loadScript(path,ready){
     const existing=[...document.scripts].find(script=>script.src&&script.src.endsWith(`/${path}`));
@@ -136,17 +138,32 @@
       });
     }));
   }
-  function loadUiWhenBaseRuntimeReady(){
-    if(testMode&&!root.__FP_TEST__){
-      if(Date.now()>=testApiDeadline){root.__FP_WF02_BOOTSTRAP_ERROR__='Base FamilyPilot test API did not become ready';return}
-      setTimeout(loadUiWhenBaseRuntimeReady,25);
+  function settleTransferSurfaceWhenBaseRuntimeReady(){
+    const runtime=root.__FP_RUNTIME__;
+    if(!runtime||(testMode&&!root.__FP_TEST__)){
+      if(Date.now()>=runtimeDeadline){root.__FP_WF02_BOOTSTRAP_ERROR__='Base FamilyPilot runtime did not become ready';return}
+      setTimeout(settleTransferSurfaceWhenBaseRuntimeReady,25);
       return;
     }
-    loadScript('familypilot-wallet-transfers-ui.js',()=>{root.__FP_WF02_READY__=true;loadPaymentAttention()});
+    if(testMode){
+      loadScript('familypilot-wallet-transfers-ui.js',()=>{root.__FP_WF02_READY__=true;root.__FP_WF02_HIDDEN__=false;loadPaymentAttention()});
+      return;
+    }
+    try{
+      root.FamilyPilotWalletTransfers?.normalizeState(runtime.state,Date.now());
+      runtime.save?.();
+    }catch(error){
+      root.__FP_WF02_COMPATIBILITY_ERROR__=String(error?.message||error);
+    }
+    const marker=ensurePackageMarker();
+    if(marker)marker.dataset.productState='hidden-superseded';
+    root.__FP_WF02_READY__=false;
+    root.__FP_WF02_HIDDEN__=true;
+    loadPaymentAttention();
   }
   function mount(){
     ensurePackageMarker();
-    loadScript('familypilot-viewport-anchor.js',()=>loadScript('familypilot-wallet-transfers.js',loadUiWhenBaseRuntimeReady));
+    loadScript('familypilot-viewport-anchor.js',()=>loadScript('familypilot-wallet-transfers.js',settleTransferSurfaceWhenBaseRuntimeReady));
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});
   else queueMicrotask(mount);
