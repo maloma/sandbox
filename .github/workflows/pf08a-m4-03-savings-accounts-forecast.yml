@@ -3,8 +3,10 @@ name: PF-08A M4-03 Savings Accounts Forecast Gate
 on:
   pull_request:
     paths:
-      - 'familypilot-savings-goals.js'
-      - 'familypilot-savings-goals-ui.js'
+      - 'familypilot-m4-03-savings-accounts.js'
+      - 'familypilot-m4-03-savings-accounts-ui.js'
+      - 'familypilot-scope.js'
+      - 'src/familypilot-scope.js'
       - 'tools/pf08a-m4-03-savings-accounts-forecast-browser-smoke.mjs'
       - '.github/workflows/pf08a-m4-03-savings-accounts-forecast.yml'
 
@@ -29,10 +31,12 @@ jobs:
         env:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
-      - name: Verify syntax
+      - name: Verify loader mirrors and syntax
         run: |
-          node --check familypilot-savings-goals.js
-          node --check familypilot-savings-goals-ui.js
+          cmp -s familypilot-scope.js src/familypilot-scope.js
+          node --check familypilot-m4-03-savings-accounts.js
+          node --check familypilot-m4-03-savings-accounts-ui.js
+          node --check familypilot-scope.js
           node --check tools/pf08a-m4-03-savings-accounts-forecast-browser-smoke.mjs
       - name: Verify M4-03 savings accounts and forecast
         run: node tools/pf08a-m4-03-savings-accounts-forecast-browser-smoke.mjs
