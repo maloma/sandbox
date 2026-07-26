@@ -6,11 +6,13 @@ on:
       - 'familypilot-wallet-management.js'
       - 'familypilot-scope.js'
       - 'src/familypilot-scope.js'
+      - 'familypilot-m4-04-compatibility.js'
       - 'familypilot-m4-04-money-planning.js'
       - 'familypilot-m4-04-money-planning-ui.js'
       - 'familypilot-viewport-anchor.js'
       - 'tools/pf08a-m4-04-money-planning-browser-smoke.mjs'
       - 'tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs'
+      - 'tools/pf08a-wf02-m404-diagnostic.mjs'
       - '.github/workflows/pf08a-m4-04-money-planning.yml'
 
 permissions:
@@ -39,13 +41,17 @@ jobs:
           cmp -s familypilot-scope.js src/familypilot-scope.js
           node --check familypilot-wallet-management.js
           node --check familypilot-scope.js
+          node --check familypilot-m4-04-compatibility.js
           node --check familypilot-m4-04-money-planning.js
           node --check familypilot-m4-04-money-planning-ui.js
           node --check familypilot-viewport-anchor.js
           node --check tools/pf08a-m4-04-money-planning-browser-smoke.mjs
           node --check tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs
+          node --check tools/pf08a-wf02-m404-diagnostic.mjs
       - name: Verify M4-04 behavior
         run: node tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs
+      - name: Verify WF-02 browser compatibility
+        run: node tools/pf08a-wf02-m404-diagnostic.mjs
       - name: Obligations domain regression
         run: node tools/pf08a-m3-01-domain-test.cjs
       - name: Debts domain regression
