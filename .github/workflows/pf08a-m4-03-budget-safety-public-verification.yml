@@ -1,0 +1,34 @@
+name: PF-08A M4-03 Budget Safety Public Verification
+
+on:
+  pull_request:
+    paths:
+      - 'tools/pf08a-m4-03-budget-safety-public-smoke.mjs'
+      - '.github/workflows/pf08a-m4-03-budget-safety-public-verification.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-public-package:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+      - name: Verify exact checked-out head
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
+      - name: Verify protected public budget package
+        env:
+          PUBLIC_URL: https://maloma.github.io/sandbox/
+          EXPECTED_MAIN_M4_03_BUDGET_SAFE: 370290069984f86b601b580473471ea8988c1826
+        run: node tools/pf08a-m4-03-budget-safety-public-smoke.mjs
