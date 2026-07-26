@@ -6,7 +6,7 @@ on:
       - 'familypilot-m4-03-budget-designer.js'
       - 'familypilot-m4-03-budget-designer-ui.js'
       - 'familypilot-viewport-anchor.js'
-      - 'tools/pf08a-m4-03-budget-designer-browser-smoke.mjs'
+      - 'tools/pf08a-m4-03-budget-designer-browser-smoke-v2.mjs'
       - '.github/workflows/pf08a-m4-03-budget-designer.yml'
 
 permissions:
@@ -35,6 +35,6 @@ jobs:
           node --check familypilot-m4-03-budget-designer.js
           node --check familypilot-m4-03-budget-designer-ui.js
           node --check familypilot-viewport-anchor.js
-          node --check tools/pf08a-m4-03-budget-designer-browser-smoke.mjs
+          node --check tools/pf08a-m4-03-budget-designer-browser-smoke-v2.mjs
       - name: Verify budget designer behavior
-        run: node tools/pf08a-m4-03-budget-designer-browser-smoke.mjs
+        run: node tools/pf08a-m4-03-budget-designer-browser-smoke-v2.mjs
