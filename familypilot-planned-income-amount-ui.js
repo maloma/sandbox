@@ -26,16 +26,16 @@ function boot(attempt=0){
       modal.querySelector('[data-income-action="received"]')?.remove();
       modal.querySelector('[data-income-action="skipped"]')?.remove();
       const record=modal.querySelector('[data-income-action="partial"]');
-      if(record){record.textContent='Записать поступление';record.className='btn primary'}
+      if(record){if(record.textContent!=='Записать поступление')record.textContent='Записать поступление';if(record.className!=='btn primary')record.className='btn primary'}
       const detach=modal.querySelector('[data-income-action="unreceived"]');
-      if(detach)detach.textContent='Изменить связанные поступления';
+      if(detach&&detach.textContent!=='Изменить связанные поступления')detach.textContent='Изменить связанные поступления';
     }
     const receipt=document.getElementById('plannedIncomeReceiptModal');
     if(receipt){
-      const title=document.getElementById('plannedIncomeReceiptTitle');if(title)title.textContent='Записать поступление';
+      const title=document.getElementById('plannedIncomeReceiptTitle');if(title&&title.textContent!=='Записать поступление')title.textContent='Записать поступление';
       const input=document.getElementById('plannedIncomeReceiptAmount');
-      const label=input?.closest('.field')?.querySelector('label');if(label)label.textContent='Фактически полученная сумма';
-      const save=document.getElementById('plannedIncomeReceiptCreate');if(save)save.textContent='Сохранить приход';
+      const label=input?.closest('.field')?.querySelector('label');if(label&&label.textContent!=='Фактически полученная сумма')label.textContent='Фактически полученная сумма';
+      const save=document.getElementById('plannedIncomeReceiptCreate');if(save&&save.textContent!=='Сохранить приход')save.textContent='Сохранить приход';
     }
   }
 
@@ -105,7 +105,7 @@ function boot(attempt=0){
       if(!item||!copy||item.status==='disabled')continue;
       const next=(state.plannedIncomeOccurrences||[]).filter(entry=>entry.ruleId===item.id&&entry.dueAt>=day(now())&&api.summary(state,entry.id).status!=='received').sort((a,b)=>a.dueAt-b.dueAt)[0];
       const suffix=copy.textContent.includes(' · ')?copy.textContent.slice(copy.textContent.indexOf(' · ')):'';
-      copy.textContent=(next?`Ближайший: ${formatDate(next.dueAt)}`:'Нет ближайшего прихода')+suffix;
+      const value=(next?`Ближайший: ${formatDate(next.dueAt)}`:'Нет ближайшего прихода')+suffix;if(copy.textContent!==value)copy.textContent=value;
     }
   }
 
@@ -119,7 +119,9 @@ function boot(attempt=0){
     filtered.innerHTML=items.length?items.map(historyRow).join(''):'<div class="obligation-empty">По выбранному фильтру записей нет.</div>';
   }
 
-  const observer=new MutationObserver(()=>queueMicrotask(renderFilter));
+  let renderScheduled=false;
+  const scheduleRender=()=>{if(renderScheduled)return;renderScheduled=true;setTimeout(()=>{renderScheduled=false;renderFilter()},0)};
+  const observer=new MutationObserver(scheduleRender);
   observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
   installFilter();renderFilter();
   window.FamilyPilotPlannedIncomeAmountUI=Object.freeze({renderFilter,filteredItems,historyAge:HISTORY_AGE});
