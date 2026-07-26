@@ -54,7 +54,7 @@
 
   function normalizeState(state,members,at=Date.now()){
     if(!state||typeof state!=='object')throw new Error('FamilyPilot state is required');
-    state.schemaVersion=Math.max(13,Number(state.schemaVersion)||0);
+    state.schemaVersion=Math.max(7,Number(state.schemaVersion)||0);
     state.household=state.household||{id:'household-demo',baseCurrency:'EUR'};
     state.household.baseCurrency=String(state.household.baseCurrency||'EUR');
     state.wallets=(Array.isArray(state.wallets)?state.wallets:[]).filter(Boolean).map(wallet=>normalizeWallet(wallet,state,members,at));
