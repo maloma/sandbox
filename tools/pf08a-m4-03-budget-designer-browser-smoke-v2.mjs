@@ -87,7 +87,7 @@ const harness = `<!doctype html>
     const ordinaryBefore = JSON.stringify(savings.ordinaryTotals());
     const stateBefore = budget.state();
 
-    budget.seedDeficit(100000, now + 7 * 86400000);
+    budget.seedDeficit(9000000, now + 7 * 86400000);
     const analysis = budget.analysis(30);
     assert(analysis.deficit && analysis.amount > 0, 'Deficit was not detected');
 
