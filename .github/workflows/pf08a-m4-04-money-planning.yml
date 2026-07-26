@@ -44,6 +44,8 @@ jobs:
           node --check familypilot-viewport-anchor.js
           node --check tools/pf08a-m4-04-money-planning-browser-smoke.mjs
           node --check tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs
+      - name: Verify M4-04 behavior
+        run: node tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs
       - name: Obligations domain regression
         run: node tools/pf08a-m3-01-domain-test.cjs
       - name: Debts domain regression
@@ -54,5 +56,3 @@ jobs:
         run: node tools/pf08a-wf01-domain-test.cjs
       - name: Wallet transfers domain regression
         run: node tools/pf08a-wf02-domain-test.cjs
-      - name: Verify M4-04 behavior
-        run: node tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs
