@@ -5,6 +5,7 @@ on:
     paths:
       - 'familypilot-wallet-management.js'
       - 'familypilot-scope.js'
+      - 'src/familypilot-scope.js'
       - 'familypilot-m4-04-money-planning.js'
       - 'familypilot-m4-04-money-planning-ui.js'
       - 'familypilot-viewport-anchor.js'
@@ -33,8 +34,9 @@ jobs:
         env:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
-      - name: Verify syntax
+      - name: Verify loader mirror and syntax
         run: |
+          cmp -s familypilot-scope.js src/familypilot-scope.js
           node --check familypilot-wallet-management.js
           node --check familypilot-scope.js
           node --check familypilot-m4-04-money-planning.js
@@ -42,5 +44,15 @@ jobs:
           node --check familypilot-viewport-anchor.js
           node --check tools/pf08a-m4-04-money-planning-browser-smoke.mjs
           node --check tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs
+      - name: Obligations domain regression
+        run: node tools/pf08a-m3-01-domain-test.cjs
+      - name: Debts domain regression
+        run: node tools/pf08a-m2-01-domain-test.cjs
+      - name: Savings domain regression
+        run: node tools/pf08a-m4-01-domain-test.cjs
+      - name: Wallet management domain regression
+        run: node tools/pf08a-wf01-domain-test.cjs
+      - name: Wallet transfers domain regression
+        run: node tools/pf08a-wf02-domain-test.cjs
       - name: Verify M4-04 behavior
         run: node tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs
