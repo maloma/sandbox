@@ -27,7 +27,7 @@ function checks(packageFiles){
  return{
   loader:packageFiles.scope.includes('familypilot-m4-03-savings-accounts.js')&&packageFiles.scope.includes('familypilot-m4-03-savings-accounts-ui.js')&&packageFiles.scope.includes('loadM403'),
   domain:packageFiles.m403.includes('FamilyPilotSavingsAccounts')&&packageFiles.m403.includes('internal_transfer')&&packageFiles.m403.includes('fixed_contribution'),
-  ui:packageFiles.m403Ui.includes("content='m4-03-savings-accounts-forecast-v1'")||packageFiles.m403Ui.includes("content='m4-03-savings-accounts-forecast-v1'"),
+  ui:packageFiles.m403Ui.includes("marker.content='m4-03-savings-accounts-forecast-v1'")&&packageFiles.m403Ui.includes('__FP_M4_03_READY__'),
   title:packageFiles.savingsUi.includes('<h1>Накопления</h1>'),
   legacy:packageFiles.savings.includes('FamilyPilotSavingsGoals')&&packageFiles.savingsUi.includes('__FP_M4_01_UI__'),
   transferRetired:packageFiles.scope.includes("productState='hidden-superseded'")
