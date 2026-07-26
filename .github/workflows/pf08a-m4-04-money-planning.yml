@@ -12,6 +12,7 @@ on:
       - 'familypilot-viewport-anchor.js'
       - 'tools/pf08a-m4-04-money-planning-browser-smoke.mjs'
       - 'tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs'
+      - 'tools/pf08a-m4-04-money-planning-browser-smoke-v3.mjs'
       - 'tools/pf08a-wf02-m404-diagnostic.mjs'
       - '.github/workflows/pf08a-m4-04-money-planning.yml'
 
@@ -47,9 +48,10 @@ jobs:
           node --check familypilot-viewport-anchor.js
           node --check tools/pf08a-m4-04-money-planning-browser-smoke.mjs
           node --check tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs
+          node --check tools/pf08a-m4-04-money-planning-browser-smoke-v3.mjs
           node --check tools/pf08a-wf02-m404-diagnostic.mjs
       - name: Verify M4-04 behavior
-        run: node tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs
+        run: node tools/pf08a-m4-04-money-planning-browser-smoke-v3.mjs
       - name: Verify WF-02 browser compatibility
         run: node tools/pf08a-wf02-m404-diagnostic.mjs
       - name: Obligations domain regression
