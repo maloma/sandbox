@@ -53,7 +53,8 @@ function checks(packageFiles) {
       && packageFiles.additiveReserveUi.includes('Отдельное дополнительное накопление')
       && packageFiles.additiveReserveUi.includes('Резерв на покрытие дефицита'),
     transferInvariant: packageFiles.m403.includes('internal_transfer')
-      && packageFiles.transfers.includes("kind:'transfer'"),
+      && packageFiles.transfers.includes('transfer_source')
+      && packageFiles.transfers.includes('transfer_destination'),
     savingsTitle: packageFiles.savingsUi.includes('<h1>Накопления</h1>'),
   };
 }
