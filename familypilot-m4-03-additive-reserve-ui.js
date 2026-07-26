@@ -59,7 +59,7 @@
           <span class="budget-badge ${proposal.reviewRequired?'alert':existing?'ok':''}">${proposal.reviewRequired?'Пересмотреть':status}</span>
         </div>
         <div class="budget-note" style="margin-top:10px">
-          Резерв помогает покрывать дефицит и непредвиденные расходы. Он не создаётся за счёт уменьшения взносов на отпуск, автомобиль, подарок или другие цели, а получает собственный дополнительный ежемесячный взнос.
+          Резерв на покрытие дефицита и непредвиденных расходов не создаётся за счёт уменьшения взносов на отпуск, автомобиль, подарок или другие цели, а получает собственный дополнительный ежемесячный взнос.
         </div>
         ${proposal.reviewRequired?`<div class="budget-note reserve-additive-alert" style="margin-top:8px">Системная рекомендация изменилась на ${changePercent}% относительно последнего подтверждения. Правило нужно проверить заново.</div>`:''}
         <div class="budget-summary" style="margin-top:10px">
