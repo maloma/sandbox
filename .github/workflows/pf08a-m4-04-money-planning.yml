@@ -9,6 +9,7 @@ on:
       - 'familypilot-m4-04-money-planning-ui.js'
       - 'familypilot-viewport-anchor.js'
       - 'tools/pf08a-m4-04-money-planning-browser-smoke.mjs'
+      - 'tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs'
       - '.github/workflows/pf08a-m4-04-money-planning.yml'
 
 permissions:
@@ -40,5 +41,6 @@ jobs:
           node --check familypilot-m4-04-money-planning-ui.js
           node --check familypilot-viewport-anchor.js
           node --check tools/pf08a-m4-04-money-planning-browser-smoke.mjs
+          node --check tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs
       - name: Verify M4-04 behavior
-        run: node tools/pf08a-m4-04-money-planning-browser-smoke.mjs
+        run: node tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs
