@@ -37,5 +37,5 @@ jobs:
       - name: Verify published planned-income package
         env:
           PUBLIC_URL: https://maloma.github.io/sandbox/
-          EXPECTED_MAIN_PLANNED_INCOME: 031daeba41af132d0fc9ddda21001ae297687089
+          EXPECTED_MAIN_PLANNED_INCOME: cedfce4c4c4954e6ad1a19f631e725801a7258f5
         run: node tools/pf08a-planned-income-public-browser-smoke.mjs
