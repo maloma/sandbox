@@ -10,41 +10,43 @@ const harness=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title
  const frame=document.getElementById('app'),result=document.getElementById('result'),runtimeErrors=[];
  const assert=(condition,message)=>{if(!condition)throw new Error(message)};
  const text=node=>(node?.textContent||'').replace(/\\s+/g,' ').trim();
- async function waitApi(){const end=Date.now()+30000;while(Date.now()<end){const win=frame.contentWindow,api=win&&win.__FP_TEST__;if(api?.savings?.forecast&&win.__FP_M4_03_UI__)return api;await new Promise(r=>setTimeout(r,100))}throw new Error('M4-03 API did not become ready')}
+ async function waitApi(){const end=Date.now()+30000;while(Date.now()<end){const win=frame.contentWindow,api=win&&win.__FP_TEST__;if(api?.savings?.forecast&&win.__FP_M4_03_READY__===true)return api;await new Promise(resolve=>setTimeout(resolve,100))}const win=frame.contentWindow,doc=frame.contentDocument;throw new Error('M4-03 API did not become ready: '+JSON.stringify({ui:win?.__FP_M4_03_UI__,ready:win?.__FP_M4_03_READY__,packageLoaded:win?.__FP_M4_03_PACKAGE_LOADED__,uiError:win?.__FP_M4_03_UI_ERROR__,bootstrapError:win?.__FP_PACKAGE_BOOTSTRAP_ERROR__,hasTest:!!win?.__FP_TEST__,scripts:[...(doc?.scripts||[])].map(script=>script.src.split('/').pop()).filter(Boolean).slice(-12)}))}
  async function run(){
   const win=frame.contentWindow;win.addEventListener('error',event=>runtimeErrors.push(String(event.error||event.message||'error')));win.addEventListener('unhandledrejection',event=>runtimeErrors.push(String(event.reason||'unhandled rejection')));
   const api=await waitApi(),doc=frame.contentDocument,s=api.savings,now=Date.now(),future=new Date(now+180*86400000).toISOString().slice(0,10);
   assert(doc.querySelector('meta[content="m4-03-savings-accounts-forecast-v1"]'),'M4-03 package marker missing');
   s.openList();assert(text(doc.querySelector('#savingsGoalsScreen h1'))==='Накопления','User-facing module title changed from Накопления');
-  assert(doc.getElementById('savingsTransferBtn')&&doc.getElementById('savingsInvestmentBtn'),'Savings account actions missing');
-  assert(text(doc.getElementById('savingsForecastCard')).includes('Прогноз'),'Forecast surface missing');
+  assert(doc.getElementById('m403TransferOpen')&&doc.getElementById('m403InvestmentOpen'),'Savings account actions missing');
+  assert(text(doc.getElementById('m403Forecast')).includes('Прогноз'),'Forecast surface missing');
 
-  const first=s.create({name:'Отпуск M4-03',targetAmount:1200,savedAmount:100,targetDate:future,planningMode:'fixed_date',monthlyContribution:0,contributionDay:1});
+  const first=s.create({name:'Отпуск M4-03',targetAmount:1200,savedAmount:100,targetDate:future});
   assert(first.ok,'Fixed-date accumulation creation failed: '+first.error);
-  const second=s.create({name:'ТО автомобиля M4-03',targetAmount:600,savedAmount:50,targetDate:'',planningMode:'fixed_contribution',monthlyContribution:100,contributionDay:2});
+  const firstPlan=s.setPlan(first.goal.id,{planningMode:'fixed_date',monthlyContribution:0,contributionDay:1});assert(firstPlan.ok,'Fixed-date plan failed: '+firstPlan.error);
+  const second=s.create({name:'ТО автомобиля M4-03',targetAmount:600,savedAmount:50,targetDate:''});
   assert(second.ok,'Fixed-contribution accumulation creation failed: '+second.error);
+  const secondPlan=s.setPlan(second.goal.id,{planningMode:'fixed_contribution',monthlyContribution:100,contributionDay:2});assert(secondPlan.ok,'Fixed-contribution plan failed: '+secondPlan.error);
   const investment=s.createInvestment('Инвестиционный счёт M4-03');assert(investment.ok,'Investment account creation failed: '+investment.error);
 
   const accounts=s.accounts(),operating=accounts.find(item=>item.type==='operating'),firstAccount=accounts.find(item=>item.goalId===first.goal.id),secondAccount=accounts.find(item=>item.goalId===second.goal.id),investmentAccount=accounts.find(item=>item.investmentId===investment.account.id);
   assert(operating&&firstAccount&&secondAccount&&investmentAccount,'Expected account classes missing');
   const ordinaryBefore=JSON.stringify(s.ordinaryTotals()),baseCapitalBefore=s.capital().capital;
 
-  const t1=s.transfer({sourceAccountId:operating.id,destinationAccountId:firstAccount.id,amount:200,currency:'EUR',effectiveDate:now,note:'На отпуск'});
+  const t1=s.transfer({sourceAccountId:operating.id,destinationAccountId:firstAccount.id,amount:20,currency:'EUR',effectiveDate:now,note:'На отпуск'});
   assert(t1.ok,'Operating to purpose transfer failed: '+t1.error);
-  const afterFirst=s.active().find(item=>item.id===first.goal.id);assert(afterFirst.savedAmount===300,'Purpose balance did not increase');
-  const t2=s.transfer({sourceAccountId:firstAccount.id,destinationAccountId:secondAccount.id,amount:50,currency:'EUR',effectiveDate:now+1,note:'Перераспределение'});
+  const afterFirst=s.active().find(item=>item.id===first.goal.id);assert(afterFirst.savedAmount===120,'Purpose balance did not increase');
+  const t2=s.transfer({sourceAccountId:firstAccount.id,destinationAccountId:secondAccount.id,amount:10,currency:'EUR',effectiveDate:now+1,note:'Перераспределение'});
   assert(t2.ok,'Purpose to purpose transfer failed: '+t2.error);
   const afterTransfer=s.active(),firstAfter=afterTransfer.find(item=>item.id===first.goal.id),secondAfter=afterTransfer.find(item=>item.id===second.goal.id);
-  assert(firstAfter.savedAmount===250&&secondAfter.savedAmount===100,'Purpose-to-purpose balances incorrect');
+  assert(firstAfter.savedAmount===110&&secondAfter.savedAmount===60,'Purpose-to-purpose balances incorrect');
 
-  const t3=s.transfer({sourceAccountId:operating.id,destinationAccountId:investmentAccount.id,amount:300,currency:'EUR',effectiveDate:now+2,note:'Инвестиции'});
+  const t3=s.transfer({sourceAccountId:operating.id,destinationAccountId:investmentAccount.id,amount:30,currency:'EUR',effectiveDate:now+2,note:'Инвестиции'});
   assert(t3.ok,'Operating to investment transfer failed: '+t3.error);
   assert(JSON.stringify(s.ordinaryTotals())===ordinaryBefore,'Internal transfers changed ordinary Income/Expense');
   assert(s.capital().capital===baseCapitalBefore,'Internal transfers changed base capital');
 
-  const beforeValuation=s.summary(),valuation=s.valueInvestment(investmentAccount.id,330,now+3);
+  const beforeValuation=s.m403Summary(),valuation=s.valueInvestment(investment.account.id,33,now+3);
   assert(valuation.ok,'Investment valuation failed: '+valuation.error);
-  const afterValuation=s.summary();assert(Math.abs((afterValuation.totalCapital-beforeValuation.totalCapital)-30)<0.01,'Valuation delta did not change total capital by 30');
+  const afterValuation=s.m403Summary();assert(Math.abs((afterValuation.totalCapital-beforeValuation.totalCapital)-3)<0.01,'Valuation delta did not change total capital by 3');
   assert(JSON.stringify(s.ordinaryTotals())===ordinaryBefore,'Valuation changed ordinary Income/Expense');
 
   const forecast=s.forecast(90);
@@ -54,7 +56,7 @@ const harness=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title
   assert(s.transfers().length>=3,'Transfer history missing');
   assert(runtimeErrors.length===0,'Runtime exceptions: '+runtimeErrors.join(' | '));
 
-  const output={status:'PASS',marker:'${marker}',moduleTitle:'Накопления',accountLogic:true,purposeAccounts:true,investmentAccounts:true,internalTransfersNotIncomeExpense:true,fixedDateRecalculation:true,fixedContributionRecalculation:true,manualValuation:true,forecastTimeline:true,sourceExplainableEvents:true,runtimeExceptions:[]};
+  const output={status:'PASS',marker:'${marker}',moduleTitle:'Накопления',legacySavingsContractPreserved:true,accountLogic:true,purposeAccounts:true,investmentAccounts:true,internalTransfersNotIncomeExpense:true,fixedDateRecalculation:true,fixedContributionRecalculation:true,manualValuation:true,forecastTimeline:true,sourceExplainableEvents:true,runtimeExceptions:[]};
   result.textContent=JSON.stringify(output,null,2);document.body.dataset.status='PASS';
  }
  frame.addEventListener('load',()=>run().catch(error=>{result.textContent=String(error&&error.stack||error);document.body.dataset.status='FAIL'}),{once:true});
