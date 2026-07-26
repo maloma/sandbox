@@ -1,0 +1,80 @@
+name: PF-08A M4-04 Money Planning Gate
+
+on:
+  pull_request:
+    paths:
+      - 'familypilot-wallet-management.js'
+      - 'familypilot-scope.js'
+      - 'src/familypilot-scope.js'
+      - 'familypilot-m4-03-additive-reserve-ui.js'
+      - 'familypilot-m4-04-money-planning.js'
+      - 'familypilot-m4-04-money-planning-ui.js'
+      - 'familypilot-viewport-anchor.js'
+      - 'tools/pf08a-m2-01-verify-debt-integration.mjs'
+      - 'tools/pf08a-wf01-verify-integration.mjs'
+      - 'tools/pf08a-m4-04-money-planning-browser-smoke.mjs'
+      - 'tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs'
+      - 'tools/pf08a-m4-04-money-planning-browser-smoke-v3.mjs'
+      - 'tools/pf08a-wf02-m404-diagnostic.mjs'
+      - '.github/workflows/pf08a-m4-04-money-planning.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-exact-head:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+      - name: Verify exact checked-out head
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
+      - name: Verify loader mirror and syntax
+        run: |
+          cmp -s familypilot-scope.js src/familypilot-scope.js
+          node --check familypilot-wallet-management.js
+          node --check familypilot-scope.js
+          node --check familypilot-m4-03-additive-reserve-ui.js
+          node --check familypilot-m4-04-money-planning.js
+          node --check familypilot-m4-04-money-planning-ui.js
+          node --check familypilot-viewport-anchor.js
+          node --check tools/pf08a-m2-01-verify-debt-integration.mjs
+          node --check tools/pf08a-wf01-verify-integration.mjs
+          node --check tools/pf08a-m4-04-money-planning-browser-smoke.mjs
+          node --check tools/pf08a-m4-04-money-planning-browser-smoke-v2.mjs
+          node --check tools/pf08a-m4-04-money-planning-browser-smoke-v3.mjs
+          node --check tools/pf08a-wf02-m404-diagnostic.mjs
+      - name: Verify M4-04 behavior
+        run: node tools/pf08a-m4-04-money-planning-browser-smoke-v3.mjs
+      - name: Verify WF-02 browser compatibility
+        run: node tools/pf08a-wf02-m404-diagnostic.mjs
+      - name: Obligations integration contract
+        run: node tools/pf08a-m3-01-verify-plan-obligations.mjs
+      - name: Debts integration contract
+        run: node tools/pf08a-m2-01-verify-debt-integration.mjs
+      - name: Savings integration contract
+        run: node tools/pf08a-m4-01-verify-integration.mjs
+      - name: Wallet management integration contract
+        run: node tools/pf08a-wf01-verify-integration.mjs
+      - name: Wallet transfers integration contract
+        run: node tools/pf08a-wf02-verify-integration.mjs
+      - name: Obligations domain regression
+        run: node tools/pf08a-m3-01-domain-test.cjs
+      - name: Debts domain regression
+        run: node tools/pf08a-m2-01-domain-test.cjs
+      - name: Savings domain regression
+        run: node tools/pf08a-m4-01-domain-test.cjs
+      - name: Wallet management domain regression
+        run: node tools/pf08a-wf01-domain-test.cjs
+      - name: Wallet transfers domain regression
+        run: node tools/pf08a-wf02-domain-test.cjs

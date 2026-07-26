@@ -53,13 +53,13 @@
       card.innerHTML=`
         <div class="budget-head">
           <div>
-            <h2>Резерв на покрытие дефицита</h2>
-            <small>Отдельное дополнительное накопление на непредвиденный случай.</small>
+            <h2>Резерв (непредвиденные расходы)</h2>
+            <small>Отдельное дополнительное накопление на непредвиденные расходы.</small>
           </div>
           <span class="budget-badge ${proposal.reviewRequired?'alert':existing?'ok':''}">${proposal.reviewRequired?'Пересмотреть':status}</span>
         </div>
         <div class="budget-note" style="margin-top:10px">
-          Резерв не создаётся за счёт уменьшения взносов на отпуск, автомобиль, подарок или другие цели. Он получает собственный дополнительный ежемесячный взнос.
+          Резерв на покрытие дефицита и непредвиденных расходов не создаётся за счёт уменьшения взносов на отпуск, автомобиль, подарок или другие цели, а получает собственный дополнительный ежемесячный взнос.
         </div>
         ${proposal.reviewRequired?`<div class="budget-note reserve-additive-alert" style="margin-top:8px">Системная рекомендация изменилась на ${changePercent}% относительно последнего подтверждения. Правило нужно проверить заново.</div>`:''}
         <div class="budget-summary" style="margin-top:10px">

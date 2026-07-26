@@ -3,6 +3,7 @@
 
   const activeOperations=state=>(Array.isArray(state?.operations)?state.operations:[]).filter(operation=>operation?.status==='active');
   const activeMovements=state=>(Array.isArray(state?.walletMovements)?state.walletMovements:[]).filter(movement=>movement?.status==='active'&&(movement?.movementRole==='transfer_source'||movement?.movementRole==='transfer_destination'));
+  const activeAdjustments=state=>(Array.isArray(state?.balanceAdjustments)?state.balanceAdjustments:[]).filter(item=>item?.status==='active');
   const wallets=state=>Array.isArray(state?.wallets)?state.wallets:[];
 
   function canAccessWallet(state,wallet){
@@ -42,42 +43,72 @@
     return activeMovements(state).filter(movement=>includedWalletIds.has(movement.walletId));
   }
   function walletMovements(state,walletId){return activeMovements(state).filter(movement=>movement.walletId===walletId)}
+  function walletAdjustments(state,walletId){return activeAdjustments(state).filter(item=>item.walletId===walletId)}
 
   function totals(operations){
     return operations.reduce((result,operation)=>{
       const amount=Number(operation?.amount)||0;
       if(operation?.kind==='income')result.income+=amount;
       if(operation?.kind==='expense')result.expense+=amount;
-      if(operation?.kind === 'debt_inflow')result.debtInflow+=amount;
-      if(operation?.kind === 'debt_outflow')result.debtOutflow+=amount;
+      if(operation?.kind==='debt_inflow')result.debtInflow+=amount;
+      if(operation?.kind==='debt_outflow')result.debtOutflow+=amount;
       return result;
     },{income:0,expense:0,debtInflow:0,debtOutflow:0});
   }
   function movementTotals(movements){
     return movements.reduce((result,movement)=>{const amount=Number(movement?.amount)||0;if(movement?.direction==='inflow')result.transferInflow+=amount;if(movement?.direction==='outflow')result.transferOutflow+=amount;return result},{transferInflow:0,transferOutflow:0});
   }
-  function snapshot(state,selected,operations,movements,opening,scope,currency){
-    const flow=totals(operations),transferFlow=movementTotals(movements);
-    const change=flow.income+flow.debtInflow+transferFlow.transferInflow-flow.expense-flow.debtOutflow-transferFlow.transferOutflow;
-    return{wallet:selected,scope,currency,opening,...flow,...transferFlow,change,capital:opening+change};
+  function adjustmentTotal(adjustments){return adjustments.reduce((sum,item)=>sum+(Number(item?.delta)||0),0)}
+  function snapshot(state,selected,operations,movements,adjustments,opening,scope,currency){
+    const flow=totals(operations),transferFlow=movementTotals(movements),adjustment=adjustmentTotal(adjustments);
+    const change=flow.income+flow.debtInflow+transferFlow.transferInflow-flow.expense-flow.debtOutflow-transferFlow.transferOutflow+adjustment;
+    return{wallet:selected,scope,currency,opening,...flow,...transferFlow,adjustment,change,capital:opening+change};
+  }
+  function walletCapitalSnapshot(state,walletId){
+    const selected=wallets(state).find(item=>item.id===walletId&&!item.archivedAt);
+    if(!selected)return{wallet:null,scope:'wallet',currency:state?.household?.baseCurrency||'EUR',opening:0,income:0,expense:0,debtInflow:0,debtOutflow:0,transferInflow:0,transferOutflow:0,adjustment:0,change:0,capital:0};
+    const operations=activeOperations(state).filter(operation=>!isTransfer(operation)&&operation.walletId===selected.id),movements=walletMovements(state,selected.id),adjustments=walletAdjustments(state,selected.id),opening=Number(selected.openingBalance)||0;
+    return snapshot(state,selected,operations,movements,adjustments,opening,'wallet',selected.nativeCurrency||state?.household?.baseCurrency||'EUR');
   }
   function capitalSnapshot(state){
     const selected=activeWallet(state);
-    if(!selected)return{wallet:null,scope:'household',currency:state?.household?.baseCurrency||'EUR',opening:0,income:0,expense:0,debtInflow:0,debtOutflow:0,transferInflow:0,transferOutflow:0,change:0,capital:0};
-    if(isPersonalWallet(selected)){
-      const operations=activeOperations(state).filter(operation=>!isTransfer(operation)&&operation.walletId===selected.id),movements=walletMovements(state,selected.id),opening=Number(selected.openingBalance)||0;
-      return snapshot(state,selected,operations,movements,opening,'personal',selected.nativeCurrency||state?.household?.baseCurrency||'EUR');
-    }
-    const operations=householdCapitalOperations(state),movements=householdCapitalMovements(state),opening=Number(state?.household?.openingCapital)||0;
+    if(!selected)return{wallet:null,scope:'household',currency:state?.household?.baseCurrency||'EUR',opening:0,income:0,expense:0,debtInflow:0,debtOutflow:0,transferInflow:0,transferOutflow:0,adjustment:0,change:0,capital:0};
+    if(isPersonalWallet(selected)){const result=walletCapitalSnapshot(state,selected.id);return{...result,scope:'personal'}}
+    const operations=householdCapitalOperations(state),movements=householdCapitalMovements(state),includedIds=new Set(wallets(state).filter(wallet=>!wallet.archivedAt&&wallet.includedInHouseholdCapital===true).map(wallet=>wallet.id)),adjustments=activeAdjustments(state).filter(item=>includedIds.has(item.walletId)),opening=Number(state?.household?.openingCapital)||0;
     const additionalOpening=wallets(state).filter(wallet=>wallet.type!=='household_default'&&wallet.includedInHouseholdCapital===true).reduce((sum,wallet)=>sum+(Number(wallet.openingBalance)||0),0);
-    return snapshot(state,selected,operations,movements,opening+additionalOpening,'household',state?.household?.baseCurrency||selected.nativeCurrency||'EUR');
+    return snapshot(state,selected,operations,movements,adjustments,opening+additionalOpening,'household',state?.household?.baseCurrency||selected.nativeCurrency||'EUR');
+  }
+  function capitalBreakdown(state){
+    const included=wallets(state).filter(wallet=>!wallet.archivedAt&&wallet.includedInHouseholdCapital===true);
+    const balances=new Map(included.map(wallet=>[wallet.id,walletCapitalSnapshot(state,wallet.id).capital]));
+    const defaultId=defaultWallet(state)?.id||included[0]?.id||'';
+    for(const account of Array.isArray(state?.investmentAccounts)?state.investmentAccounts:[]){
+      if(account?.status!=='active')continue;
+      const assignment=(state?.investmentLocationAssignments||[]).find(item=>item?.investmentId===account.id&&item?.status!=='inactive');
+      const locationId=assignment?.locationId||defaultId;
+      if(balances.has(locationId))balances.set(locationId,(balances.get(locationId)||0)-(Number(account.bookAmount)||0));
+    }
+    let cash=0,bank=0;
+    const locations=[];
+    for(const wallet of included){
+      const balance=Math.round((balances.get(wallet.id)||0)*100)/100;
+      const moneyForm=wallet.moneyForm==='cash'?'cash':'bank';
+      if(moneyForm==='cash')cash+=balance;else bank+=balance;
+      locations.push({walletId:wallet.id,name:wallet.name,moneyForm,locationKind:wallet.locationKind||'bank_current',balance,currency:wallet.nativeCurrency||state?.household?.baseCurrency||'EUR'});
+    }
+    const investments=(Array.isArray(state?.investmentAccounts)?state.investmentAccounts:[]).filter(account=>account?.status==='active').reduce((sum,account)=>sum+(Number(account.currentValue)||0),0);
+    const reservedPurpose=(Array.isArray(state?.savingsGoals)?state.savingsGoals:[]).filter(goal=>goal?.status==='active').reduce((sum,goal)=>sum+(Number(goal.savedAmount)||0),0);
+    cash=Math.round(cash*100)/100;bank=Math.round(bank*100)/100;
+    const total=Math.round((cash+bank+investments)*100)/100;
+    const freelyAvailable=Math.round(Math.max(0,cash+bank-reservedPurpose)*100)/100;
+    return{cash,bank,investments:Math.round(investments*100)/100,total,reservedPurpose:Math.round(reservedPurpose*100)/100,freelyAvailable,locations};
   }
   function scopeDescriptor(state){
     const selected=activeWallet(state),personal=isPersonalWallet(selected);
-    return{wallet:selected,scope:personal?'personal':'household',currency:personal?(selected?.nativeCurrency||state?.household?.baseCurrency||'EUR'):(state?.household?.baseCurrency||'EUR'),capitalTitle:personal?'Личный капитал':'Капитал',capitalLabel:personal?(selected?.name||'Личный кошелёк'):'включённые кошельки',operationsLabel:personal?(selected?.name||'Личный кошелёк'):'Семейный контекст',analyticsLabel:personal?(selected?.name||'Личный кошелёк'):'Семейный контекст'};
+    return{wallet:selected,scope:personal?'personal':'household',currency:personal?(selected?.nativeCurrency||state?.household?.baseCurrency||'EUR'):(state?.household?.baseCurrency||'EUR'),capitalTitle:personal?'Личный капитал':'Капитал',capitalLabel:personal?(selected?.name||'Личный кошелёк'):'включённые места хранения',operationsLabel:personal?(selected?.name||'Личный кошелёк'):'Семейный контекст',analyticsLabel:personal?(selected?.name||'Личный кошелёк'):'Семейный контекст'};
   }
 
-  root.FamilyPilotScope=Object.freeze({activeOperations,activeMovements,canAccessWallet,accessibleWallets,defaultWallet,activeWallet,isPersonalWallet,isTransfer,visibleOperations,householdCapitalOperations,householdCapitalMovements,walletMovements,totals,movementTotals,capitalSnapshot,scopeDescriptor});
+  root.FamilyPilotScope=Object.freeze({activeOperations,activeMovements,activeAdjustments,canAccessWallet,accessibleWallets,defaultWallet,activeWallet,isPersonalWallet,isTransfer,visibleOperations,householdCapitalOperations,householdCapitalMovements,walletMovements,walletAdjustments,totals,movementTotals,adjustmentTotal,walletCapitalSnapshot,capitalSnapshot,capitalBreakdown,scopeDescriptor});
 })(typeof window!=='undefined'?window:globalThis);
 
 (function bootstrapFamilyPilotPackages(root){

@@ -34,7 +34,7 @@ assert(debtSource.includes("derivedKind:'reciprocal'"),'Automatic reciprocal deb
 assert(debtSource.includes("derivedKind:'offset'"),'Mutual offset derivation missing');
 assert(debtSource.includes("derivedKind:'closed'"),'Debt-closed event missing');
 assert(debtSource.includes("return'debt_inflow'")&&debtSource.includes("return'debt_outflow'"),'Debt principal movement kinds missing');
-assert(scopeSource.includes("operation?.kind === 'debt_inflow'")&&scopeSource.includes("operation?.kind === 'debt_outflow'"),'Capital does not include debt principal movements');
+assert(/operation\?\.kind\s*===\s*['"]debt_inflow['"]/.test(scopeSource)&&/operation\?\.kind\s*===\s*['"]debt_outflow['"]/.test(scopeSource),'Capital does not include debt principal movements');
 assert(debtUi.includes("operation.kind==='income'||operation.kind==='expense'"),'Analytics does not explicitly exclude debt principal movements');
 assert(debtUi.includes('debtApi.closeChain')&&debtUi.includes('debtApi.keepChainOpen'),'Zero-balance close/keep-open choice missing');
 assert(debtUi.includes("chain?.status==='closed'"),'Closed-chain read-only guard missing');
