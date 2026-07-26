@@ -128,7 +128,7 @@
               root.__FP_M3_07_READY__=true;
               loadScript('familypilot-rule-history.js',()=>{
                 root.__FP_M3_08_READY__=true;
-                loadScript('familypilot-planned-income.js',()=>loadScript('familypilot-planned-income-ui.js',()=>{root.__FP_M4_01_READY__=true}));
+                loadScript('familypilot-planned-income.js',()=>loadScript('familypilot-planned-income-amount-model.js',()=>loadScript('familypilot-planned-income-ui.js',()=>loadScript('familypilot-planned-income-amount-ui.js',()=>{root.__FP_M4_01_READY__=true;root.__FP_M4_02_READY__=true}))));
               });
             }))));
           });
