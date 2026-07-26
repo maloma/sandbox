@@ -53,8 +53,8 @@
       card.innerHTML=`
         <div class="budget-head">
           <div>
-            <h2>Резерв на покрытие дефицита</h2>
-            <small>Отдельное дополнительное накопление на непредвиденный случай.</small>
+            <h2>Резерв (непредвиденные расходы)</h2>
+            <small>Резерв на покрытие дефицита и непредвиденных расходов.</small>
           </div>
           <span class="budget-badge ${proposal.reviewRequired?'alert':existing?'ok':''}">${proposal.reviewRequired?'Пересмотреть':status}</span>
         </div>
