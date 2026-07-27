@@ -1,0 +1,49 @@
+name: PF-08A Wave 1C Persistence Recovery Gate
+
+on:
+  pull_request:
+    paths:
+      - 'familypilot-scope.js'
+      - 'familypilot-persistence-runtime.js'
+      - 'tools/pf08a-wave1c-persistence-browser-smoke.mjs'
+      - 'tools/pf08a-wave1c-integrated-browser-smoke.mjs'
+      - '.github/workflows/pf08a-wave1c-persistence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-exact-head:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+      - name: Verify exact checked-out head
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
+      - name: Verify syntax and architecture markers
+        run: |
+          node --check familypilot-scope.js
+          node --check familypilot-persistence-runtime.js
+          node --check tools/pf08a-wave1c-persistence-browser-smoke.mjs
+          node --check tools/pf08a-wave1c-integrated-browser-smoke.mjs
+          grep -q "FamilyPilotPersistence" familypilot-scope.js
+          grep -q "CURRENT_SCHEMA=22" familypilot-scope.js
+          grep -q "familypilot-state-slot-a-v1" familypilot-scope.js
+          grep -q "familypilot-state-slot-b-v1" familypilot-scope.js
+          grep -q "familypilot-persistence-runtime.js" familypilot-scope.js
+          grep -q "persistence_recovery:true" tools/pf08a-wave1c-integrated-browser-smoke.mjs
+          grep -q "readiness_verdict:'NOT_READY'" tools/pf08a-wave1c-integrated-browser-smoke.mjs
+      - name: Verify persistence and recovery
+        run: node tools/pf08a-wave1c-persistence-browser-smoke.mjs
+      - name: Verify integrated Wave 1C diagnostic
+        run: node tools/pf08a-wave1c-integrated-browser-smoke.mjs

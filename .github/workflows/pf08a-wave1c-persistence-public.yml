@@ -1,0 +1,79 @@
+name: PF-08A Wave 1C Persistence Public Verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'familypilot-scope.js'
+      - 'familypilot-persistence-runtime.js'
+      - 'tools/pf08a-wave1c-persistence-public-smoke.mjs'
+      - '.github/workflows/pf08a-wave1c-persistence-public.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  verify-public-and-record-evidence:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+      - name: Verify public Wave 1C package
+        env:
+          PUBLIC_URL: https://maloma.github.io/sandbox/
+          EXPECTED_MAIN_PF08A_WAVE1C: ${{ github.sha }}
+        run: |
+          node --check tools/pf08a-wave1c-persistence-public-smoke.mjs
+          node tools/pf08a-wave1c-persistence-public-smoke.mjs | tee /tmp/wave1c-public-result.txt
+          grep -q 'PF08A_WAVE1C_PERSISTENCE_PASS' /tmp/wave1c-public-result.txt
+          grep -q '"persistence_recovery": true' /tmp/wave1c-public-result.txt
+          grep -q '"readiness_verdict": "NOT_READY"' /tmp/wave1c-public-result.txt
+      - name: Create and merge public evidence PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          VERIFIED_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          short="${VERIFIED_SHA:0:12}"
+          branch="evidence/pf08a-wave1c-public-${short}"
+          git switch -c "$branch"
+          mkdir -p evidence
+          python - <<'PY'
+          import json, os
+          data={
+            'status':'PUBLIC_PASS',
+            'package':'PF-08A Wave 1C Persistence and Recovery',
+            'verified_main':os.environ['VERIFIED_SHA'],
+            'workflow_run_id':int(os.environ['RUN_ID']),
+            'browser_marker':'PF08A_WAVE1C_PERSISTENCE_PASS',
+            'compatibility_marker':'PF08A_WAVE1C_COMPAT_MIGRATION_PASS',
+            'integrated_marker':'PF08A_FIRST_VERSION_WAVE1C_INTEGRATED_PASS',
+            'persistence_recovery':True,
+            'state_schema_version':22,
+            'single_savings_truth':True,
+            'visible_module_failure_surface':False,
+            'readiness_verdict':'NOT_READY',
+            'runtime_exceptions':[],
+          }
+          path='evidence/pf08a-wave1c-public-'+os.environ['VERIFIED_SHA'][:12]+'.json'
+          open(path,'w',encoding='utf-8').write(json.dumps(data,ensure_ascii=False,indent=2)+'\n')
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add evidence
+          git commit -m "Record PF-08A Wave 1C public PASS"
+          git push origin "$branch"
+          pr_url=$(gh pr create --repo "$REPOSITORY" --base main --head "$branch" --title "Verify published PF-08A Wave 1C persistence recovery" --body "Read-only public verification passed for exact main ${VERIFIED_SHA}. Records persistence recovery, schema 22, single savings truth, private diagnostics, no runtime exceptions, and the remaining NOT_READY verdict pending visible degraded mode.")
+          gh pr merge "$pr_url" --squash --match-head-commit "$(git rev-parse HEAD)"

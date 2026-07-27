@@ -1,0 +1,35 @@
+name: PF-08A Wave 1C Compatibility Migration Gate
+
+on:
+  pull_request:
+    paths:
+      - 'familypilot-scope.js'
+      - 'familypilot-persistence-runtime.js'
+      - 'tools/pf08a-wave1c-compatibility-migration-smoke.mjs'
+      - '.github/workflows/pf08a-wave1c-compatibility-migration.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-compatibility-migration:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+      - name: Verify exact checked-out head
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
+      - name: Verify compatibility migration and snapshot
+        run: |
+          node --check tools/pf08a-wave1c-compatibility-migration-smoke.mjs
+          node tools/pf08a-wave1c-compatibility-migration-smoke.mjs

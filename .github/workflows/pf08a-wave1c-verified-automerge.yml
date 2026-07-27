@@ -1,0 +1,73 @@
+name: PF-08A Wave 1C Verified Auto-Merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'familypilot-scope.js'
+      - 'familypilot-persistence-runtime.js'
+      - 'tools/pf08a-wave1c-persistence-browser-smoke.mjs'
+      - 'tools/pf08a-wave1c-integrated-browser-smoke.mjs'
+      - 'tools/pf08a-wave1c-compatibility-migration-smoke.mjs'
+      - '.github/workflows/pf08a-wave1c-persistence.yml'
+      - '.github/workflows/pf08a-wave1c-compatibility-migration.yml'
+      - '.github/workflows/pf08a-wave1c-verified-automerge.yml'
+
+permissions:
+  actions: read
+  checks: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  wait-for-gates-and-merge:
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Wait for all required workflow runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python - <<'PY'
+          import json, os, subprocess, sys, time
+          repo=os.environ['REPOSITORY']; sha=os.environ['HEAD_SHA']
+          required={
+            'PF-08A Wave 1C Persistence Recovery Gate',
+            'PF-08A Wave 1C Compatibility Migration Gate',
+            'PF-08A M3-07A UX Gate',
+            'PF-08A M3-07B Partial Date and Modal Gate',
+            'PF-08A M4-03 Budget Designer Gate',
+            'PF-08A M4-04 Money Planning Gate',
+            'PF-08A M4-05 Onboarding and Income Distribution Gate',
+            'PF-08A M4-06 What If Gate',
+            'PF-08A M4-06 Goal and Deficit Solver Gate',
+            'PF-08A M4-06 Scenario-to-Plan Conversion Gate',
+            'PF-08A M4-06 Manual Interest Gate',
+            'PF-08A M4-07 Learning Mode Gate',
+          }
+          deadline=time.time()+2700
+          while time.time()<deadline:
+            raw=subprocess.check_output(['gh','api',f'repos/{repo}/actions/runs','-f',f'head_sha={sha}','-f','event=pull_request','-f','per_page=100'],text=True)
+            runs=json.loads(raw).get('workflow_runs',[])
+            latest={}
+            for run in sorted(runs,key=lambda x:x.get('run_number',0)):
+              latest[run['name']]=run
+            missing=sorted(required-latest.keys())
+            failed=sorted(name for name in required if name in latest and latest[name].get('status')=='completed' and latest[name].get('conclusion') not in {'success','neutral','skipped'})
+            pending=sorted(name for name in required if name in latest and latest[name].get('status')!='completed')
+            print(json.dumps({'missing':missing,'pending':pending,'failed':failed},ensure_ascii=False),flush=True)
+            if failed:
+              sys.exit('Required workflow failed: '+', '.join(failed))
+            if not missing and not pending:
+              sys.exit(0)
+            time.sleep(20)
+          sys.exit('Timed out waiting for required workflows')
+          PY
+      - name: Merge exact verified head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: gh pr merge "$PR_URL" --squash --match-head-commit "$HEAD_SHA"
