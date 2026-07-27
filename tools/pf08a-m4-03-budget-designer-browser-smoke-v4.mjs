@@ -8,6 +8,16 @@ const sourcePath = join(here, 'pf08a-m4-03-budget-designer-browser-smoke-v2.mjs'
 const patchedPath = join(here, '.pf08a-m4-03-budget-safety-smoke-patched.mjs');
 let source = readFileSync(sourcePath, 'utf8');
 
+source = source.replace('savedAmount: 300,', 'savedAmount: 0,');
+source = source.replace('savedAmount: 200,', 'savedAmount: 0,');
+
+const goalsNeedle = "    assert(goalA.ok && goalB.ok, 'Savings goals could not be created');";
+const goalsReplacement = `${goalsNeedle}
+    const truthLocation = win.FamilyPilotSavingsTruth.eligibleLocations(win.__FP_RUNTIME__.state)[0];
+    assert(truthLocation, 'Canonical savings location is unavailable');
+    assert(api.savingsTruth.allocate(goalA.goal.id, truthLocation.id, 300).ok, 'Canonical allocation A failed');
+    assert(api.savingsTruth.allocate(goalB.goal.id, truthLocation.id, 200).ok, 'Canonical allocation B failed');`;
+
 const seedNeedle = '    budget.seedDeficit(9000000, now + 7 * 86400000);';
 const seedReplacement = `    const runtimeState = win.__FP_RUNTIME__.state;
     for (let index = 0; index < 5; index += 1) {
@@ -34,6 +44,7 @@ const reserveReplacement = `    const reserve = budget.reserve();
     assert(reserve.targetAmount <= reserve.targetLimit, 'Reserve target exceeds supported savings-goal limit');`;
 
 for (const [needle, replacement] of [
+  [goalsNeedle, goalsReplacement],
   [seedNeedle, seedReplacement],
   [reviewNeedle, reviewReplacement],
   [reserveNeedle, reserveReplacement],
