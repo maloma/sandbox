@@ -15,6 +15,20 @@
     return'';
   }
 
+  function reconcileActionExecution(state){
+    const purposeTransfers=(state.savingsTransfers||[]).filter(item=>item?.status==='active'&&item.actionOccurrenceId),walletTransfers=(state.walletTransfers||[]).filter(item=>item?.status==='active'&&item.actionOccurrenceId);
+    for(const action of state.savingsActionOccurrences||[]){
+      const linked=purposeTransfers.filter(item=>item.actionOccurrenceId===action.id);
+      if(!linked.length)continue;
+      const actual=round(linked.reduce((sum,item)=>sum+Math.max(0,number(item.amount)),0));
+      action.actualAmount=actual;
+      action.savingsTransferIds=linked.map(item=>item.id);
+      action.walletTransferIds=walletTransfers.filter(item=>item.actionOccurrenceId===action.id).map(item=>item.id);
+      action.status=actual+.005>=number(action.plannedAmount)?'completed':'partial';
+      action.updatedAt=Math.max(number(action.updatedAt),...linked.map(item=>number(item.createdAt)));
+    }
+  }
+
   function snapshotFor(state,ruleId,kind,mode,incomes){
     let snapshot=state.incomeRuleActivationSnapshots.find(item=>item.ruleId===ruleId&&item.kind===kind);
     if(!snapshot||String(snapshot.mode||'')!==String(mode||'')){
@@ -42,6 +56,7 @@
 
   function enforce(state,api,at=Date.now()){
     state.incomeRuleActivationSnapshots=Array.isArray(state.incomeRuleActivationSnapshots)?state.incomeRuleActivationSnapshots:[];
+    reconcileActionExecution(state);
     const incomes=(state.operations||[]).filter(item=>item?.status==='active'&&item.kind==='income');
     for(const rule of(state.savingsRules||[]).filter(item=>item.status==='active')){
       const snapshot=snapshotFor(state,rule.id,'general','income_percentage',incomes),excluded=new Set(snapshot.excludedOperationIds||[]);
