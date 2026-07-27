@@ -4,7 +4,7 @@
   if(!root || root.FamilyPilotModuleRegistry || typeof document === 'undefined') return;
 
   const params = new URLSearchParams(root.location?.search || '');
-  const testMode = params.has('test');
+  const testMode = params.get('test') === '1';
   const allowedFailureStages = new Set([
     'script_load',
     'readiness_timeout',
@@ -73,6 +73,75 @@
       dependencies:[], routes:['persistence'], unaffectedRoutes:[],
     },
   ]);
+
+  const ownershipContracts = Object.freeze({
+    base_finance:{
+      navigationSelectors:[],
+      screenSelectors:['#homeScreen','#operationsScreen','#analyticsScreen'],
+      packageMarkers:['global:__FP_RUNTIME__'],
+      listenerSentinel:null,
+    },
+    obligations:{
+      navigationSelectors:['[data-plan-module="obligations"]'],
+      screenSelectors:['#obligationsScreen'],
+      packageMarkers:['global:FamilyPilotObligations'],
+      listenerSentinel:null,
+    },
+    planned_income:{
+      navigationSelectors:['#plannedIncomePlanModule,[data-plan-module="planned-income"]'],
+      screenSelectors:['#plannedIncomeScreen'],
+      packageMarkers:['global:__FP_M4_01_READY__'],
+      listenerSentinel:null,
+    },
+    debts:{
+      navigationSelectors:['#homeDebtReceivable','#homeDebtLiability'],
+      screenSelectors:[],
+      packageMarkers:['global:FamilyPilotDebts'],
+      listenerSentinel:null,
+    },
+    savings:{
+      navigationSelectors:['#planSavingsModule,[data-plan-module="savings"]'],
+      screenSelectors:['#savingsGoalsScreen'],
+      packageMarkers:['global:__FP_SAVINGS_TRUTH_READY__'],
+      listenerSentinel:null,
+    },
+    money_planning:{
+      navigationSelectors:['#m404MoneyEntry','#m404GiftPlanEntry'],
+      screenSelectors:['#moneyLocationsScreen'],
+      packageMarkers:['global:__FP_M4_04_READY__'],
+      listenerSentinel:null,
+    },
+    budget_designer:{
+      navigationSelectors:['#budgetDesignerModule,[data-plan-module="budget-designer"]'],
+      screenSelectors:['#budgetDesignerScreen'],
+      packageMarkers:['global:__FP_M4_03_BUDGET_PACKAGE_LOADED__'],
+      listenerSentinel:null,
+    },
+    onboarding:{
+      navigationSelectors:['#m405OnboardingEntry,[data-onboarding-open]'],
+      screenSelectors:[],
+      packageMarkers:['global:__FP_M4_05_PACKAGE_LOADED__'],
+      listenerSentinel:null,
+    },
+    what_if:{
+      navigationSelectors:['#m406PlanEntry,[data-m406-open]'],
+      screenSelectors:['#whatIfScreen'],
+      packageMarkers:['global:__FP_M4_06_PACKAGE_LOADED__'],
+      listenerSentinel:null,
+    },
+    learning:{
+      navigationSelectors:['#learningModeEntry'],
+      screenSelectors:['#learningModeScreen'],
+      packageMarkers:['global:__FP_M4_07_LEARNING_READY__'],
+      listenerSentinel:null,
+    },
+    persistence:{
+      navigationSelectors:['#persistenceEntry,[data-persistence-open]'],
+      screenSelectors:['#persistenceScreen'],
+      packageMarkers:['global:__FP_PERSISTENCE_READY__'],
+      listenerSentinel:null,
+    },
+  });
 
   const records = new Map();
   const safeEvents = [];
@@ -148,7 +217,9 @@
       rootDiagnosticId:null,
       blockedByModuleId:null,
       loadedScripts:[],
-      ownershipContract:{},
+      ownershipContract:clone(ownershipContracts[definition.moduleId] || definition.ownershipContract || {
+        navigationSelectors:[], screenSelectors:[], packageMarkers:[], listenerSentinel:null,
+      }),
       ...definition,
     };
   }
@@ -212,6 +283,36 @@
     return Boolean(testMode && injection && injection.moduleId === moduleId && injection.stage === stage);
   }
 
+  function countSelector(selector){
+    try{return Number(document.querySelectorAll?.(selector)?.length || 0)}catch{return 0}
+  }
+
+  function markerAvailable(marker){
+    const value = String(marker || '');
+    if(value.startsWith('global:')) return Boolean(root[value.slice(7)]);
+    return countSelector(value) === 1;
+  }
+
+  function validateOwnership(record){
+    const contract = record?.ownershipContract || {};
+    const missing = [];
+    const collisions = [];
+    const selectors = [
+      ...(contract.navigationSelectors || []),
+      ...(contract.screenSelectors || []),
+    ];
+    for(const selector of selectors){
+      const count = countSelector(selector);
+      if(count === 0) missing.push(selector);
+      if(count > 1) collisions.push({selector,count});
+    }
+    for(const marker of contract.packageMarkers || []){
+      if(!markerAvailable(marker)) missing.push(marker);
+    }
+    if(contract.listenerSentinel && !root[contract.listenerSentinel]) missing.push(`global:${contract.listenerSentinel}`);
+    return {ok:missing.length === 0 && collisions.length === 0, missing, collisions};
+  }
+
   function markReady(moduleId){
     const record = internalGet(moduleId);
     if(!record) return null;
@@ -224,6 +325,15 @@
       });
     }
     if(record.state === 'ready') return record;
+    const ownership = validateOwnership(record);
+    if(!ownership.ok){
+      return markDegraded(moduleId, {
+        reasonCode:'module_contract_failed',
+        failureStage:'contract_validation',
+        installStarted:true,
+        retryClass:'reload_required',
+      });
+    }
     return transition(record, 'ready', {
       activeAttemptId:null,
       readyAt:Date.now(),
@@ -413,7 +523,17 @@
 
       const ready = readyPredicates[record.moduleId]?.() === true;
       if(ready){
-        if(!shouldInject(record.moduleId, 'readiness_timeout') && record.state !== 'ready') markReady(record.moduleId);
+        const ownership = validateOwnership(record);
+        if(ownership.ok){
+          if(!shouldInject(record.moduleId, 'readiness_timeout') && record.state !== 'ready') markReady(record.moduleId);
+        }else if(ownership.collisions.length && !['degraded','unavailable'].includes(record.state)){
+          markDegraded(record.moduleId, {
+            reasonCode:'module_contract_failed',
+            failureStage:'contract_validation',
+            installStarted:true,
+            retryClass:'reload_required',
+          });
+        }
         continue;
       }
 
@@ -496,6 +616,7 @@
     retry,
     reconcile,
     moduleForPath,
+    validateOwnership:moduleId => clone(validateOwnership(internalGet(moduleId))),
     financialFingerprint,
   };
 
