@@ -37,6 +37,13 @@
   function removeFallback(moduleId){
     document.querySelectorAll(`[data-fp-fallback-entry="${moduleId}"]`).forEach(node=>node.remove());
   }
+  function normalizePersistenceOwnership(){
+    const entry=document.getElementById('persistenceEntry');
+    const button=entry?.querySelector('[data-persistence-open]');
+    if(!entry||!button)return;
+    entry.setAttribute('data-persistence-open','');
+    button.removeAttribute('data-persistence-open');
+  }
   function makePlanEntry(moduleId){
     const grid=document.querySelector('#plansScreen .plan-grid');
     if(!grid)return null;
@@ -63,6 +70,7 @@
     return section;
   }
   function sync(){
+    normalizePersistenceOwnership();
     const registry=window.FamilyPilotModuleRegistry;
     if(!registry)return;
     for(const record of registry.snapshot().catalogue){
