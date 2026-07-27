@@ -158,7 +158,7 @@
   }
   function memberName(members,id){return(Array.isArray(members)?members:[]).find(member=>member.id===id)?.name||id||'—'}
   function locationLabel(wallet){
-    return({cash_wallet:'Наличные в кошелёке',cash_envelope:'Наличный конверт',cash_box:'Наличная касса / коробка',bank_current:'Банковский текущий счёт',bank_savings:'Банковский накопительный счёт'})[wallet?.locationKind]||'Место хранения';
+    return({cash_wallet:'Наличные в кошельке',cash_envelope:'Наличный конверт',cash_box:'Наличная касса',bank_current:'Банковский текущий счёт',bank_savings:'Банковский накопительный счёт'})[wallet?.locationKind]||'Место хранения';
   }
   function descriptor(wallet,members){
     return{
