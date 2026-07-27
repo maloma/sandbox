@@ -124,12 +124,12 @@
       for(const item of snapshot().catalogue){
         const failed = isFailed(item);
         for(const node of entryNodes(item.moduleId)){
-          node.dataset.fpModule = item.moduleId;
-          node.dataset.fpModuleState = item.state;
+          if(node.dataset.fpModule !== item.moduleId) node.dataset.fpModule = item.moduleId;
+          if(node.dataset.fpModuleState !== item.state) node.dataset.fpModuleState = item.state;
           node.classList.toggle('fp-module-entry-degraded', failed);
           node.removeAttribute('disabled');
           const stateNode = node.querySelector('.plan-module-state') || node.querySelector('[id$="State"]');
-          if(stateNode && failed) stateNode.textContent = 'Временно недоступно';
+          if(stateNode && failed && stateNode.textContent !== 'Временно недоступно') stateNode.textContent = 'Временно недоступно';
         }
       }
     }
@@ -140,13 +140,17 @@
       if(!host) return;
       const roots = rootFailures();
       host.hidden = roots.length === 0;
-      if(!roots.length){host.innerHTML = '';return}
+      if(!roots.length){
+        if(host.childNodes.length) host.replaceChildren();
+        return;
+      }
       const rows = roots.map(item => {
         const dependents = snapshot().catalogue.filter(row => isFailed(row) && row.moduleId !== item.moduleId && (row.rootFailureModuleId || row.moduleId) === item.moduleId);
         const detail = dependents.length ? `Также недоступно: ${dependents.map(row => row.userName).join(', ')}` : 'Остальные разделы продолжают работать.';
         return `<div class="fp-module-list-row"><div><strong>${esc(item.userName)}</strong><small>${esc(detail)}</small></div><span class="fp-module-code">${esc(item.diagnosticId || '')}</span></div>`;
       }).join('');
-      host.innerHTML = `<h2>Некоторые разделы временно недоступны</h2><p>Сохранённые данные не удалены из-за этой ошибки.</p><div class="fp-module-list">${rows}</div><div class="fp-module-actions"><button class="btn secondary" type="button" data-fp-module-details="${esc(roots[0].moduleId)}">Подробнее</button>${retryLabel(roots[0]) ? `<button class="btn primary fp-module-retry" type="button" data-fp-module-retry="${esc(roots[0].moduleId)}">${esc(retryLabel(roots[0]))}</button>` : ''}</div>`;
+      const markup = `<h2>Некоторые разделы временно недоступны</h2><p>Сохранённые данные не удалены из-за этой ошибки.</p><div class="fp-module-list">${rows}</div><div class="fp-module-actions"><button class="btn secondary" type="button" data-fp-module-details="${esc(roots[0].moduleId)}">Подробнее</button>${retryLabel(roots[0]) ? `<button class="btn primary fp-module-retry" type="button" data-fp-module-retry="${esc(roots[0].moduleId)}">${esc(retryLabel(roots[0]))}</button>` : ''}</div>`;
+      if(host.innerHTML !== markup) host.innerHTML = markup;
     }
 
     function renderDegraded(moduleId){
@@ -245,7 +249,7 @@
     window.addEventListener('familypilot:module-state', render);
     new MutationObserver(render).observe(document.querySelector('main'), {subtree:true, childList:true});
 
-    if(new URLSearchParams(location.search).has('test')){
+    if(new URLSearchParams(location.search).get('test') === '1'){
       const test = window.__FP_TEST__ = window.__FP_TEST__ || {};
       test.moduleRegistry = {
         snapshot,
