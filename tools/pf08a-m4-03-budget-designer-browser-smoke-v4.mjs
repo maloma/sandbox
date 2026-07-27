@@ -18,6 +18,10 @@ const goalsReplacement = `${goalsNeedle}
     assert(api.savingsTruth.allocate(goalA.goal.id, truthLocation.id, 300).ok, 'Canonical allocation A failed');
     assert(api.savingsTruth.allocate(goalB.goal.id, truthLocation.id, 200).ok, 'Canonical allocation B failed');`;
 
+const returnNeedle = "      assert(budget.applyReturn(returnFromSavings.items, [returnFromSavings.items[0].id]).applied.length === 1, 'Confirmed savings return failed');";
+const returnReplacement = `      const returnResult = budget.applyReturn(returnFromSavings.items, [returnFromSavings.items[0].id]);
+      assert(returnResult.applied.length === 1, 'Confirmed savings return failed: ' + JSON.stringify(returnResult.errors || []));`;
+
 const seedNeedle = '    budget.seedDeficit(9000000, now + 7 * 86400000);';
 const seedReplacement = `    const runtimeState = win.__FP_RUNTIME__.state;
     for (let index = 0; index < 5; index += 1) {
@@ -45,6 +49,7 @@ const reserveReplacement = `    const reserve = budget.reserve();
 
 for (const [needle, replacement] of [
   [goalsNeedle, goalsReplacement],
+  [returnNeedle, returnReplacement],
   [seedNeedle, seedReplacement],
   [reviewNeedle, reviewReplacement],
   [reserveNeedle, reserveReplacement],
