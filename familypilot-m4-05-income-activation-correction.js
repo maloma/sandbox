@@ -16,16 +16,17 @@
   }
 
   function reconcileActionExecution(state){
+    state.m405ActionExecutionLedger=Array.isArray(state.m405ActionExecutionLedger)?state.m405ActionExecutionLedger:[];
     const purposeTransfers=(state.savingsTransfers||[]).filter(item=>item?.status==='active'&&item.actionOccurrenceId),walletTransfers=(state.walletTransfers||[]).filter(item=>item?.status==='active'&&item.actionOccurrenceId);
     for(const action of state.savingsActionOccurrences||[]){
-      const linked=purposeTransfers.filter(item=>item.actionOccurrenceId===action.id);
-      if(!linked.length)continue;
-      const actual=round(linked.reduce((sum,item)=>sum+Math.max(0,number(item.amount)),0));
+      const linked=purposeTransfers.filter(item=>item.actionOccurrenceId===action.id),ledger=state.m405ActionExecutionLedger.find(item=>item.actionId===action.id);
+      const transferAmount=round(linked.reduce((sum,item)=>sum+Math.max(0,number(item.amount)),0)),actual=Math.max(transferAmount,round(ledger?.actualAmount));
+      if(!actual&&!ledger)continue;
       action.actualAmount=actual;
-      action.savingsTransferIds=linked.map(item=>item.id);
-      action.walletTransferIds=walletTransfers.filter(item=>item.actionOccurrenceId===action.id).map(item=>item.id);
-      action.status=actual+.005>=number(action.plannedAmount)?'completed':'partial';
-      action.updatedAt=Math.max(number(action.updatedAt),...linked.map(item=>number(item.createdAt)));
+      action.savingsTransferIds=linked.length?linked.map(item=>item.id):(ledger?.savingsTransferIds||[]);
+      action.walletTransferIds=walletTransfers.filter(item=>item.actionOccurrenceId===action.id).map(item=>item.id).concat(ledger?.walletTransferIds||[]).filter((item,index,list)=>item&&list.indexOf(item)===index);
+      action.status=ledger?.status||(actual+.005>=number(action.plannedAmount)?'completed':'partial');
+      action.updatedAt=Math.max(number(action.updatedAt),number(ledger?.updatedAt),...linked.map(item=>number(item.createdAt)));
     }
   }
 
