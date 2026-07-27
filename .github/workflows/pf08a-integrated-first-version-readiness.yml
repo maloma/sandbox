@@ -1,0 +1,54 @@
+name: PF-08A Integrated First-Version Readiness Gate
+
+on:
+  pull_request:
+    paths:
+      - 'familypilot-m4-07-learning-mode.js'
+      - 'familypilot-m4-07-learning-mode-ui.js'
+      - 'familypilot-viewport-anchor.js'
+      - 'familypilot-savings-goals.js'
+      - 'familypilot-savings-goals-ui.js'
+      - 'familypilot-m4-03-savings-accounts.js'
+      - 'familypilot-m4-04-money-planning.js'
+      - 'familypilot-m4-04-money-planning-ui.js'
+      - 'familypilot-m4-05-onboarding-income-distribution.js'
+      - 'familypilot-m4-05-onboarding-income-distribution-ui.js'
+      - 'familypilot-m4-06-what-if.js'
+      - 'familypilot-m4-06-what-if-ui.js'
+      - 'familypilot-m4-06-goal-deficit-solver.js'
+      - 'familypilot-m4-06-manual-interest.js'
+      - 'tools/pf08a-integrated-first-version-browser-smoke.mjs'
+      - '.github/workflows/pf08a-integrated-first-version-readiness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-exact-head:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+      - name: Verify exact checked-out head
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
+      - name: Verify syntax and readiness semantics
+        run: |
+          node --check familypilot-m4-07-learning-mode.js
+          node --check tools/pf08a-integrated-first-version-browser-smoke.mjs
+          grep -q "Начните с минимума информации" familypilot-m4-07-learning-mode.js
+          ! grep -q "Начните с минимальной картины" familypilot-m4-07-learning-mode.js
+          grep -q "single_savings_truth:false" tools/pf08a-integrated-first-version-browser-smoke.mjs
+          grep -q "visible_module_failure_surface:false" tools/pf08a-integrated-first-version-browser-smoke.mjs
+          grep -q "readiness_verdict:'NOT_READY'" tools/pf08a-integrated-first-version-browser-smoke.mjs
+      - name: Run integrated first-version diagnostic
+        run: node tools/pf08a-integrated-first-version-browser-smoke.mjs
