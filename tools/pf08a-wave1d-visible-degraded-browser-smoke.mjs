@@ -13,14 +13,18 @@ const token='wave1d-'+Date.now();
 const wait=ms=>new Promise(resolveWait=>setTimeout(resolveWait,ms));
 let reportResult;
 const reportPromise=new Promise(resolveReport=>{reportResult=resolveReport});
+let lastProgress='not_started';
 
 const harness=`<!doctype html><html lang="ru"><body data-status="PENDING"><iframe id="app" style="width:390px;height:844px;border:0"></iframe><iframe id="ordinary" style="display:none"></iframe><iframe id="timeout" style="display:none"></iframe><pre id="result">PENDING</pre><script>(()=>{
 const out=document.getElementById('result'),app=document.getElementById('app'),ordinary=document.getElementById('ordinary'),timeout=document.getElementById('timeout');
-const wait=ms=>new Promise(r=>setTimeout(r,ms)),assert=(v,m)=>{if(!v)throw Error(m)},load=(frame,src)=>new Promise(resolve=>{frame.addEventListener('load',resolve,{once:true});frame.src=src});
+const wait=ms=>new Promise(r=>setTimeout(r,ms)),assert=(v,m)=>{if(!v)throw Error(m)};
+const progress=phase=>fetch('/__wave1d_progress',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({phase})}).catch(()=>{});
+const load=(frame,src,label,ms=120000)=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error(label+' load timed out')),ms);frame.addEventListener('load',()=>{clearTimeout(timer);progress(label+' loaded');resolve()},{once:true});progress(label+' start');frame.src=src});
 const until=async(check,label,ms=110000)=>{const end=Date.now()+ms;let last;while(Date.now()<end){try{last=check();if(last)return last}catch(e){last=String(e)}await wait(100)}throw Error(label+' timed out: '+JSON.stringify(last))};
 const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null,2);document.body.dataset.status=status;try{await fetch('/__wave1d_result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({status,payload})})}catch{}};
 (async()=>{try{
- await load(app,'/?test=1&persistenceTest=${token}-root&moduleFailure=what_if&moduleFailureStage=script_load&wave1d=1');
+ await load(app,'/?test=1&persistenceTest=${token}-root&moduleFailure=what_if&moduleFailureStage=script_load&wave1d=1','injected app');
+ await progress('injected app readiness');
  const w=app.contentWindow;
  await until(()=>{const r=w.FamilyPilotModuleRegistry?.get?.('what_if');return w.__FP_MODULE_REGISTRY_UI_READY__&&w.__FP_MODULE_ENTRY_BRIDGE_READY__&&r?.state==='degraded'&&w.__FP_TEST__?.moduleRegistry},'script failure degraded state');
  const registry=w.FamilyPilotModuleRegistry,ui=w.__FP_TEST__.moduleRegistry,before=ui.financialFingerprint(),rootRecord=registry.get('what_if'),learning=registry.get('learning');
@@ -49,6 +53,7 @@ const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null
  registry.test.clearFailure();
  const attempt1=registry.retry('what_if'),attempt2=registry.retry('what_if');
  assert(attempt1&&attempt1===attempt2,'Repeated retry did not collapse to one attempt');
+ await progress('safe retry recovery');
  await until(()=>registry.get('what_if')?.state==='ready'&&registry.get('learning')?.state==='ready'&&w.__FP_M4_07_LEARNING_READY__===true,'safe retry recovery',120000);
  ui.render();await wait(150);
  assert(!ui.summaryText().includes('Некоторые разделы временно недоступны'),'Global degraded summary remained after recovery');
@@ -66,13 +71,15 @@ const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null
  assert(registry.get('persistence').retryClass==='never','Persistence lock exposed unsafe retry');
  assert(ui.financialFingerprint()===before,'Persistence containment changed financial state');
 
- await load(ordinary,'/?persistenceTest=${token}-ordinary&moduleFailure=what_if&moduleFailureStage=script_load');
+ await progress('ordinary app load');
+ await load(ordinary,'/?persistenceTest=${token}-ordinary&moduleFailure=what_if&moduleFailureStage=script_load','ordinary app');
  const o=ordinary.contentWindow;
  await until(()=>o.FamilyPilotModuleRegistry?.get?.('what_if')?.state==='ready'&&o.__FP_M4_07_LEARNING_READY__===true,'ordinary route readiness',120000);
  assert(!o.FamilyPilotModuleRegistry.test,'Registry test API leaked to ordinary route');
  assert(o.FamilyPilotModuleRegistry.get('what_if').state==='ready','Ordinary route honored failure parameters');
 
- await load(timeout,'/?test=1&persistenceTest=${token}-timeout&moduleFailure=what_if&moduleFailureStage=readiness_timeout');
+ await progress('readiness-timeout app load');
+ await load(timeout,'/?test=1&persistenceTest=${token}-timeout&moduleFailure=what_if&moduleFailureStage=readiness_timeout','readiness-timeout app');
  const t=timeout.contentWindow;
  await until(()=>t.__FP_MODULE_REGISTRY_UI_READY__&&t.FamilyPilotModuleRegistry?.get?.('what_if')?.state==='degraded','readiness timeout degraded state',120000);
  const timeoutRecord=t.FamilyPilotModuleRegistry.get('what_if'),timeoutUi=t.__FP_TEST__.moduleRegistry,timeoutBefore=timeoutUi.financialFingerprint();
@@ -95,12 +102,12 @@ const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=u
 const server=createServer((req,res)=>{
   try{
     const url=new URL(req.url,'http://127.0.0.1');
-    if(url.pathname==='/__wave1d_result'&&req.method==='POST'){
+    if((url.pathname==='/__wave1d_result'||url.pathname==='/__wave1d_progress')&&req.method==='POST'){
       let body='';
       req.setEncoding('utf8');
       req.on('data',chunk=>body+=chunk);
       req.on('end',()=>{
-        try{reportResult(JSON.parse(body))}catch(error){reportResult({status:'FAIL',payload:{error:String(error)}})}
+        try{const parsed=JSON.parse(body);if(url.pathname==='/__wave1d_progress'){lastProgress=String(parsed.phase||'unknown')}else{reportResult(parsed)}}catch(error){if(url.pathname==='/__wave1d_result')reportResult({status:'FAIL',payload:{error:String(error)}})}
         res.writeHead(204);res.end();
       });
       return;
@@ -125,7 +132,7 @@ try{
   const childExit=new Promise(resolveExit=>child.once('close',code=>resolveExit({type:'exit',code})));
   const timeoutResult=new Promise(resolveTimeout=>setTimeout(()=>resolveTimeout({type:'timeout'}),420000));
   const outcome=await Promise.race([reportPromise.then(report=>({type:'report',report})),childExit,timeoutResult]);
-  if(outcome.type==='timeout')throw Error('Browser timeout\n'+stderr.slice(-12000));
+  if(outcome.type==='timeout')throw Error('Browser timeout at '+lastProgress+'\n'+stderr.slice(-12000));
   if(outcome.type==='exit')throw Error(`Browser exited before reporting (${outcome.code})\n${stderr.slice(-12000)}`);
   if(outcome.report.status!=='PASS')throw Error(outcome.report.payload?.error||JSON.stringify(outcome.report));
   console.log(JSON.stringify(outcome.report.payload,null,2));
