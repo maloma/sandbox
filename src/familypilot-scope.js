@@ -54,7 +54,7 @@
   let networkRequests=0;
 
   function markOwnedRead(){if(firstOwnedReadAt===null)firstOwnedReadAt=Date.now()}
-  function isPlainObject(value){if(value===null||typeof value!=='object')return false;const p=Object.getPrototypeOf(value);return p===Object.prototype||p===null}
+  function isPlainObject(value){if(value===null||typeof value!=='object')return false;if(Object.prototype.toString.call(value)!=='[object Object]')return false;const p=Object.getPrototypeOf(value);return p===null||typeof p==='object'}
   function canonicalSerialize(value){
     const seen=new Set();
     function normalize(input){
@@ -291,40 +291,12 @@
   root.__FP_WF02_BOOTSTRAP__=true;
   const testMode=new URLSearchParams(location.search).has('test');
   const runtimeDeadline=Date.now()+30000;
-
-  function ensurePackageMarker(){
-    const selector='meta[name="familypilot-package"][content="base-currency-wallet-transfers-v1"]';
-    let marker=document.head?.querySelector(selector);
-    if(document.head&&!marker){marker=document.createElement('meta');marker.name='familypilot-package';marker.content='base-currency-wallet-transfers-v1';marker.dataset.runtimeMount='familypilot-scope';document.head.appendChild(marker)}
-    return marker;
-  }
-  function loadScript(path,ready=()=>{}){
-    const existing=[...document.scripts].find(script=>script.src&&script.src.endsWith(`/${path}`));
-    if(existing){if(existing.dataset.loaded==='true')ready();else existing.addEventListener('load',ready,{once:true});return}
-    const script=document.createElement('script');script.src=`./${path}`;script.async=false;script.dataset.familyPilotPackage='runtime-extension';
-    script.addEventListener('load',()=>{script.dataset.loaded='true';ready()},{once:true});
-    script.addEventListener('error',()=>{root.__FP_PACKAGE_BOOTSTRAP_ERROR__=`Failed to load ${path}`},{once:true});
-    document.head.appendChild(script);
-  }
+  function ensurePackageMarker(){const selector='meta[name="familypilot-package"][content="base-currency-wallet-transfers-v1"]';let marker=document.head?.querySelector(selector);if(document.head&&!marker){marker=document.createElement('meta');marker.name='familypilot-package';marker.content='base-currency-wallet-transfers-v1';marker.dataset.runtimeMount='familypilot-scope';document.head.appendChild(marker)}return marker}
+  function loadScript(path,ready=()=>{}){const existing=[...document.scripts].find(script=>script.src&&script.src.endsWith(`/${path}`));if(existing){if(existing.dataset.loaded==='true')ready();else existing.addEventListener('load',ready,{once:true});return}const script=document.createElement('script');script.src=`./${path}`;script.async=false;script.dataset.familyPilotPackage='runtime-extension';script.addEventListener('load',()=>{script.dataset.loaded='true';ready()},{once:true});script.addEventListener('error',()=>{root.__FP_PACKAGE_BOOTSTRAP_ERROR__=`Failed to load ${path}`},{once:true});document.head.appendChild(script)}
   const loadOne=path=>new Promise(resolve=>loadScript(path,resolve));
   async function loadM403(){await loadOne('familypilot-m4-03-savings-accounts.js');await loadOne('familypilot-m4-03-savings-accounts-ui.js');root.__FP_M4_03_PACKAGE_LOADED__=true}
-  async function loadPaymentAttention(){
-    await loadOne('familypilot-payment-attention.js');await loadOne('familypilot-payment-attention-ui.js');root.__FP_M3_03_READY__=true;
-    await loadOne('familypilot-obligation-state-ui.js');root.__FP_M3_04_READY__=true;
-    await loadOne('familypilot-partial-payment-removal-v2.js');await loadOne('familypilot-partial-payments.js');await loadOne('familypilot-obligation-wallet-isolation.js');await loadOne('familypilot-partial-payment-settlement.js');await loadOne('familypilot-partial-payments-render-sync.js');await loadOne('familypilot-overpayment-resolution.js');await loadOne('familypilot-partial-payment-entry-ui.js');await loadOne('familypilot-partial-state-visuals.js');root.__FP_M3_07A_READY__=true;root.__FP_M3_07_MODEL_READY__=true;
-    await loadOne('familypilot-payment-link-lifecycle.js');root.__FP_M3_05_READY__=true;
-    await loadOne('familypilot-linked-obligation-operation-lifecycle.js');await loadOne('familypilot-mobile-payment-tap.js');await loadOne('familypilot-operation-mobile-ui.js');await loadOne('familypilot-operation-date-picker.js');root.__FP_M3_06_READY__=true;root.__FP_M3_07_READY__=true;
-    await loadOne('familypilot-rule-history.js');root.__FP_M3_08_READY__=true;
-    await loadOne('familypilot-planned-income.js');await loadOne('familypilot-planned-income-amount-model.js');await loadOne('familypilot-planned-income-ui.js');await loadOne('familypilot-planned-income-amount-ui.js');root.__FP_M4_01_READY__=true;root.__FP_M4_02_READY__=true;
-    await loadM403();
-  }
-  function settleTransferSurfaceWhenBaseRuntimeReady(){
-    const runtime=root.__FP_RUNTIME__;
-    if(!runtime||(testMode&&!root.__FP_TEST__)){if(Date.now()>=runtimeDeadline){root.__FP_WF02_BOOTSTRAP_ERROR__='Base FamilyPilot runtime did not become ready';return}setTimeout(settleTransferSurfaceWhenBaseRuntimeReady,25);return}
-    if(testMode){loadScript('familypilot-wallet-transfers-ui.js',()=>{root.__FP_WF02_READY__=true;root.__FP_WF02_HIDDEN__=false;loadPaymentAttention().catch(error=>{root.__FP_PACKAGE_BOOTSTRAP_ERROR__=String(error?.message||error)})});return}
-    try{root.FamilyPilotWalletTransfers?.normalizeState(runtime.state,Date.now());runtime.save?.()}catch(error){root.__FP_WF02_COMPATIBILITY_ERROR__=String(error?.message||error)}
-    const marker=ensurePackageMarker();if(marker)marker.dataset.productState='hidden-superseded';root.__FP_WF02_READY__=false;root.__FP_WF02_HIDDEN__=true;loadPaymentAttention().catch(error=>{root.__FP_PACKAGE_BOOTSTRAP_ERROR__=String(error?.message||error)});
-  }
+  async function loadPaymentAttention(){await loadOne('familypilot-payment-attention.js');await loadOne('familypilot-payment-attention-ui.js');root.__FP_M3_03_READY__=true;await loadOne('familypilot-obligation-state-ui.js');root.__FP_M3_04_READY__=true;await loadOne('familypilot-partial-payment-removal-v2.js');await loadOne('familypilot-partial-payments.js');await loadOne('familypilot-obligation-wallet-isolation.js');await loadOne('familypilot-partial-payment-settlement.js');await loadOne('familypilot-partial-payments-render-sync.js');await loadOne('familypilot-overpayment-resolution.js');await loadOne('familypilot-partial-payment-entry-ui.js');await loadOne('familypilot-partial-state-visuals.js');root.__FP_M3_07A_READY__=true;root.__FP_M3_07_MODEL_READY__=true;await loadOne('familypilot-payment-link-lifecycle.js');root.__FP_M3_05_READY__=true;await loadOne('familypilot-linked-obligation-operation-lifecycle.js');await loadOne('familypilot-mobile-payment-tap.js');await loadOne('familypilot-operation-mobile-ui.js');await loadOne('familypilot-operation-date-picker.js');root.__FP_M3_06_READY__=true;root.__FP_M3_07_READY__=true;await loadOne('familypilot-rule-history.js');root.__FP_M3_08_READY__=true;await loadOne('familypilot-planned-income.js');await loadOne('familypilot-planned-income-amount-model.js');await loadOne('familypilot-planned-income-ui.js');await loadOne('familypilot-planned-income-amount-ui.js');root.__FP_M4_01_READY__=true;root.__FP_M4_02_READY__=true;await loadM403()}
+  function settleTransferSurfaceWhenBaseRuntimeReady(){const runtime=root.__FP_RUNTIME__;if(!runtime||(testMode&&!root.__FP_TEST__)){if(Date.now()>=runtimeDeadline){root.__FP_WF02_BOOTSTRAP_ERROR__='Base FamilyPilot runtime did not become ready';return}setTimeout(settleTransferSurfaceWhenBaseRuntimeReady,25);return}if(testMode){loadScript('familypilot-wallet-transfers-ui.js',()=>{root.__FP_WF02_READY__=true;root.__FP_WF02_HIDDEN__=false;loadPaymentAttention().catch(error=>{root.__FP_PACKAGE_BOOTSTRAP_ERROR__=String(error?.message||error)})});return}try{root.FamilyPilotWalletTransfers?.normalizeState(runtime.state,Date.now());runtime.save?.()}catch(error){root.__FP_WF02_COMPATIBILITY_ERROR__=String(error?.message||error)}const marker=ensurePackageMarker();if(marker)marker.dataset.productState='hidden-superseded';root.__FP_WF02_READY__=false;root.__FP_WF02_HIDDEN__=true;loadPaymentAttention().catch(error=>{root.__FP_PACKAGE_BOOTSTRAP_ERROR__=String(error?.message||error)})}
   function mount(){ensurePackageMarker();loadScript('familypilot-persistence-runtime.js',()=>{root.__FP_PERSISTENCE_RUNTIME_SCRIPT_LOADED__=true});loadScript('familypilot-viewport-anchor.js',()=>loadScript('familypilot-wallet-transfers.js',settleTransferSurfaceWhenBaseRuntimeReady))}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else queueMicrotask(mount);
 })(typeof window!=='undefined'?window:globalThis);
