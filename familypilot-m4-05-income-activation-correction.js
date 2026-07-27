@@ -29,12 +29,13 @@
     if(rule.mode!==api.RESERVE_FIXED)return;
     const action=(state.savingsActionOccurrences||[]).find(item=>item.goalId===rule.goalId&&item.sourceId===`monthly:${rule.goalId}:${monthKey(at)}`&&!['completed','skipped'].includes(item.status));
     if(!action||action.status==='postponed')return;
-    const excluded=new Set(snapshot.excludedOperationIds||[]),eligible=(state.operations||[]).filter(item=>item?.status==='active'&&item.kind==='income'&&number(item.occurredAt)>=monthStart(at)&&number(item.createdAt,item.occurredAt)>=number(rule.createdAt)&&!excluded.has(item.id)).sort((a,b)=>a.occurredAt-b.occurredAt);
+    const excluded=new Set(snapshot.excludedOperationIds||[]),eligible=(state.operations||[]).filter(item=>item?.status==='active'&&item.kind==='income'&&number(item.occurredAt)>=monthStart(at)&&number(item.createdAt,item.occurredAt)>=number(rule.createdAt)&&!excluded.has(item.id)).sort((a,b)=>a.occurredAt-b.occurredAt||a.createdAt-b.createdAt);
     if(!eligible.length){
       if(!action.actualAmount){action.status='inactive';action.note='waiting-for-actual-income';action.incomeTriggerOperationId=null}
       return;
     }
-    const income=action.status==='partial'?(eligible.find(item=>number(item.occurredAt)>number(action.updatedAt))||eligible.find(item=>item.id===action.incomeTriggerOperationId)||eligible[0]):(eligible.find(item=>item.id===action.incomeTriggerOperationId)||eligible[0]);
+    const currentId=operationId(action),current=eligible.find(item=>item.id===currentId),later=current?eligible.find(item=>item.id!==current.id&&(number(item.occurredAt)>number(current.occurredAt)||(number(item.occurredAt)===number(current.occurredAt)&&number(item.createdAt)>number(current.createdAt)))):null;
+    const income=action.status==='partial'?(later||current||eligible[0]):(current||eligible[0]);
     action.status=action.status==='inactive'?'planned':action.status;
     action.dueAt=number(income.occurredAt,at);action.sourceLocationId=income.walletId||action.sourceLocationId;action.destinationLocationId=rule.destinationLocationId||action.destinationLocationId;action.incomeTriggerOperationId=income.id;action.note=`income-trigger:${income.id}`;
   }
