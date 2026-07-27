@@ -7,10 +7,11 @@ const here=dirname(fileURLToPath(import.meta.url));
 const sourcePath=join(here,'pf08a-m4-05-onboarding-income-distribution-browser-smoke.mjs');
 const patchedPath=join(here,'.pf08a-m4-05-browser-smoke-patched.mjs');
 let source=readFileSync(sourcePath,'utf8');
-const needle="  const beforeIncome=m405.batches();assert(beforeIncome.length===0,'Fixed reserve reminder appeared before actual income');";
-const replacement="  const beforeIncome=m405.batches();if(beforeIncome.length)throw new Error('Fixed reserve reminder appeared before actual income: '+JSON.stringify({batches:beforeIncome.map(batch=>({operation:{id:batch.operation.id,amount:batch.operation.amount,occurredAt:batch.operation.occurredAt,createdAt:batch.operation.createdAt},actions:batch.actions.map(action=>({id:action.id,sourceId:action.sourceId,goalId:action.goalId,title:action.title,status:action.status,note:action.note,incomeTriggerOperationId:action.incomeTriggerOperationId}))})),reserveRules:state.reserveContributionRules,snapshots:state.incomeRuleActivationSnapshots}));";
-if(!source.includes(needle))throw new Error('Expected assertion was not found');
-source=source.replace(needle,replacement);
+const replacements=[
+  ["  const beforeIncome=m405.batches();assert(beforeIncome.length===0,'Fixed reserve reminder appeared before actual income');","  const beforeIncome=m405.batches();if(beforeIncome.length)throw new Error('Fixed reserve reminder appeared before actual income: '+JSON.stringify({batches:beforeIncome.map(batch=>({operation:{id:batch.operation.id,amount:batch.operation.amount,occurredAt:batch.operation.occurredAt,createdAt:batch.operation.createdAt},actions:batch.actions.map(action=>({id:action.id,sourceId:action.sourceId,goalId:action.goalId,title:action.title,status:action.status,note:action.note}))})),reserveRules:state.reserveContributionRules,snapshots:state.incomeRuleActivationSnapshots}));"],
+  ["  const reserveRemainder=batch2.actions.find(item=>item.id===reserveAction.id);assert(reserveRemainder&&Math.abs((reserveRemainder.plannedAmount-reserveRemainder.actualAmount)-30)<.01,'Remaining fixed reserve amount was not offered after next income');","  const reserveRemainder=batch2.actions.find(item=>item.id===reserveAction.id);if(!(reserveRemainder&&Math.abs((reserveRemainder.plannedAmount-reserveRemainder.actualAmount)-30)<.01))throw new Error('Remaining fixed reserve amount was not offered after next income: '+JSON.stringify({income1,income2,reserveAction,batches:m405.batches(),actions:state.savingsActionOccurrences.filter(item=>item.goalId===reserveAction.goalId),snapshots:state.incomeRuleActivationSnapshots}));"]
+];
+for(const [needle,replacement] of replacements){if(!source.includes(needle))throw new Error('Expected assertion was not found: '+needle);source=source.replace(needle,replacement)}
 writeFileSync(patchedPath,source,'utf8');
 try{
   await new Promise((resolveRun,rejectRun)=>{
