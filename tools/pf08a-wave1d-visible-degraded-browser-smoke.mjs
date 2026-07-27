@@ -26,7 +26,7 @@ const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null
  await load(app,'/?test=1&persistenceTest=${token}-root&moduleFailure=what_if&moduleFailureStage=script_load&wave1d=1','injected app');
  await progress('injected app readiness');
  const w=app.contentWindow;
- await until(()=>{const r=w.FamilyPilotModuleRegistry?.get?.('what_if');return w.__FP_MODULE_REGISTRY_UI_READY__&&w.__FP_MODULE_ENTRY_BRIDGE_READY__&&r?.state==='degraded'&&w.__FP_TEST__?.moduleRegistry},'script failure degraded state');
+ await until(()=>{const registry=w.FamilyPilotModuleRegistry,r=registry?.get?.('what_if'),learning=registry?.get?.('learning');return w.__FP_MODULE_REGISTRY_UI_READY__&&w.__FP_MODULE_ENTRY_BRIDGE_READY__&&r?.state==='degraded'&&learning?.state==='degraded'&&learning?.rootDiagnosticId===r?.rootDiagnosticId&&learning?.blockedByModuleId==='what_if'&&w.__FP_TEST__?.moduleRegistry},'script failure and dependent propagation');
  const registry=w.FamilyPilotModuleRegistry,ui=w.__FP_TEST__.moduleRegistry,before=ui.financialFingerprint(),rootRecord=registry.get('what_if'),learning=registry.get('learning');
  assert(rootRecord.failureStage==='script_load','Wrong root failure stage');
  assert(rootRecord.retryClass==='script_only','Script-only retry class missing');
