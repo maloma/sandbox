@@ -50,6 +50,43 @@
 
     const ensureArray=key=>{if(!Array.isArray(state[key]))state[key]=[]};
     const hasApi=name=>Boolean(window[name]);
+    const unique=list=>[...new Set((Array.isArray(list)?list:[]).map(String).filter(Boolean))];
+    function mergeDuplicateWallets(){
+      ensureArray('members');ensureArray('wallets');
+      const memberIds=unique([...(state.members||[]).map(item=>item?.id),...(Array.isArray(state.household?.memberIds)?state.household.memberIds:[])]);
+      const result=[],byId=new Map();
+      for(let index=0;index<state.wallets.length;index++){
+        const raw=state.wallets[index];
+        if(!raw||typeof raw!=='object'||Array.isArray(raw))continue;
+        const wallet={...raw,id:String(raw.id||`wallet-legacy-${index+1}`)};
+        wallet.allowedMemberIds=unique(Array.isArray(wallet.allowedMemberIds)?wallet.allowedMemberIds:wallet.visibleToMemberIds);
+        wallet.visibleToMemberIds=unique(wallet.visibleToMemberIds);
+        if(wallet.nativeCurrency==null&&wallet.baseCurrency)wallet.nativeCurrency=wallet.baseCurrency;
+        if(wallet.archivedAt===undefined)wallet.archivedAt=null;
+        if(wallet.createdAt===undefined)wallet.createdAt=now();
+        const canonical=byId.get(wallet.id);
+        if(!canonical){byId.set(wallet.id,wallet);result.push(wallet);continue}
+        for(const [key,value] of Object.entries(wallet)){
+          if(['allowedMemberIds','visibleToMemberIds','permissions','includedInHouseholdCapital','openingBalance'].includes(key))continue;
+          if((canonical[key]===undefined||canonical[key]===null||canonical[key]==='')&&value!==undefined&&value!==null&&value!=='')canonical[key]=value;
+        }
+        canonical.allowedMemberIds=unique([...(canonical.allowedMemberIds||[]),...(wallet.allowedMemberIds||[])]);
+        canonical.visibleToMemberIds=unique([...(canonical.visibleToMemberIds||[]),...(wallet.visibleToMemberIds||[])]);
+        canonical.permissions={...(wallet.permissions||{}),...(canonical.permissions||{})};
+        if(wallet.includedInHouseholdCapital===true)canonical.includedInHouseholdCapital=true;
+        if(canonical.openingBalance==null&&wallet.openingBalance!=null)canonical.openingBalance=wallet.openingBalance;
+        if(canonical.nativeCurrency==null&&canonical.baseCurrency)canonical.nativeCurrency=canonical.baseCurrency;
+        canonical.createdAt=Math.min(Number(canonical.createdAt)||now(),Number(wallet.createdAt)||now());
+      }
+      for(const wallet of result){
+        const householdLike=!wallet.ownerMemberId&&(String(wallet.type||'').includes('household')||String(wallet.visibilityMode||'').includes('all'));
+        if(householdLike&&wallet.allowedMemberIds.length===0)wallet.allowedMemberIds=[...memberIds];
+        if(wallet.nativeCurrency==null)wallet.nativeCurrency=state.household?.baseCurrency||'EUR';
+        if(!Number.isFinite(Number(wallet.openingBalance)))wallet.openingBalance=0;
+      }
+      state.wallets=result;
+      if(!state.wallets.some(wallet=>wallet.id===state.activeWalletId))state.activeWalletId=state.wallets.find(wallet=>wallet.type==='household_default')?.id||state.wallets[0]?.id||null;
+    }
     const phase=(id,order,ready,apply=()=>{},validate=()=>({ok:true}))=>({
       id,
       order,
@@ -67,9 +104,10 @@
       phase('01_base_structure',10,()=>hasApi('FamilyPilotScope'),()=>{
         window.FamilyPilotScope.migrateState(state,now());
         for(const key of ['members','wallets','operations','transfers','walletMovements'])ensureArray(key);
+        mergeDuplicateWallets();
       }),
       phase('02_scope_and_wallets',20,()=>hasApi('FamilyPilotWalletManagement')&&hasApi('FamilyPilotScope'),()=>{
-        ensureArray('members');ensureArray('wallets');
+        ensureArray('members');ensureArray('wallets');mergeDuplicateWallets();
       },()=>({ok:Array.isArray(state.wallets)&&Array.isArray(state.members),error:'scope_wallet_validation_failed'})),
       phase('03_operations_and_categories',30,()=>Boolean(runtime.scopeApi),()=>{
         ensureArray('operations');ensureArray('categories');
