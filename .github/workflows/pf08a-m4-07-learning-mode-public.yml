@@ -1,0 +1,34 @@
+name: PF-08A M4-07 Learning Mode Public Verification
+
+on:
+  pull_request:
+    paths:
+      - 'tools/pf08a-m4-07-learning-mode-public-smoke.mjs'
+      - '.github/workflows/pf08a-m4-07-learning-mode-public.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-public-package:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+      - name: Verify exact checked-out head
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
+      - name: Verify public Learning Mode
+        env:
+          PUBLIC_URL: https://maloma.github.io/sandbox/
+          EXPECTED_MAIN_M4_07_LEARNING: 07e8e26e7bc2600cdd722a8dedd37ec4a911e7bd
+        run: node tools/pf08a-m4-07-learning-mode-public-smoke.mjs
