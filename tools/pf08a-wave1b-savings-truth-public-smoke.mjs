@@ -39,7 +39,7 @@ function checks(pkg){return{
  loader:pkg.viewportAnchor.includes('familypilot-pf08a-savings-truth.js')&&pkg.viewportAnchor.includes('familypilot-pf08a-savings-truth-ui.js'),
  domain:pkg.truth.includes('purposeAllocations')&&pkg.truth.includes('savingsLegacyReconciliationIssues')&&pkg.truth.includes('actualSaved'),
  migration:pkg.truth.includes('captureLegacyPreflight')&&pkg.truth.includes('savingsPurposeMigrationResults')&&pkg.truthCorrection.includes('protectExisting'),
- bridges:pkg.truthAccountsBridge.includes('changeAllocation')&&pkg.truthMoneyBridge.includes('completeAction'),
+ bridges:pkg.truthAccountsBridge.includes('truth.allocateExisting')&&pkg.truthAccountsBridge.includes('function createTransfer')&&pkg.truthMoneyBridge.includes('function completeAction')&&pkg.truthMoneyBridge.includes('physicalResult'),
  ui:pkg.truthUi.includes('Распределить имеющиеся деньги')&&pkg.truthUi.includes('Подтверждено сейчас')&&pkg.truthUi.includes('Ранее было указано'),
  directEditorHidden:pkg.truthUi.includes("field.hidden=true"),
  correctedLearning:pkg.learning.includes("title:'Начните с минимума информации'")&&!pkg.learning.includes('Начните с минимальной картины'),
