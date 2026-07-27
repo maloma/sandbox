@@ -30,5 +30,7 @@ jobs:
       - name: Verify public integrated diagnostic
         env:
           PUBLIC_URL: https://maloma.github.io/sandbox/
-          EXPECTED_MAIN_PF08A_INTEGRATED: 462445e2a75fa5b573fb31255e7dacba2ead153e
-        run: node tools/pf08a-integrated-first-version-public-smoke.mjs
+          EXPECTED_MAIN_PF08A_INTEGRATED: 860c16ae197aacb80c74fcb671c5745fefd809bb
+        run: |
+          node --check tools/pf08a-integrated-first-version-public-smoke.mjs
+          node tools/pf08a-integrated-first-version-public-smoke.mjs
