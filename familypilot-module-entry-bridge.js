@@ -34,6 +34,9 @@
     return (selectors[moduleId]||[]).some(selector=>document.querySelector(selector));
   }
   function failed(record){return record&&['degraded','unavailable'].includes(record.state)}
+  function fallbackExists(moduleId){
+    return Boolean(document.querySelector(`[data-fp-fallback-entry="${moduleId}"]`));
+  }
   function removeFallback(moduleId){
     document.querySelectorAll(`[data-fp-fallback-entry="${moduleId}"]`).forEach(node=>node.remove());
   }
@@ -83,6 +86,7 @@
         if(realExists)removeFallback(record.moduleId);
         continue;
       }
+      if(fallbackExists(record.moduleId))continue;
       if(planModules.has(record.moduleId))makePlanEntry(record.moduleId);else makeMoreEntry(record.moduleId);
     }
   }
