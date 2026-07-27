@@ -28,14 +28,16 @@ const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null
  const w=app.contentWindow;
  await until(()=>{const registry=w.FamilyPilotModuleRegistry,r=registry?.get?.('what_if'),learning=registry?.get?.('learning');return w.__FP_MODULE_REGISTRY_UI_READY__&&w.__FP_MODULE_ENTRY_BRIDGE_READY__&&r?.state==='degraded'&&learning?.state==='degraded'&&learning?.rootDiagnosticId===r?.rootDiagnosticId&&learning?.blockedByModuleId==='what_if'&&w.__FP_TEST__?.moduleRegistry},'script failure and dependent propagation');
  const registry=w.FamilyPilotModuleRegistry,ui=w.__FP_TEST__.moduleRegistry,before=ui.financialFingerprint(),rootRecord=registry.get('what_if'),learning=registry.get('learning');
+ const failedEntry=()=>[...w.document.querySelectorAll('#m406PlanEntry,[data-m406-open],[data-fp-fallback-entry="what_if"]')].find(node=>!node.hidden&&getComputedStyle(node).display!=='none');
+ await until(()=>failedEntry(),'failed module entry visibility');
  assert(rootRecord.failureStage==='script_load','Wrong root failure stage');
  assert(rootRecord.retryClass==='script_only','Script-only retry class missing');
  assert(/^FP-MOD-[A-Z0-9]{4}$/.test(rootRecord.diagnosticId),'Diagnostic ID invalid');
  assert(learning.state==='degraded'&&learning.rootDiagnosticId===rootRecord.rootDiagnosticId,'Dependent root cause not propagated');
  assert(learning.blockedByModuleId==='what_if','Dependent blocker missing');
  ui.render();await wait(100);
- assert(ui.entryVisible('what_if'),'Failed module entry is not visible');
- assert(ui.entryState('what_if')==='degraded','Failed entry state is not degraded');
+ assert(Boolean(failedEntry()),'Failed module entry is not visible');
+ assert(failedEntry()?.dataset.fpModuleState==='degraded','Failed entry state is not degraded');
  const summary=ui.summaryText();
  assert(summary.includes('Некоторые разделы временно недоступны'),'Global degraded summary missing');
  assert(summary.includes('Сохранённые данные не удалены из-за этой ошибки'),'Data-preservation wording missing');
