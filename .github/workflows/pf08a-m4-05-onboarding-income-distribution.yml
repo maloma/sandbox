@@ -1,0 +1,44 @@
+name: PF-08A M4-05 Onboarding and Income Distribution Gate
+
+on:
+  pull_request:
+    paths:
+      - 'familypilot-m4-05-onboarding-income-distribution.js'
+      - 'familypilot-m4-05-product-corrections.js'
+      - 'familypilot-m4-05-onboarding-income-distribution-ui.js'
+      - 'familypilot-m4-05-ui-corrections.js'
+      - 'familypilot-viewport-anchor.js'
+      - 'tools/pf08a-m4-05-onboarding-income-distribution-browser-smoke.mjs'
+      - '.github/workflows/pf08a-m4-05-onboarding-income-distribution.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-exact-head:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+      - name: Verify exact checked-out head
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
+      - name: Verify syntax
+        run: |
+          node --check familypilot-m4-05-onboarding-income-distribution.js
+          node --check familypilot-m4-05-product-corrections.js
+          node --check familypilot-m4-05-onboarding-income-distribution-ui.js
+          node --check familypilot-m4-05-ui-corrections.js
+          node --check familypilot-viewport-anchor.js
+          node --check tools/pf08a-m4-05-onboarding-income-distribution-browser-smoke.mjs
+      - name: Verify M4-05 behavior
+        run: node tools/pf08a-m4-05-onboarding-income-distribution-browser-smoke.mjs
