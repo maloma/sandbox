@@ -10,11 +10,15 @@ const path=join(root,name);
 const profile=mkdtempSync(join(tmpdir(),'pf08a-wave1d-visible-'));
 const marker='PF08A_WAVE1D_VISIBLE_DEGRADED_PASS';
 const token='wave1d-'+Date.now();
+const wait=ms=>new Promise(resolveWait=>setTimeout(resolveWait,ms));
+let reportResult;
+const reportPromise=new Promise(resolveReport=>{reportResult=resolveReport});
 
 const harness=`<!doctype html><html lang="ru"><body data-status="PENDING"><iframe id="app" style="width:390px;height:844px;border:0"></iframe><iframe id="ordinary" style="display:none"></iframe><iframe id="timeout" style="display:none"></iframe><pre id="result">PENDING</pre><script>(()=>{
 const out=document.getElementById('result'),app=document.getElementById('app'),ordinary=document.getElementById('ordinary'),timeout=document.getElementById('timeout');
 const wait=ms=>new Promise(r=>setTimeout(r,ms)),assert=(v,m)=>{if(!v)throw Error(m)},load=(frame,src)=>new Promise(resolve=>{frame.addEventListener('load',resolve,{once:true});frame.src=src});
 const until=async(check,label,ms=110000)=>{const end=Date.now()+ms;let last;while(Date.now()<end){try{last=check();if(last)return last}catch(e){last=String(e)}await wait(100)}throw Error(label+' timed out: '+JSON.stringify(last))};
+const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null,2);document.body.dataset.status=status;try{await fetch('/__wave1d_result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({status,payload})})}catch{}};
 (async()=>{try{
  await load(app,'/?test=1&persistenceTest=${token}-root&moduleFailure=what_if&moduleFailureStage=script_load&wave1d=1');
  const w=app.contentWindow;
@@ -83,12 +87,55 @@ const until=async(check,label,ms=110000)=>{const end=Date.now()+ms;let last;whil
  assert(eventSafe,'Registry safe event history contains financial or stack payload');
  assert(registry.snapshot().events.length<=50,'Registry event history exceeded bound');
  try{w.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.();o.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.();t.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.()}catch{}
- out.textContent=JSON.stringify({status:'PASS',marker:'${marker}',visible_global_card:true,visible_local_card:true,failed_entry_preserved:true,precise_data_wording:true,diagnostic_id:true,root_cause_grouping:true,unaffected_routes:true,one_active_attempt:true,safe_retry:true,no_duplicate_ui:true,financial_isolation:true,persistence_priority:true,injection_isolated:true,partial_install_reload_required:true,safe_events:true},null,2);document.body.dataset.status='PASS';
-}catch(error){out.textContent=String(error.stack||error);document.body.dataset.status='FAIL'}})();})();
+ await report('PASS',{status:'PASS',marker:'${marker}',visible_global_card:true,visible_local_card:true,failed_entry_preserved:true,precise_data_wording:true,diagnostic_id:true,root_cause_grouping:true,unaffected_routes:true,one_active_attempt:true,safe_retry:true,no_duplicate_ui:true,financial_isolation:true,persistence_priority:true,injection_isolated:true,partial_install_reload_required:true,safe_events:true});
+}catch(error){await report('FAIL',{status:'FAIL',error:String(error.stack||error)})}})();})();
 </script></body></html>`;
 writeFileSync(path,harness,'utf8');
-const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8'};
-const server=createServer((req,res)=>{try{const url=new URL(req.url,'http://127.0.0.1'),raw=url.pathname==='/'?'index.html':url.pathname.replace(/^\//,''),target=normalize(resolve(root,raw));if(target!==root&&!target.startsWith(root+sep))throw Error('forbidden');res.writeHead(200,{'content-type':mime[extname(target)]||'application/octet-stream','cache-control':'no-store'});res.end(readFileSync(target))}catch{if(!res.headersSent)res.writeHead(404);if(!res.writableEnded)res.end('Not found')}});
-const chrome=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'].find(existsSync);if(!chrome)throw Error('Chrome unavailable');
+const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json'};
+const server=createServer((req,res)=>{
+  try{
+    const url=new URL(req.url,'http://127.0.0.1');
+    if(url.pathname==='/__wave1d_result'&&req.method==='POST'){
+      let body='';
+      req.setEncoding('utf8');
+      req.on('data',chunk=>body+=chunk);
+      req.on('end',()=>{
+        try{reportResult(JSON.parse(body))}catch(error){reportResult({status:'FAIL',payload:{error:String(error)}})}
+        res.writeHead(204);res.end();
+      });
+      return;
+    }
+    const raw=url.pathname==='/'?'index.html':url.pathname.replace(/^\//,''),target=normalize(resolve(root,raw));
+    if(target!==root&&!target.startsWith(root+sep))throw Error('forbidden');
+    res.writeHead(200,{'content-type':mime[extname(target)]||'application/octet-stream','cache-control':'no-store'});
+    res.end(readFileSync(target));
+  }catch{
+    if(!res.headersSent)res.writeHead(404);
+    if(!res.writableEnded)res.end('Not found');
+  }
+});
+const chrome=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'].find(existsSync);
+if(!chrome)throw Error('Chrome unavailable');
 await new Promise((resolveListen,rejectListen)=>{server.once('error',rejectListen);server.listen(0,'127.0.0.1',resolveListen)});
-try{const port=server.address().port,output=await new Promise((resolveRun,rejectRun)=>{const child=spawn(chrome,['--headless=new','--no-sandbox','--disable-dev-shm-usage','--disable-gpu',`--user-data-dir=${profile}`,'--virtual-time-budget=360000','--dump-dom',`http://127.0.0.1:${port}/${name}`],{stdio:['ignore','pipe','pipe']});let stdout='',stderr='';const timer=setTimeout(()=>{child.kill('SIGKILL');rejectRun(Error('Browser timeout\n'+stderr.slice(-6000)))},400000);child.stdout.on('data',x=>stdout+=x);child.stderr.on('data',x=>stderr+=x);child.once('error',rejectRun);child.once('close',code=>{clearTimeout(timer);code?rejectRun(Error(stderr.slice(-12000))):resolveRun(stdout)})});const match=output.match(/<pre id="result">([\s\S]*?)<\/pre>/),decoded=(match?.[1]||'').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');if(!output.includes('data-status="PASS"')||!output.includes(marker))throw Error(decoded||output.slice(-16000));console.log(decoded);console.log(marker)}finally{await new Promise(resolveClose=>server.close(resolveClose));if(existsSync(path))unlinkSync(path);rmSync(profile,{recursive:true,force:true})}
+let child=null,stderr='',primaryError=null;
+try{
+  const port=server.address().port;
+  child=spawn(chrome,['--headless=new','--no-sandbox','--disable-dev-shm-usage','--disable-gpu',`--user-data-dir=${profile}`,`http://127.0.0.1:${port}/${name}`],{stdio:['ignore','ignore','pipe']});
+  child.stderr.on('data',chunk=>stderr+=chunk);
+  const childExit=new Promise(resolveExit=>child.once('close',code=>resolveExit({type:'exit',code})));
+  const timeoutResult=new Promise(resolveTimeout=>setTimeout(()=>resolveTimeout({type:'timeout'}),420000));
+  const outcome=await Promise.race([reportPromise.then(report=>({type:'report',report})),childExit,timeoutResult]);
+  if(outcome.type==='timeout')throw Error('Browser timeout\n'+stderr.slice(-12000));
+  if(outcome.type==='exit')throw Error(`Browser exited before reporting (${outcome.code})\n${stderr.slice(-12000)}`);
+  if(outcome.report.status!=='PASS')throw Error(outcome.report.payload?.error||JSON.stringify(outcome.report));
+  console.log(JSON.stringify(outcome.report.payload,null,2));
+  console.log(marker);
+}catch(error){
+  primaryError=error;
+  throw error;
+}finally{
+  if(child&&!child.killed){child.kill('SIGTERM');await wait(200);if(!child.killed)child.kill('SIGKILL')}
+  await new Promise(resolveClose=>server.close(resolveClose));
+  if(existsSync(path))unlinkSync(path);
+  try{rmSync(profile,{recursive:true,force:true,maxRetries:5,retryDelay:100})}catch(cleanupError){if(!primaryError)throw cleanupError;console.error('Profile cleanup failed after primary error:',String(cleanupError))}
+}
