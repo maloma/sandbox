@@ -1,0 +1,30 @@
+name: PF-08A Wave 1D Bridge Patch
+
+on:
+  push:
+    branches:
+      - agent/pf08a-wave1d-visible-degraded
+    paths:
+      - '.github/tools/patch-wave1d-bridge.py'
+      - '.github/workflows/pf08a-wave1d-bridge-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-index:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/pf08a-wave1d-visible-degraded
+          fetch-depth: 0
+      - run: python .github/tools/patch-wave1d-bridge.py
+      - run: |
+          grep -q 'familypilot-module-entry-bridge.js' index.html
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          if git diff --quiet -- index.html; then exit 0; fi
+          git add index.html
+          git commit -m 'Load Wave 1D missing-entry bridge'
+          git push origin HEAD:agent/pf08a-wave1d-visible-degraded
