@@ -9,7 +9,7 @@ const harnessName='.pf08a-m4-06-interest-browser-harness.html';
 const harnessPath=join(root,harnessName);
 const profilePath=mkdtempSync(join(tmpdir(),'pf08a-m406-interest-chrome-'));
 const marker='PF08A_M4_06_MANUAL_INTEREST_PASS';
-const harness=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>M4-06 interest smoke</title></head><body data-status="PENDING"><iframe id="app" src="/?test=1&m406interest=1" style="width:390px;height:844px;border:0"></iframe><pre id="result">PENDING</pre><script>
+const harness=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>M4-06 interest smoke</title></head><body data-status="PENDING"><iframe id="app" style="width:390px;height:844px;border:0"></iframe><pre id="result">PENDING</pre><script>
 (()=>{
  const frame=document.getElementById('app'),result=document.getElementById('result'),runtimeErrors=[];
  const assert=(condition,message)=>{if(!condition)throw new Error(message)};
@@ -38,8 +38,8 @@ const harness=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title
   assert(runtimeErrors.length===0,'Runtime exceptions: '+runtimeErrors.join(' | '));
   result.textContent=JSON.stringify({status:'PASS',marker:'${marker}',worked_example:true,zero_interest_baseline:true,own_money_separation:true,goal_source:true,custom_source:true,scenario_delta_aggregation:true,generic_scenario_assumptions_ignored:true,target_months:true,high_rate_warning:true,long_term_warning:true,non_finite_rejected:true,saved_snapshot:true,stale_detection:true,duplicate_archive:true,no_apply_to_real_plan:true,financial_state_isolation:true,runtime_exceptions:[]},null,2);document.body.dataset.status='PASS';
  }
- const start=()=>run().catch(error=>{result.textContent=String(error?.stack||error);document.body.dataset.status='FAIL'});
- if(frame.contentDocument?.readyState==='complete')start();else frame.addEventListener('load',start,{once:true});
+ frame.addEventListener('load',()=>run().catch(error=>{result.textContent=String(error?.stack||error);document.body.dataset.status='FAIL'}),{once:true});
+ frame.src='/?test=1&m406interest=1&v='+Date.now();
 })();</script></body></html>`;
 writeFileSync(harnessPath,harness);
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json','.css':'text/css; charset=utf-8'};
