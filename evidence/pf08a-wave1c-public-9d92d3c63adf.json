@@ -1,0 +1,15 @@
+{
+  "status": "PUBLIC_PASS",
+  "package": "PF-08A Wave 1C Persistence and Recovery",
+  "verified_main": "9d92d3c63adf32e87b8ae6ba22f8aa336da0a464",
+  "workflow_run_id": 30288986622,
+  "browser_marker": "PF08A_WAVE1C_PERSISTENCE_PASS",
+  "compatibility_marker": "PF08A_WAVE1C_COMPAT_MIGRATION_PASS",
+  "integrated_marker": "PF08A_FIRST_VERSION_WAVE1C_INTEGRATED_PASS",
+  "persistence_recovery": true,
+  "state_schema_version": 22,
+  "single_savings_truth": true,
+  "visible_module_failure_surface": false,
+  "readiness_verdict": "NOT_READY",
+  "runtime_exceptions": []
+}
