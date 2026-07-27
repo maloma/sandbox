@@ -32,7 +32,14 @@
       const items=batches();section.hidden=!items.length;if(!items.length){section.innerHTML='';return}
       section.innerHTML=`<div class="m405-head"><div><h2>Распределить полученный доход</h2><small>Напоминание появляется сразу после фактического прихода. Каждый перевод подтверждается отдельно.</small></div><span class="m405-badge m405-alert">${items.reduce((sum,batch)=>sum+batch.actions.length,0)}</span></div><div class="m405-stack" style="margin-top:10px">${items.map(batch=>`<article class="m405-distribution"><div class="m405-income"><div><strong>Получен доход</strong><small>${fmtDate(batch.operation.occurredAt)} · ${esc((state().wallets||[]).find(item=>item.id===batch.operation.walletId)?.name||'Основной счёт')}</small></div><strong>${money(batch.operation.amount,'EUR')}</strong></div><div class="m405-stack">${batch.actions.map(item=>`<div class="m405-item"><div class="m405-item-title"><div><strong>${esc(goalName(item.goalId))}</strong><small>${esc(item.title)} · ${esc((state().wallets||[]).find(location=>location.id===item.destinationLocationId)?.name||'место хранения не выбрано')}</small></div><strong>${money(remaining(item),'EUR')}</strong></div>${item.actualAmount?`<div class="m405-muted">Уже подтверждено ${money(item.actualAmount,'EUR')}</div>`:''}<div class="m405-actions"><button class="btn primary" data-m405-action="full" data-m405-action-id="${esc(item.id)}">Выполнено полностью</button><button class="btn secondary" data-m405-action="partial" data-m405-action-id="${esc(item.id)}">Выполнено частично</button><button class="btn secondary" data-m405-action="different" data-m405-action-id="${esc(item.id)}">Другая сумма</button><button class="btn secondary" data-m405-action="skipped" data-m405-action-id="${esc(item.id)}">Не выполнено</button><button class="btn secondary" data-m405-action="postponed" data-m405-action-id="${esc(item.id)}">Перенести</button></div></div>`).join('')}</div></article>`).join('')}</div>`;
     }
-    function refreshCurrent(){distribution().normalizeState(state(),deps(),now());runtime.save();renderDistribution()}
+    function renderHomePrompt(){
+      const section=$('m405IncomeHomePrompt');if(!section)return;
+      const items=batches();section.hidden=!items.length;if(!items.length){section.innerHTML='';return}
+      const latest=items[0];section.innerHTML=`<button class="m405-entry" type="button" data-m405-open-income-distribution><span><strong>Распределить полученный доход</strong><small>Получено ${money(latest.operation.amount,'EUR')}. Подтвердите переводы в накопления на ${money(latest.totalPlanned,'EUR')}.</small></span><span>›</span></button>`;
+      const current=state();current.m405NotifiedIncomeBatchIds=Array.isArray(current.m405NotifiedIncomeBatchIds)?current.m405NotifiedIncomeBatchIds:[];
+      if(!current.m405NotifiedIncomeBatchIds.includes(latest.id)){current.m405NotifiedIncomeBatchIds.push(latest.id);runtime.save();toast('Доход сохранён. Проверьте распределение в накоплениях.')}
+    }
+    function refreshCurrent(){distribution().normalizeState(state(),deps(),now());runtime.save();renderDistribution();renderHomePrompt()}
     function complete(id,input){const current=state(),result=api.completeAction(current,id,input,current.currentMemberId,deps(),now());if(result.ok)refreshCurrent();return result}
     function openAction(id,outcome){const item=action(id);if(!item)return;activeActionId=id;activeOutcome=outcome;
       if(outcome==='skipped'){if(confirm('Отметить перевод как не выполненный?')){const result=complete(id,{outcome:'skipped'});toast(result.ok?'Отмечено как не выполнено':result.error)}return}
@@ -45,12 +52,12 @@
     function bridge(){return distribution().giftReserveBridgeProposal(state(),deps(),now())}
     function applyBridge(input,confirmed){const current=state(),result=distribution().applyGiftReserveBridge(current,input,confirmed,current.currentMemberId,deps(),now());if(result.ok)refreshCurrent();return result}
 
-    const previous=runtime.getRenderAll();runtime.setRenderAll(function(){const result=previous();renderDistribution();return result});
-    renderDistribution();
-    document.addEventListener('click',event=>{const button=event.target.closest('#m405IncomeDistribution [data-m405-action]'),closer=event.target.closest('[data-m405-current-close]');if(button){event.preventDefault();event.stopImmediatePropagation();openAction(button.dataset.m405ActionId,button.dataset.m405Action);return}if(closer){event.preventDefault();close(closer.dataset.m405CurrentClose)}},true);
+    const previous=runtime.getRenderAll();runtime.setRenderAll(function(){const result=previous();renderDistribution();renderHomePrompt();return result});
+    renderDistribution();renderHomePrompt();
+    document.addEventListener('click',event=>{const button=event.target.closest('#m405IncomeDistribution [data-m405-action]'),openDistribution=event.target.closest('[data-m405-open-income-distribution]'),closer=event.target.closest('[data-m405-current-close]');if(button){event.preventDefault();event.stopImmediatePropagation();openAction(button.dataset.m405ActionId,button.dataset.m405Action);return}if(openDistribution){event.preventDefault();showScreen('savingsGoals');renderDistribution();$('m405IncomeDistribution')?.scrollIntoView({behavior:'smooth',block:'start'});return}if(closer){event.preventDefault();close(closer.dataset.m405CurrentClose)}},true);
     $('m405CurrentActionSave').onclick=saveAction;$('m405CurrentPostponeSave').onclick=savePostpone;
 
-    if(new URLSearchParams(location.search).has('test')){window.__FP_TEST__=window.__FP_TEST__||{};window.__FP_TEST__.m405Current={complete,batches,seedIncome,configureReserve,bridge,applyBridge,renderDistribution,action:id=>JSON.parse(JSON.stringify(action(id)||null))}}
+    if(new URLSearchParams(location.search).has('test')){window.__FP_TEST__=window.__FP_TEST__||{};window.__FP_TEST__.m405Current={complete,batches,seedIncome,configureReserve,bridge,applyBridge,renderDistribution,renderHomePrompt,action:id=>JSON.parse(JSON.stringify(action(id)||null))}}
     window.__FP_M4_05_CURRENT_ACTIONS_READY__=true;
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',wait,{once:true});else wait();
