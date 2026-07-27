@@ -8,6 +8,10 @@ const sourcePath = join(here, 'pf08a-m4-03-budget-designer-browser-smoke-v2.mjs'
 const patchedPath = join(here, '.pf08a-m4-03-budget-safety-smoke-patched.mjs');
 let source = readFileSync(sourcePath, 'utf8');
 
+source = source.replace(
+  "if (api?.budget?.analysis && win.__FP_M4_03_BUDGET_READY__ === true) return api;",
+  "if (api?.budget?.analysis && api?.savingsTruth?.allocate && win.__FP_M4_03_BUDGET_READY__ === true && win.__FP_SAVINGS_TRUTH_READY__ === true) return api;",
+);
 source = source.replace('savedAmount: 300,', 'savedAmount: 0,');
 source = source.replace('savedAmount: 200,', 'savedAmount: 0,');
 
