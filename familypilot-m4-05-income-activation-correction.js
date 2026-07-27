@@ -57,7 +57,7 @@
     if(!original||original.__m405IncomeActivationCorrection)return original;
     const normalized=(state,inputDeps={},at=Date.now())=>{original.normalizeState(state,inputDeps,at);return enforce(state,wrapped,at)};
     const configured=(state,input,actorId='member-anna',inputDeps={},at=Date.now())=>{const previous=original.currentReserveRule(state),previousMode=previous?.mode,result=original.configureReserveRule(state,input,actorId,inputDeps,at);if(result.ok&&previousMode&&previousMode!==result.rule.mode)state.incomeRuleActivationSnapshots=(state.incomeRuleActivationSnapshots||[]).filter(item=>!(item.kind==='reserve'&&item.ruleId===result.rule.id));if(result.ok)enforce(state,wrapped,at);return result};
-    const batches=(state,inputDeps={},at=Date.now())=>{normalized(state,inputDeps,at);return original.incomeDistributionBatches(state,inputDeps,at).map(batch=>({...batch,actions:batch.actions.filter(item=>item.status!=='inactive')})).filter(batch=>batch.actions.length)};
+    const batches=(state,inputDeps={},at=Date.now())=>{normalized(state,inputDeps,at);const result=original.incomeDistributionBatches(state,inputDeps,at);enforce(state,wrapped,at);return result.map(batch=>({...batch,actions:batch.actions.filter(item=>item.status!=='inactive')})).filter(batch=>batch.actions.length)};
     const applied=(state,draft,confirmed,actorId='member-anna',inputDeps={},at=Date.now())=>{const result=original.applyOnboarding(state,draft,confirmed,actorId,inputDeps,at);if(result.ok)enforce(state,wrapped,at);return result};
     const wrapped=Object.freeze({...original,normalizeState:normalized,configureReserveRule:configured,incomeDistributionBatches:batches,applyOnboarding:applied,__m405IncomeActivationCorrection:true});
     return wrapped;
