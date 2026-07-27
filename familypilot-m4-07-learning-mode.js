@@ -1,0 +1,58 @@
+(function(root,factory){
+  const api=factory();
+  if(typeof module==='object'&&module.exports)module.exports=api;
+  if(root)root.FamilyPilotLearningMode=api;
+})(typeof globalThis!=='undefined'?globalThis:this,function(){
+  'use strict';
+  const clone=value=>JSON.parse(JSON.stringify(value));
+  const nowValue=value=>Number.isFinite(Number(value))?Number(value):Date.now();
+  const unique=list=>[...new Set((Array.isArray(list)?list:[]).map(String).filter(Boolean))];
+  const LESSONS=Object.freeze([
+    {id:'four_layers',contentVersion:1,title:'Факт, план, прогноз и «Что если»',promise:'Разберитесь, почему четыре похожих числа могут означать совершенно разные вещи.',blocks:['Факт — реально полученный доход, расход, перевод или текущий остаток.','План — ожидаемое будущее событие или правило.','Прогноз — расчёт из текущих фактов и планов, а не банковский баланс.','«Что если» — изолированная гипотеза, а не обещание.'],example:'Запланированная зарплата не увеличивает деньги до фактического получения.',target:'operations'},
+    {id:'location_and_purpose',contentVersion:1,title:'Где деньги и для чего они',promise:'Не считайте одни и те же деньги дважды.',blocks:['Место хранения отвечает на вопрос «где»: наличные, текущий счёт, сберегательный счёт.','Назначение отвечает на вопрос «для чего»: общие накопления, резерв, подарок, отпуск.','Назначение делит уже существующий капитал и не создаёт его вторую копию.'],example:'500 € на банковском счёте могут быть назначены резерву, но капитал остаётся 500 €, а не 1 000 €.',target:'savingsGoals'},
+    {id:'minimum_start',contentVersion:1,title:'Начните с минимальной картины',promise:'Полная финансовая история для старта не нужна.',blocks:['Достаточно указать основные наличные и банковские остатки.','Добавьте главный ожидаемый доход и обязательные платежи.','Настройте одно правило накоплений или одну цель.','Остальные детали можно добавлять постепенно.'],example:'Даже четыре базовые записи уже позволяют увидеть ближайшую нагрузку.',target:'plans'},
+    {id:'plan_becomes_fact',contentVersion:1,title:'План становится фактом после подтверждения',promise:'FamilyPilot не должен угадывать, что реально произошло.',blocks:['Ожидаемый доход становится фактом после записи фактического прихода.','Перевод в накопления подтверждается отдельно.','Платёж или подарок отмечается по реальному результату.','Доступны варианты: выполнено полностью, частично, другая сумма, не выполнено или перенести.'],example:'Планировали перевести 100 €, но перевели 60 € — выберите «Другая сумма» или частичное выполнение.',target:'operations'},
+    {id:'corrections_normal',contentVersion:1,title:'Корректировки — нормальная часть учёта',promise:'Математический остаток иногда отличается от реальности.',blocks:['Добавьте пропущенный фактический доход или расход.','Для сверки реального кошелька используйте нейтральную корректировку баланса.','Будущие планы можно пересмотреть отдельно.','Периодическая ревизия необязательна, но помогает прогнозу.'],example:'Нашли разницу 20 € в наличных — корректировка уточнит остаток без выдуманного дохода.',target:'operations'},
+    {id:'tools_together',contentVersion:1,title:'Как инструменты работают вместе',promise:'Каждый раздел отвечает на свой вопрос.',blocks:['Накопления описывают цели и правила.','Резерв на непредвиденные расходы добавляется к другим целям, а не заменяет их.','Фонд подарков помогает распределять расходы на события.','Проектирование бюджета показывает будущую нагрузку, но не двигает деньги.','«Что если» позволяет проверить альтернативы без изменения фактов.'],example:'Сценарий может показать полезное изменение взноса, но реальный план изменится только после отдельного подтверждения.',target:'whatIf'},
+    {id:'monthly_rhythm',contentVersion:1,title:'Спокойный месячный ритм',promise:'Рекомендуемый порядок можно адаптировать под себя.',blocks:['В начале месяца просмотрите изменившиеся планы и подтвердите каждый нужный пункт.','После фактического дохода проверьте, какие накопления действительно переведены.','В течение месяца записывайте только значимые фактические изменения.','В конце месяца сравните расчёт с реальностью и исправьте только то, что полезно.'],example:'Необязательно вести каждую мелочь, если вашей семье достаточно более крупного уровня учёта.',target:'plans'}
+  ]);
+  const TIPS=Object.freeze([
+    {id:'operations_fact',target:'operations',lessonId:'four_layers',text:'Здесь живут факты: реально полученные доходы, расходы и переводы.'},
+    {id:'plans_future',target:'plans',lessonId:'four_layers',text:'План показывает ожидаемые события. Деньги изменятся только после фактической операции или подтверждения.'},
+    {id:'savings_two_layers',target:'savingsGoals',lessonId:'location_and_purpose',text:'Накопление отвечает на вопрос «для чего», а счёт или наличные — «где лежат деньги».'},
+    {id:'budget_no_action',target:'budgetDesigner',lessonId:'tools_together',text:'Это расчёт будущей нагрузки. Он не переводит деньги и не создаёт доход.'},
+    {id:'what_if_isolated',target:'whatIf',lessonId:'tools_together',text:'Сценарии изолированы от реальных финансов, пока вы отдельно не подтвердите конкретное изменение плана.'},
+    {id:'gift_fund',target:'m404Events',lessonId:'tools_together',text:'Фонд подарков распределяет будущие расходы, а покупка подарка остаётся фактическим расходом.'},
+    {id:'learning_optional',target:'learningMode',lessonId:'minimum_start',text:'Обучение необязательно: выберите только полезные темы и продолжите позже.'}
+  ]);
+  const lesson=id=>LESSONS.find(item=>item.id===id)||LESSONS[0];
+  const defaultMember=(at=Date.now())=>({enabled:true,contextualTipsEnabled:true,currentLessonId:LESSONS[0].id,completedLessonIds:[],skippedLessonIds:[],shownTipIds:[],dismissedTipIds:[],reviewedVersions:{},startedAt:null,updatedAt:at,completedAt:null,version:1});
+  function normalizeMember(raw,at=Date.now()){
+    const base=defaultMember(at),valid=new Set(LESSONS.map(item=>item.id));
+    const completed=unique(raw?.completedLessonIds).filter(id=>valid.has(id)),skipped=unique(raw?.skippedLessonIds).filter(id=>valid.has(id)&&!completed.includes(id));
+    const reviewed={};for(const [id,value] of Object.entries(raw?.reviewedVersions||{}))if(valid.has(id)&&Number(value)>0)reviewed[id]=Number(value);
+    const reviewedCount=new Set([...completed,...skipped]).size;
+    return{...base,...raw,enabled:raw?.enabled!==false,contextualTipsEnabled:raw?.contextualTipsEnabled!==false,currentLessonId:valid.has(String(raw?.currentLessonId||''))?String(raw.currentLessonId):LESSONS[0].id,completedLessonIds:completed,skippedLessonIds:skipped,shownTipIds:unique(raw?.shownTipIds),dismissedTipIds:unique(raw?.dismissedTipIds),reviewedVersions:reviewed,startedAt:raw?.startedAt==null?null:nowValue(raw.startedAt),updatedAt:nowValue(raw?.updatedAt||at),completedAt:reviewedCount===LESSONS.length?nowValue(raw?.completedAt||at):null,version:1};
+  }
+  function normalizeState(state,at=Date.now()){
+    if(!state||typeof state!=='object')throw new Error('FamilyPilot state is required');
+    state.schemaVersion=Math.max(20,Number(state.schemaVersion)||0);state.learningModeByMember=state.learningModeByMember&&typeof state.learningModeByMember==='object'?state.learningModeByMember:{};
+    for(const [id,value] of Object.entries(state.learningModeByMember))state.learningModeByMember[id]=normalizeMember(value,at);
+    return state;
+  }
+  function memberState(state,memberId,at=Date.now()){normalizeState(state,at);const id=String(memberId||state.currentMemberId||'member-anna');if(!state.learningModeByMember[id])state.learningModeByMember[id]=defaultMember(at);else state.learningModeByMember[id]=normalizeMember(state.learningModeByMember[id],at);return state.learningModeByMember[id]}
+  function touch(progress,at){progress.updatedAt=at;const reviewed=new Set([...progress.completedLessonIds,...progress.skippedLessonIds]);progress.completedAt=reviewed.size===LESSONS.length?(progress.completedAt||at):null;return progress}
+  function start(state,memberId,at=Date.now()){const p=memberState(state,memberId,at);p.startedAt=p.startedAt||at;return touch(p,at)}
+  function selectLesson(state,memberId,lessonId,at=Date.now()){const p=start(state,memberId,at);p.currentLessonId=lesson(lessonId).id;return touch(p,at)}
+  function completeLesson(state,memberId,lessonId,at=Date.now()){const item=lesson(lessonId),p=selectLesson(state,memberId,item.id,at);p.completedLessonIds=unique([...p.completedLessonIds,item.id]);p.skippedLessonIds=p.skippedLessonIds.filter(id=>id!==item.id);p.reviewedVersions[item.id]=item.contentVersion;return touch(p,at)}
+  function skipLesson(state,memberId,lessonId,at=Date.now()){const item=lesson(lessonId),p=selectLesson(state,memberId,item.id,at);if(!p.completedLessonIds.includes(item.id))p.skippedLessonIds=unique([...p.skippedLessonIds,item.id]);p.reviewedVersions[item.id]=item.contentVersion;return touch(p,at)}
+  function resetMember(state,memberId,at=Date.now()){normalizeState(state,at);const id=String(memberId||state.currentMemberId||'member-anna');state.learningModeByMember[id]=defaultMember(at);return state.learningModeByMember[id]}
+  function setTipsEnabled(state,memberId,enabled,at=Date.now()){const p=memberState(state,memberId,at);p.contextualTipsEnabled=Boolean(enabled);return touch(p,at)}
+  function markTipShown(state,memberId,tipId,at=Date.now()){const p=memberState(state,memberId,at);if(!p.contextualTipsEnabled)return p;p.shownTipIds=unique([...p.shownTipIds,String(tipId)]);return touch(p,at)}
+  function dismissTip(state,memberId,tipId,at=Date.now()){const p=memberState(state,memberId,at);p.shownTipIds=unique([...p.shownTipIds,String(tipId)]);p.dismissedTipIds=unique([...p.dismissedTipIds,String(tipId)]);return touch(p,at)}
+  function tipForTarget(state,memberId,target,at=Date.now()){const p=memberState(state,memberId,at);if(!p.contextualTipsEnabled)return null;const item=TIPS.find(t=>t.target===target);if(!item||p.shownTipIds.includes(item.id)||p.dismissedTipIds.includes(item.id))return null;return clone(item)}
+  function status(state,memberId,lessonId,catalogue=LESSONS,at=Date.now()){const p=memberState(state,memberId,at),item=(catalogue||LESSONS).find(row=>row.id===lessonId)||lesson(lessonId),completed=p.completedLessonIds.includes(item.id),skipped=p.skippedLessonIds.includes(item.id),reviewedVersion=Number(p.reviewedVersions[item.id]||0);return{completed,skipped,reviewed:completed||skipped,reviewedVersion,updated:reviewedVersion>0&&Number(item.contentVersion)>reviewedVersion}}
+  function summary(state,memberId,at=Date.now()){const p=memberState(state,memberId,at),reviewed=new Set([...p.completedLessonIds,...p.skippedLessonIds]);return{reviewed:reviewed.size,total:LESSONS.length,completed:p.completedLessonIds.length,skipped:p.skippedLessonIds.length,currentLessonId:p.currentLessonId,completedAt:p.completedAt,contextualTipsEnabled:p.contextualTipsEnabled}}
+  function financialFingerprint(state){const keys=['operations','wallets','obligationRules','obligationOccurrences','debtEvents','savingsGoals','savingsAccountPlans','savingsContributionOverrides','savingsTransfers','walletTransfers','investmentAccounts','investmentValuations','balanceAdjustments','plannedIncomeRules','plannedIncomeOccurrences','birthdays','giftFund','whatIfScenarios','whatIfPlanConversions','whatIfInterestSimulations','onboardingState'];const out={};for(const key of keys)out[key]=clone(state?.[key]||[]);return JSON.stringify(out)}
+  return Object.freeze({LESSONS,TIPS,normalizeState,memberState,start,selectLesson,completeLesson,skipLesson,resetMember,setTipsEnabled,markTipShown,dismissTip,tipForTarget,status,summary,financialFingerprint});
+});
