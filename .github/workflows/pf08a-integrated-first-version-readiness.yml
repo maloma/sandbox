@@ -11,6 +11,11 @@ on:
       - 'familypilot-m4-03-savings-accounts.js'
       - 'familypilot-m4-04-money-planning.js'
       - 'familypilot-m4-04-money-planning-ui.js'
+      - 'familypilot-pf08a-savings-truth.js'
+      - 'familypilot-pf08a-savings-truth-correction.js'
+      - 'familypilot-pf08a-savings-accounts-bridge.js'
+      - 'familypilot-pf08a-savings-money-bridge.js'
+      - 'familypilot-pf08a-savings-truth-ui.js'
       - 'familypilot-m4-05-onboarding-income-distribution.js'
       - 'familypilot-m4-05-onboarding-income-distribution-ui.js'
       - 'familypilot-m4-06-what-if.js'
@@ -44,10 +49,13 @@ jobs:
       - name: Verify syntax and readiness semantics
         run: |
           node --check familypilot-m4-07-learning-mode.js
+          node --check familypilot-pf08a-savings-truth.js
+          node --check familypilot-pf08a-savings-truth-ui.js
           node --check tools/pf08a-integrated-first-version-browser-smoke.mjs
           grep -q "Начните с минимума информации" familypilot-m4-07-learning-mode.js
           ! grep -q "Начните с минимальной картины" familypilot-m4-07-learning-mode.js
-          grep -q "single_savings_truth:false" tools/pf08a-integrated-first-version-browser-smoke.mjs
+          grep -q "single_savings_truth:true" tools/pf08a-integrated-first-version-browser-smoke.mjs
+          grep -q "direct_saved_editor_absent:true" tools/pf08a-integrated-first-version-browser-smoke.mjs
           grep -q "visible_module_failure_surface:false" tools/pf08a-integrated-first-version-browser-smoke.mjs
           grep -q "readiness_verdict:'NOT_READY'" tools/pf08a-integrated-first-version-browser-smoke.mjs
       - name: Run integrated first-version diagnostic

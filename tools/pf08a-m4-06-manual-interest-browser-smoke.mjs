@@ -1,49 +1,291 @@
 import { createServer } from 'node:http';
-import { existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
 
-const root=process.cwd();
-const harnessName='.pf08a-m4-06-interest-browser-harness.html';
-const harnessPath=join(root,harnessName);
-const profilePath=mkdtempSync(join(tmpdir(),'pf08a-m406-interest-chrome-'));
-const marker='PF08A_M4_06_MANUAL_INTEREST_PASS';
-const harness=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>M4-06 interest smoke</title></head><body data-status="PENDING"><iframe id="app" src="/?test=1&m406interest=1" style="width:390px;height:844px;border:0"></iframe><pre id="result">PENDING</pre><script>
-(()=>{
- const frame=document.getElementById('app'),result=document.getElementById('result'),runtimeErrors=[];
- const assert=(condition,message)=>{if(!condition)throw new Error(message)};
- const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
- const text=node=>(node?.textContent||'').replace(/\\s+/g,' ').trim();
- async function ready(){const end=Date.now()+55000;while(Date.now()<end){const win=frame.contentWindow,api=win&&win.__FP_TEST__;if(api?.interest?.calculate&&api?.whatIf?.create&&win.__FP_M4_06_INTEREST_READY__===true)return api;await wait(100)}const win=frame.contentWindow;throw new Error('M4-06 interest API not ready '+JSON.stringify({package:win?.__FP_M4_06_INTEREST_PACKAGE_LOADED__,ready:win?.__FP_M4_06_INTEREST_READY__,error:win?.__FP_M4_06_INTEREST_UI_ERROR__,bootstrap:win?.__FP_PACKAGE_BOOTSTRAP_ERROR__}))}
- async function run(){
-  const win=frame.contentWindow;win.addEventListener('error',event=>runtimeErrors.push(String(event.error||event.message||'error')));win.addEventListener('unhandledrejection',event=>runtimeErrors.push(String(event.reason||'rejection')));
-  const test=await ready(),doc=frame.contentDocument,runtime=win.__FP_RUNTIME__,state=runtime.state,interest=test.interest,whatIf=test.whatIf,legacy=win.FamilyPilotSavingsGoals,accounts=win.FamilyPilotSavingsAccounts,domain=win.FamilyPilotManualInterest;
-  assert(doc.querySelector('meta[content="m4-06-manual-interest-v1"]'),'Interest package marker missing');assert(doc.getElementById('m406Interest'),'Interest section missing');
-  const date='2026-07-27',financialBefore=interest.financialFingerprint();
-  const worked=interest.calculate({name:'Пример',sourceMode:'custom',startingAmount:1000,monthlyContribution:100,annualRate:12,termMonths:2,targetAmount:'',calculationDate:date});assert(worked.ok,'Worked example failed: '+worked.error);assert(Math.abs(worked.result.endingWithInterest-1221.10)<.001,'Worked ending balance mismatch');assert(Math.abs(worked.result.endingWithoutInterest-1200)<.001,'Worked zero-interest baseline mismatch');assert(Math.abs(worked.result.interestEarned-21.10)<.001,'Worked interest mismatch');assert(worked.result.timeline[0].interest===10&&worked.result.timeline[1].interest===11.1,'Monthly interest order mismatch');assert(worked.result.assumptions.contributionTiming==='end_of_month','Contribution timing assumption missing');
-  assert(interest.financialFingerprint()===financialBefore,'Custom calculation changed financial state');
-  const goal=legacy.createGoal(state,{name:'Резерв для процентов',targetAmount:5000,savedAmount:1000,targetDate:''},state.currentMemberId,Date.now()+1);assert(goal.ok,'Could not create interest goal');assert(accounts.setPlan(state,goal.goal.id,{planningMode:'fixed_contribution',monthlyContribution:200,contributionDay:5},state.currentMemberId,Date.now()+2).ok,'Could not set interest plan');runtime.save();runtime.renderAll();
-  const scenario=whatIf.create({name:'Сценарий процентов',horizonDays:90,monthlyExpenseReduction:999,monthlyAdditionalIncome:777,savingsContributionChanges:[{goalId:goal.goal.id,monthlyDelta:40},{goalId:goal.goal.id,monthlyDelta:10}],notes:'Проверка агрегации'});assert(scenario.ok,'Could not create interest scenario');
-  const source=interest.calculate({name:'Источник сценария',sourceMode:'goal',goalId:goal.goal.id,contributionSource:'scenario',scenarioId:scenario.scenario.id,annualRate:0,termMonths:1,calculationDate:date});assert(source.ok,'Goal scenario source failed: '+source.error);assert(Math.abs(source.sourceScenarioDelta-50)<.001,'Scenario deltas were not aggregated');assert(Math.abs(source.inputs.monthlyContribution-250)<.001,'Scenario default contribution mismatch');
-  const goalCalc=interest.calculate({name:'Цель и сценарий',sourceMode:'goal',goalId:goal.goal.id,contributionSource:'scenario',scenarioId:scenario.scenario.id,startingAmount:1000,monthlyContribution:250,annualRate:12,termMonths:12,targetAmount:5000,calculationDate:date});assert(goalCalc.ok,'Goal scenario calculation failed');assert(goalCalc.sourceScenarioDelta===50,'Source delta missing');assert(goalCalc.result.totalContributions===3000,'Generic income/expense leaked into contribution calculation');assert(goalCalc.result.ownMoney===4000,'Own-money calculation mismatch');
-  const target=interest.calculate({name:'Срок цели',sourceMode:'custom',startingAmount:1000,monthlyContribution:100,annualRate:120,termMonths:8,targetAmount:1500,calculationDate:date});assert(target.ok,'Target calculation failed');assert(target.result.targetMonthWithInterest===3,'Interest target month mismatch');assert(target.result.targetMonthWithoutInterest===5,'Baseline target month mismatch');assert(target.result.timeSavedMonths===2,'Time saved mismatch');assert(target.result.warnings.some(item=>item.includes('Высокая ставка')),'High-rate warning missing');
-  const longTerm=interest.calculate({name:'Длинный срок',sourceMode:'custom',startingAmount:1,monthlyContribution:1,annualRate:1,termMonths:121,targetAmount:'',calculationDate:date});assert(longTerm.ok&&longTerm.result.warnings.some(item=>item.includes('Долгий срок')),'Long-term warning missing');
-  const invalid=interest.calculate({name:'Переполнение',sourceMode:'custom',startingAmount:'1e309',monthlyContribution:0,annualRate:1,termMonths:1,targetAmount:'',calculationDate:date});assert(!invalid.ok,'Non-finite input was accepted');
-  const beforeSavedFingerprint=interest.financialFingerprint();const saved=interest.save({name:'Сохранённый расчёт',sourceMode:'goal',goalId:goal.goal.id,contributionSource:'actual',scenarioId:'',startingAmount:1000,monthlyContribution:200,annualRate:5,termMonths:24,targetAmount:5000,calculationDate:date});assert(saved.ok,'Saving simulation failed: '+saved.error);const savedEnding=saved.simulation.result.endingWithInterest;assert(interest.financialFingerprint()===beforeSavedFingerprint,'Saving simulation changed financial state');assert(!interest.stale(saved.simulation.id),'Fresh saved simulation marked stale');
-  const currentGoal=state.savingsGoals.find(item=>item.id===goal.goal.id);currentGoal.savedAmount=1100;currentGoal.updatedAt=Date.now()+20;runtime.save();runtime.renderAll();assert(interest.stale(saved.simulation.id),'Changed goal source was not marked stale');const stored=interest.list().find(item=>item.id===saved.simulation.id);assert(stored.result.endingWithInterest===savedEnding,'Saved snapshot silently recalculated');
-  const afterSourceEditFingerprint=interest.financialFingerprint();const copy=interest.duplicate(saved.simulation.id);assert(copy.ok&&copy.simulation.id!==saved.simulation.id,'Duplicate failed');const archived=interest.archive(copy.simulation.id);assert(archived.ok,'Archive failed');assert(!interest.list().some(item=>item.id===copy.simulation.id),'Archived simulation remained active');assert(interest.financialFingerprint()===afterSourceEditFingerprint,'Duplicate/archive changed financial state');
-  assert(typeof domain.applyToRealPlan==='undefined'&&typeof domain.apply==='undefined','Apply-to-real-plan API exists');
-  interest.openSaved(saved.simulation.id);interest.open();await wait(80);const section=doc.getElementById('m406Interest'),sectionText=text(section),buttons=[...section.querySelectorAll('button')].map(button=>text(button));assert(sectionText.includes('Проценты на накопления'),'Interest heading missing');assert(sectionText.includes('Свои деньги')&&sectionText.includes('Проценты'),'Primary result values missing');assert(sectionText.includes('математическая гипотеза'),'Hypothesis disclaimer missing');assert(sectionText.includes('Исходные данные изменились'),'Stale source label missing');assert(!buttons.some(label=>/примен/i.test(label)),'Apply button exists in interest UI');
-  assert(runtimeErrors.length===0,'Runtime exceptions: '+runtimeErrors.join(' | '));
-  result.textContent=JSON.stringify({status:'PASS',marker:'${marker}',worked_example:true,zero_interest_baseline:true,own_money_separation:true,goal_source:true,custom_source:true,scenario_delta_aggregation:true,generic_scenario_assumptions_ignored:true,target_months:true,high_rate_warning:true,long_term_warning:true,non_finite_rejected:true,saved_snapshot:true,stale_detection:true,duplicate_archive:true,no_apply_to_real_plan:true,financial_state_isolation:true,runtime_exceptions:[]},null,2);document.body.dataset.status='PASS';
- }
- frame.addEventListener('load',()=>run().catch(error=>{result.textContent=String(error?.stack||error);document.body.dataset.status='FAIL'}),{once:true});
-})();</script></body></html>`;
-writeFileSync(harnessPath,harness);
-const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json','.css':'text/css; charset=utf-8'};
-const server=createServer((req,res)=>{try{const url=new URL(req.url,'http://127.0.0.1'),raw=url.pathname==='/'?'index.html':url.pathname.replace(/^\//,''),target=normalize(resolve(root,raw));if(target!==root&&!target.startsWith(root+sep))throw new Error('Forbidden');const body=readFileSync(target);res.writeHead(200,{'content-type':mime[extname(target)]||'application/octet-stream','cache-control':'no-store'});res.end(body)}catch{if(!res.headersSent)res.writeHead(404);res.end('Not found')}});
-const chrome=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'].find(existsSync);if(!chrome)throw new Error('Chrome/Chromium is not installed');
-const runChrome=url=>new Promise((resolveRun,rejectRun)=>{const child=spawn(chrome,['--headless=new','--no-sandbox','--disable-dev-shm-usage','--disable-gpu',`--user-data-dir=${profilePath}`,'--virtual-time-budget=120000','--dump-dom',url],{stdio:['ignore','pipe','pipe']});let stdout='',stderr='';child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);child.on('error',rejectRun);child.on('close',code=>code===0?resolveRun(stdout):rejectRun(new Error(`Chrome exited ${code}\n${stderr}`)))});
-await new Promise((resolveListen,rejectListen)=>{server.once('error',rejectListen);server.listen(0,'127.0.0.1',resolveListen)});
-try{const {port}=server.address(),output=await runChrome(`http://127.0.0.1:${port}/${harnessName}`),match=output.match(/<pre id="result">([\s\S]*?)<\/pre>/),decoded=(match?.[1]||'').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');if(!output.includes('data-status="PASS"')||!output.includes(marker))throw new Error(`M4-06 interest browser smoke failed\n${decoded||output.slice(-16000)}`);console.log(decoded)}finally{await new Promise(resolveClose=>server.close(resolveClose));if(existsSync(harnessPath))unlinkSync(harnessPath);rmSync(profilePath,{recursive:true,force:true})}
+const root = process.cwd();
+const harnessName = '.pf08a-m4-06-interest-browser-harness.html';
+const harnessPath = join(root, harnessName);
+const profilePath = mkdtempSync(join(tmpdir(), 'pf08a-m406-interest-chrome-'));
+const marker = 'PF08A_M4_06_MANUAL_INTEREST_PASS';
+
+const harness = `<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><title>M4-06 interest smoke</title></head>
+<body data-status="PENDING">
+<iframe id="app" style="width:390px;height:844px;border:0"></iframe>
+<pre id="result">PENDING</pre>
+<script>
+(async () => {
+  const frame = document.getElementById('app');
+  const result = document.getElementById('result');
+  const runtimeErrors = [];
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const assert = (condition, message) => { if (!condition) throw new Error(message); };
+  const text = node => (node?.textContent || '').replace(/\\s+/g, ' ').trim();
+  const stage = value => { result.textContent = value; };
+
+  async function waitForRuntime() {
+    for (let attempt = 0; attempt < 1200; attempt += 1) {
+      const win = frame.contentWindow;
+      const api = win?.__FP_TEST__;
+      if (
+        api?.interest?.calculate &&
+        api?.whatIf?.create &&
+        win.__FP_M4_06_INTEREST_READY__ === true &&
+        win.__FP_SAVINGS_TRUTH_READY__ === true
+      ) return { win, api };
+      await wait(50);
+    }
+    const win = frame.contentWindow;
+    throw new Error('M4-06 interest API not ready ' + JSON.stringify({
+      package: win?.__FP_M4_06_INTEREST_PACKAGE_LOADED__,
+      ready: win?.__FP_M4_06_INTEREST_READY__,
+      truth: win?.__FP_SAVINGS_TRUTH_READY__,
+      error: win?.__FP_M4_06_INTEREST_UI_ERROR__,
+      bootstrap: win?.__FP_PACKAGE_BOOTSTRAP_ERROR__,
+    }));
+  }
+
+  try {
+    stage('LOADING_APP');
+    const loaded = new Promise(resolve => frame.addEventListener('load', resolve, { once: true }));
+    frame.src = '/?test=1&m406interest=1&v=' + Date.now();
+    await loaded;
+
+    const { win, api } = await waitForRuntime();
+    win.addEventListener('error', event => runtimeErrors.push(String(event.error || event.message || 'error')));
+    win.addEventListener('unhandledrejection', event => runtimeErrors.push(String(event.reason || 'rejection')));
+
+    const doc = frame.contentDocument;
+    const runtime = win.__FP_RUNTIME__;
+    const state = runtime.state;
+    const interest = api.interest;
+    const whatIf = api.whatIf;
+    const legacy = win.FamilyPilotSavingsGoals;
+    const accounts = win.FamilyPilotSavingsAccounts;
+    const domain = win.FamilyPilotManualInterest;
+
+    stage('WORKED_EXAMPLE');
+    assert(doc.querySelector('meta[content="m4-06-manual-interest-v1"]'), 'Interest package marker missing');
+    assert(doc.getElementById('m406Interest'), 'Interest section missing');
+    const date = '2026-07-27';
+    const financialBefore = interest.financialFingerprint();
+    const worked = interest.calculate({
+      name: 'Пример', sourceMode: 'custom', startingAmount: 1000,
+      monthlyContribution: 100, annualRate: 12, termMonths: 2,
+      targetAmount: '', calculationDate: date,
+    });
+    assert(worked.ok, 'Worked example failed: ' + worked.error);
+    assert(Math.abs(worked.result.endingWithInterest - 1221.10) < .001, 'Worked ending balance mismatch');
+    assert(Math.abs(worked.result.endingWithoutInterest - 1200) < .001, 'Worked zero-interest baseline mismatch');
+    assert(Math.abs(worked.result.interestEarned - 21.10) < .001, 'Worked interest mismatch');
+    assert(worked.result.timeline[0].interest === 10 && worked.result.timeline[1].interest === 11.1, 'Monthly interest order mismatch');
+    assert(worked.result.assumptions.contributionTiming === 'end_of_month', 'Contribution timing assumption missing');
+    assert(interest.financialFingerprint() === financialBefore, 'Custom calculation changed financial state');
+
+    stage('GOAL_AND_SCENARIO');
+    const goal = legacy.createGoal(state, {
+      name: 'Резерв для процентов', targetAmount: 5000,
+      savedAmount: 0, targetDate: '',
+    }, state.currentMemberId, Date.now() + 1);
+    assert(goal.ok, 'Could not create interest goal');
+    assert(accounts.setPlan(state, goal.goal.id, {
+      planningMode: 'fixed_contribution', monthlyContribution: 200, contributionDay: 5,
+    }, state.currentMemberId, Date.now() + 2).ok, 'Could not set interest plan');
+    runtime.save();
+    runtime.renderAll();
+
+    const scenario = whatIf.create({
+      name: 'Сценарий процентов', horizonDays: 90,
+      monthlyExpenseReduction: 999, monthlyAdditionalIncome: 777,
+      savingsContributionChanges: [
+        { goalId: goal.goal.id, monthlyDelta: 40 },
+        { goalId: goal.goal.id, monthlyDelta: 10 },
+      ],
+      notes: 'Проверка агрегации',
+    });
+    assert(scenario.ok, 'Could not create interest scenario');
+
+    const source = interest.calculate({
+      name: 'Источник сценария', sourceMode: 'goal', goalId: goal.goal.id,
+      contributionSource: 'scenario', scenarioId: scenario.scenario.id,
+      annualRate: 0, termMonths: 1, calculationDate: date,
+    });
+    assert(source.ok, 'Goal scenario source failed: ' + source.error);
+    assert(Math.abs(source.sourceScenarioDelta - 50) < .001, 'Scenario deltas were not aggregated');
+    assert(Math.abs(source.inputs.monthlyContribution - 250) < .001, 'Scenario default contribution mismatch');
+
+    const goalCalc = interest.calculate({
+      name: 'Цель и сценарий', sourceMode: 'goal', goalId: goal.goal.id,
+      contributionSource: 'scenario', scenarioId: scenario.scenario.id,
+      startingAmount: 1000, monthlyContribution: 250,
+      annualRate: 12, termMonths: 12, targetAmount: 5000,
+      calculationDate: date,
+    });
+    assert(goalCalc.ok, 'Goal scenario calculation failed');
+    assert(goalCalc.sourceScenarioDelta === 50, 'Source delta missing');
+    assert(goalCalc.result.totalContributions === 3000, 'Generic income/expense leaked into contribution calculation');
+    assert(goalCalc.result.ownMoney === 4000, 'Own-money calculation mismatch');
+
+    stage('WARNINGS_AND_TARGET');
+    const target = interest.calculate({
+      name: 'Срок цели', sourceMode: 'custom', startingAmount: 1000,
+      monthlyContribution: 100, annualRate: 120, termMonths: 8,
+      targetAmount: 1500, calculationDate: date,
+    });
+    assert(target.ok, 'Target calculation failed');
+    assert(target.result.targetMonthWithInterest === 3, 'Interest target month mismatch');
+    assert(target.result.targetMonthWithoutInterest === 5, 'Baseline target month mismatch');
+    assert(target.result.timeSavedMonths === 2, 'Time saved mismatch');
+    assert(target.result.warnings.some(item => item.includes('Высокая ставка')), 'High-rate warning missing');
+
+    const longTerm = interest.calculate({
+      name: 'Длинный срок', sourceMode: 'custom', startingAmount: 1,
+      monthlyContribution: 1, annualRate: 1, termMonths: 121,
+      targetAmount: '', calculationDate: date,
+    });
+    assert(longTerm.ok && longTerm.result.warnings.some(item => item.includes('Долгий срок')), 'Long-term warning missing');
+    const invalid = interest.calculate({
+      name: 'Переполнение', sourceMode: 'custom', startingAmount: '1e309',
+      monthlyContribution: 0, annualRate: 1, termMonths: 1,
+      targetAmount: '', calculationDate: date,
+    });
+    assert(!invalid.ok, 'Non-finite input was accepted');
+
+    stage('SNAPSHOT_AND_STALENESS');
+    const beforeSavedFingerprint = interest.financialFingerprint();
+    const saved = interest.save({
+      name: 'Сохранённый расчёт', sourceMode: 'goal', goalId: goal.goal.id,
+      contributionSource: 'actual', scenarioId: '', startingAmount: 1000,
+      monthlyContribution: 200, annualRate: 5, termMonths: 24,
+      targetAmount: 5000, calculationDate: date,
+    });
+    assert(saved.ok, 'Saving simulation failed: ' + saved.error);
+    const savedEnding = saved.simulation.result.endingWithInterest;
+    assert(interest.financialFingerprint() === beforeSavedFingerprint, 'Saving simulation changed financial state');
+    assert(!interest.stale(saved.simulation.id), 'Fresh saved simulation marked stale');
+
+    assert(accounts.setPlan(state, goal.goal.id, {
+      planningMode: 'fixed_contribution', monthlyContribution: 210, contributionDay: 5,
+    }, state.currentMemberId, Date.now() + 20).ok, 'Could not change goal source plan');
+    runtime.save();
+    runtime.renderAll();
+    assert(interest.stale(saved.simulation.id), 'Changed goal source was not marked stale');
+    const stored = interest.list().find(item => item.id === saved.simulation.id);
+    assert(stored.result.endingWithInterest === savedEnding, 'Saved snapshot silently recalculated');
+
+    const afterSourceEditFingerprint = interest.financialFingerprint();
+    const copy = interest.duplicate(saved.simulation.id);
+    assert(copy.ok && copy.simulation.id !== saved.simulation.id, 'Duplicate failed');
+    const archived = interest.archive(copy.simulation.id);
+    assert(archived.ok, 'Archive failed');
+    assert(!interest.list().some(item => item.id === copy.simulation.id), 'Archived simulation remained active');
+    assert(interest.financialFingerprint() === afterSourceEditFingerprint, 'Duplicate/archive changed financial state');
+    assert(typeof domain.applyToRealPlan === 'undefined' && typeof domain.apply === 'undefined', 'Apply-to-real-plan API exists');
+
+    stage('UI');
+    interest.openSaved(saved.simulation.id);
+    interest.open();
+    await wait(80);
+    const section = doc.getElementById('m406Interest');
+    const sectionText = text(section);
+    const buttons = [...section.querySelectorAll('button')].map(button => text(button));
+    assert(sectionText.includes('Проценты на накопления'), 'Interest heading missing');
+    assert(sectionText.includes('Свои деньги') && sectionText.includes('Проценты'), 'Primary result values missing');
+    assert(sectionText.includes('математическая гипотеза'), 'Hypothesis disclaimer missing');
+    assert(sectionText.includes('Исходные данные изменились'), 'Stale source label missing');
+    assert(!buttons.some(label => /примен/i.test(label)), 'Apply button exists in interest UI');
+    assert(runtimeErrors.length === 0, 'Runtime exceptions: ' + runtimeErrors.join(' | '));
+
+    result.textContent = JSON.stringify({
+      status: 'PASS', marker: '${marker}', worked_example: true,
+      zero_interest_baseline: true, own_money_separation: true,
+      goal_source: true, custom_source: true, scenario_delta_aggregation: true,
+      generic_scenario_assumptions_ignored: true, target_months: true,
+      high_rate_warning: true, long_term_warning: true, non_finite_rejected: true,
+      saved_snapshot: true, stale_detection: true, duplicate_archive: true,
+      no_apply_to_real_plan: true, financial_state_isolation: true,
+      runtime_exceptions: [],
+    }, null, 2);
+    document.body.dataset.status = 'PASS';
+  } catch (error) {
+    result.textContent = String(error?.stack || error);
+    document.body.dataset.status = 'FAIL';
+  }
+})();
+</script>
+</body></html>`;
+
+const inlineScript = harness.match(/<script>([\s\S]*?)<\/script>/)?.[1] || '';
+new Function(inlineScript);
+writeFileSync(harnessPath, harness, 'utf8');
+
+const mime = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json',
+  '.css': 'text/css; charset=utf-8',
+};
+const server = createServer((request, response) => {
+  try {
+    const url = new URL(request.url, 'http://127.0.0.1');
+    const raw = url.pathname === '/' ? 'index.html' : url.pathname.replace(/^\//, '');
+    const target = normalize(resolve(root, raw));
+    if (target !== root && !target.startsWith(root + sep)) throw new Error('Forbidden');
+    response.writeHead(200, {
+      'content-type': mime[extname(target)] || 'application/octet-stream',
+      'cache-control': 'no-store',
+    });
+    response.end(readFileSync(target));
+  } catch {
+    if (!response.headersSent) response.writeHead(404);
+    if (!response.writableEnded) response.end('Not found');
+  }
+});
+
+const chrome = [
+  '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium', '/usr/bin/chromium-browser',
+].find(existsSync);
+if (!chrome) throw new Error('Chrome/Chromium is not installed');
+
+await new Promise((resolveListen, rejectListen) => {
+  server.once('error', rejectListen);
+  server.listen(0, '127.0.0.1', resolveListen);
+});
+try {
+  const { port } = server.address();
+  const output = await new Promise((resolveRun, rejectRun) => {
+    const child = spawn(chrome, [
+      '--headless=new', '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu',
+      `--user-data-dir=${profilePath}`, '--virtual-time-budget=240000', '--dump-dom',
+      `http://127.0.0.1:${port}/${harnessName}`,
+    ], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '', stderr = '';
+    child.stdout.on('data', chunk => { stdout += chunk; });
+    child.stderr.on('data', chunk => { stderr += chunk; });
+    child.on('error', rejectRun);
+    child.on('close', code => code === 0 ? resolveRun(stdout) : rejectRun(new Error(`Chrome exited ${code}\n${stderr}`)));
+  });
+  const match = output.match(/<pre id="result">([\s\S]*?)<\/pre>/);
+  const decoded = (match?.[1] || '')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  if (!output.includes('data-status="PASS"') || !output.includes(marker)) {
+    throw new Error(`M4-06 interest browser smoke failed\n${decoded || output.slice(-16000)}`);
+  }
+  console.log(decoded);
+} finally {
+  await new Promise(resolveClose => server.close(resolveClose));
+  if (existsSync(harnessPath)) unlinkSync(harnessPath);
+  rmSync(profilePath, { recursive: true, force: true });
+}

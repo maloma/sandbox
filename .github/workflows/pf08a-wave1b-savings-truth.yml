@@ -1,0 +1,57 @@
+name: PF-08A Wave 1B Savings Truth Gate
+
+on:
+  pull_request:
+    paths:
+      - 'familypilot-pf08a-savings-truth.js'
+      - 'familypilot-pf08a-savings-truth-correction.js'
+      - 'familypilot-pf08a-savings-accounts-bridge.js'
+      - 'familypilot-pf08a-savings-money-bridge.js'
+      - 'familypilot-pf08a-savings-truth-ui.js'
+      - 'familypilot-viewport-anchor.js'
+      - 'tools/pf08a-wave1b-savings-truth-domain-smoke.cjs'
+      - 'tools/pf08a-wave1b-savings-truth-browser-smoke.mjs'
+      - 'tools/pf08a-integrated-first-version-browser-smoke.mjs'
+      - '.github/workflows/pf08a-wave1b-savings-truth.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-exact-head:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+      - name: Verify exact checked-out head
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
+      - name: Verify syntax and package loading
+        run: |
+          node --check familypilot-pf08a-savings-truth.js
+          node --check familypilot-pf08a-savings-truth-correction.js
+          node --check familypilot-pf08a-savings-accounts-bridge.js
+          node --check familypilot-pf08a-savings-money-bridge.js
+          node --check familypilot-pf08a-savings-truth-ui.js
+          node --check familypilot-viewport-anchor.js
+          node --check tools/pf08a-wave1b-savings-truth-domain-smoke.cjs
+          node --check tools/pf08a-wave1b-savings-truth-browser-smoke.mjs
+          node --check tools/pf08a-integrated-first-version-browser-smoke.mjs
+          grep -q "familypilot-pf08a-savings-truth.js" familypilot-viewport-anchor.js
+          grep -q "familypilot-pf08a-savings-truth-ui.js" familypilot-viewport-anchor.js
+          grep -q "single_savings_truth:true" tools/pf08a-integrated-first-version-browser-smoke.mjs
+      - name: Verify savings truth domain
+        run: node tools/pf08a-wave1b-savings-truth-domain-smoke.cjs
+      - name: Verify savings truth in browser
+        run: node tools/pf08a-wave1b-savings-truth-browser-smoke.mjs
+      - name: Verify integrated diagnostic
+        run: node tools/pf08a-integrated-first-version-browser-smoke.mjs

@@ -13,28 +13,80 @@
     script.addEventListener('error',()=>{window.__FP_PACKAGE_BOOTSTRAP_ERROR__=`Failed to load ${path}`},{once:true});
     document.head.appendChild(script);
   }
-  function m405DependenciesReady(){return window.__FP_M4_04_READY__===true&&window.__FP_RUNTIME__&&window.FamilyPilotMoneyPlanning&&window.FamilyPilotWalletManagement&&window.FamilyPilotWalletTransfers&&window.FamilyPilotSavingsGoals&&window.FamilyPilotSavingsAccounts&&window.FamilyPilotBudgetDesigner&&window.FamilyPilotPlannedIncome&&window.FamilyPilotObligations&&window.FamilyPilotDebts}
+
+  function m405DependenciesReady(){return window.__FP_M4_04_READY__===true&&window.__FP_SAVINGS_TRUTH_READY__===true&&window.__FP_RUNTIME__&&window.FamilyPilotMoneyPlanning&&window.FamilyPilotWalletManagement&&window.FamilyPilotWalletTransfers&&window.FamilyPilotSavingsGoals&&window.FamilyPilotSavingsAccounts&&window.FamilyPilotBudgetDesigner&&window.FamilyPilotPlannedIncome&&window.FamilyPilotObligations&&window.FamilyPilotDebts}
   function loadM405(attempt=0){
     if(!m405DependenciesReady()){if(attempt<READY_LIMIT)setTimeout(()=>loadM405(attempt+1),25);else window.__FP_M4_05_BOOTSTRAP_ERROR__='M4-05 domain dependencies did not become ready';return}
-    loadScript('familypilot-m4-05-onboarding-income-distribution.js',()=>loadScript('familypilot-m4-05-product-corrections.js',()=>loadScript('familypilot-m4-05-income-activation-correction.js',()=>loadScript('familypilot-m4-05-onboarding-income-distribution-ui.js',()=>loadScript('familypilot-m4-05-ui-corrections.js',()=>loadScript('familypilot-m4-05-current-state-actions.js',()=>{
-      window.__FP_M4_05_PACKAGE_LOADED__=true;
-      loadScript('familypilot-m4-06-what-if.js',()=>loadScript('familypilot-m4-06-what-if-ui.js',()=>loadScript('familypilot-m4-06-goal-deficit-solver.js',()=>loadScript('familypilot-m4-06-goal-deficit-solver-ui.js',()=>loadScript('familypilot-m4-06-scenario-plan-conversion.js',()=>loadScript('familypilot-m4-06-scenario-plan-conversion-ui.js',()=>loadScript('familypilot-m4-06-manual-interest.js',()=>loadScript('familypilot-m4-06-manual-interest-ui.js',()=>loadScript('familypilot-m4-07-learning-mode.js',()=>loadScript('familypilot-m4-07-learning-mode-ui.js',()=>{
-        window.__FP_M4_06_PACKAGE_LOADED__=true;
-        window.__FP_M4_06_SOLVER_PACKAGE_LOADED__=true;
-        window.__FP_M4_06_CONVERSION_PACKAGE_LOADED__=true;
-        window.__FP_M4_06_INTEREST_PACKAGE_LOADED__=true;
-        window.__FP_M4_07_LEARNING_PACKAGE_LOADED__=true;
-      }))))))))));
-    }))))));
+    loadScript('familypilot-m4-05-onboarding-income-distribution.js',()=>
+      loadScript('familypilot-m4-05-product-corrections.js',()=>
+        loadScript('familypilot-m4-05-income-activation-correction.js',()=>
+          loadScript('familypilot-m4-05-onboarding-income-distribution-ui.js',()=>
+            loadScript('familypilot-m4-05-ui-corrections.js',()=>
+              loadScript('familypilot-m4-05-current-state-actions.js',()=>{
+                window.__FP_M4_05_PACKAGE_LOADED__=true;
+                loadScript('familypilot-m4-06-what-if.js',()=>
+                  loadScript('familypilot-m4-06-what-if-ui.js',()=>
+                    loadScript('familypilot-m4-06-goal-deficit-solver.js',()=>
+                      loadScript('familypilot-m4-06-goal-deficit-solver-ui.js',()=>
+                        loadScript('familypilot-m4-06-scenario-plan-conversion.js',()=>
+                          loadScript('familypilot-m4-06-scenario-plan-conversion-ui.js',()=>
+                            loadScript('familypilot-m4-06-manual-interest.js',()=>
+                              loadScript('familypilot-m4-06-manual-interest-ui.js',()=>{
+                                window.__FP_M4_06_PACKAGE_LOADED__=true;
+                                window.__FP_M4_06_SOLVER_PACKAGE_LOADED__=true;
+                                window.__FP_M4_06_CONVERSION_PACKAGE_LOADED__=true;
+                                window.__FP_M4_06_INTEREST_PACKAGE_LOADED__=true;
+                                loadScript('familypilot-m4-07-learning-mode.js',()=>loadScript('familypilot-m4-07-learning-mode-ui.js',()=>{window.__FP_M4_07_PACKAGE_LOADED__=true}));
+                              })
+                            )
+                          )
+                        )
+                      )
+                    )
+                  )
+                );
+              })
+            )
+          )
+        )
+      )
+    );
   }
-  loadScript('familypilot-m4-03-forecast-correction.js',()=>loadScript('familypilot-m4-03-budget-safety-correction.js',()=>loadScript('familypilot-m4-03-budget-designer.js',()=>loadScript('familypilot-m4-03-budget-designer-ui.js',()=>loadScript('familypilot-m4-03-additive-reserve-ui.js',()=>loadScript('familypilot-m4-04-money-planning.js',()=>{
-    window.DAY=window.FamilyPilotMoneyPlanning?.DAY||86400000;
-    loadScript('familypilot-m4-04-money-planning-ui.js',()=>{
-      window.__FP_M4_03_BUDGET_PACKAGE_LOADED__=true;
-      window.__FP_M4_04_PACKAGE_LOADED__=true;
-      loadM405();
-    });
-  }))))));
+
+  function basePlanningReady(){return window.__FP_RUNTIME__&&window.FamilyPilotSavingsAccounts&&window.FamilyPilotSavingsGoals&&window.FamilyPilotWalletManagement}
+  function loadPlanning(attempt=0){
+    if(!basePlanningReady()){if(attempt<READY_LIMIT)setTimeout(()=>loadPlanning(attempt+1),25);else window.__FP_PACKAGE_BOOTSTRAP_ERROR__='Base planning dependencies did not become ready';return}
+    loadScript('familypilot-pf08a-savings-truth.js',()=>
+      loadScript('familypilot-pf08a-savings-truth-correction.js',()=>
+        loadScript('familypilot-pf08a-savings-accounts-bridge.js',()=>
+          loadScript('familypilot-m4-03-forecast-correction.js',()=>
+            loadScript('familypilot-m4-03-budget-safety-correction.js',()=>
+              loadScript('familypilot-m4-03-budget-designer.js',()=>
+                loadScript('familypilot-m4-03-budget-designer-ui.js',()=>
+                  loadScript('familypilot-m4-03-additive-reserve-ui.js',()=>
+                    loadScript('familypilot-m4-04-money-planning.js',()=>{
+                      window.DAY=window.FamilyPilotMoneyPlanning?.DAY||86400000;
+                      loadScript('familypilot-pf08a-savings-money-bridge.js',()=>
+                        loadScript('familypilot-m4-04-money-planning-ui.js',()=>
+                          loadScript('familypilot-pf08a-savings-truth-ui.js',()=>{
+                            window.__FP_M4_03_BUDGET_PACKAGE_LOADED__=true;
+                            window.__FP_M4_04_PACKAGE_LOADED__=true;
+                            window.__FP_SAVINGS_TRUTH_PACKAGE_LOADED__=true;
+                            loadM405();
+                          })
+                        )
+                      );
+                    })
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    );
+  }
+  loadPlanning();
 
   function boot(attempt=0){
     const nav=document.querySelector('.bottom'),dock=document.getElementById('actionDock'),app=document.querySelector('.app');
