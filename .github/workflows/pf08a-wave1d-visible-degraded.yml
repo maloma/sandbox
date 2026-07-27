@@ -5,9 +5,11 @@ on:
     paths:
       - 'index.html'
       - 'familypilot-module-registry.js'
+      - 'familypilot-module-registry-retry-correction.js'
       - 'familypilot-module-registry-ui.js'
       - 'familypilot-module-entry-bridge.js'
       - 'src/familypilot-module-registry.js'
+      - 'src/familypilot-module-registry-retry-correction.js'
       - 'src/familypilot-module-registry-ui.js'
       - 'src/familypilot-module-entry-bridge.js'
       - 'tools/pf08a-wave1d-module-registry-domain-smoke.mjs'
@@ -37,21 +39,24 @@ jobs:
       - name: Check syntax and mirrors
         run: |
           node --check familypilot-module-registry.js
+          node --check familypilot-module-registry-retry-correction.js
           node --check familypilot-module-registry-ui.js
           node --check familypilot-module-entry-bridge.js
           node --check tools/pf08a-wave1d-module-registry-domain-smoke.mjs
           node --check tools/pf08a-wave1d-visible-degraded-browser-smoke.mjs
           node --check tools/pf08a-wave1d-integrated-browser-smoke.mjs
           cmp -s familypilot-module-registry.js src/familypilot-module-registry.js
+          cmp -s familypilot-module-registry-retry-correction.js src/familypilot-module-registry-retry-correction.js
           cmp -s familypilot-module-registry-ui.js src/familypilot-module-registry-ui.js
           cmp -s familypilot-module-entry-bridge.js src/familypilot-module-entry-bridge.js
           python - <<'PY'
           from pathlib import Path
           text=Path('index.html').read_text()
           assert text.count('src="./familypilot-module-registry.js"') == 1
+          assert text.count('src="./familypilot-module-registry-retry-correction.js"') == 1
           assert text.count('src="./familypilot-module-registry-ui.js"') == 1
           assert text.count('src="./familypilot-module-entry-bridge.js"') == 1
-          assert text.index('fpStaticFallback') < text.index('familypilot-module-registry.js') < text.index('familypilot-module-registry-ui.js') < text.index('familypilot-module-entry-bridge.js') < text.index('familypilot-scope.js')
+          assert text.index('fpStaticFallback') < text.index('familypilot-module-registry.js') < text.index('familypilot-module-registry-retry-correction.js') < text.index('familypilot-module-registry-ui.js') < text.index('familypilot-module-entry-bridge.js') < text.index('familypilot-scope.js')
           PY
       - name: Verify registry domain
         run: node tools/pf08a-wave1d-module-registry-domain-smoke.mjs
