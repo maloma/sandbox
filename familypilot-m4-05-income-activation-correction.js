@@ -40,9 +40,7 @@
     return wrapped;
   }
 
-  let current;
-  const descriptor=Object.getOwnPropertyDescriptor(window,'FamilyPilotOnboardingDistribution');
-  if(descriptor?.value)current=wrap(descriptor.value);
+  const existing=window.FamilyPilotOnboardingDistribution;
+  let current=wrap(existing);
   Object.defineProperty(window,'FamilyPilotOnboardingDistribution',{configurable:true,enumerable:true,get(){return current},set(value){current=wrap(value)}});
-  if(descriptor?.value)window.FamilyPilotOnboardingDistribution=descriptor.value;
 })();
