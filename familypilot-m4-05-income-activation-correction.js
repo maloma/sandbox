@@ -27,6 +27,11 @@
       action.walletTransferIds=walletTransfers.filter(item=>item.actionOccurrenceId===action.id).map(item=>item.id).concat(ledger?.walletTransferIds||[]).filter((item,index,list)=>item&&list.indexOf(item)===index);
       action.status=ledger?.status||(actual+.005>=number(action.plannedAmount)?'completed':'partial');
       action.updatedAt=Math.max(number(action.updatedAt),number(ledger?.updatedAt),...linked.map(item=>number(item.createdAt)));
+      if(ledger?.dueAt!=null)action.dueAt=number(ledger.dueAt,action.dueAt);
+      if(ledger?.sourceLocationId)action.sourceLocationId=ledger.sourceLocationId;
+      if(ledger?.destinationLocationId)action.destinationLocationId=ledger.destinationLocationId;
+      if(ledger?.incomeTriggerOperationId)action.incomeTriggerOperationId=ledger.incomeTriggerOperationId;
+      if(ledger?.note!=null)action.note=String(ledger.note);
     }
   }
 
