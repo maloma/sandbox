@@ -1,0 +1,42 @@
+name: PF-08A Wave 1D Index Patch
+
+on:
+  push:
+    branches:
+      - agent/pf08a-wave1d-visible-degraded
+    paths:
+      - '.github/tools/patch-wave1d-index.py'
+      - '.github/workflows/pf08a-wave1d-index-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-index:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/pf08a-wave1d-visible-degraded
+          fetch-depth: 0
+      - name: Patch index deterministically
+        run: python .github/tools/patch-wave1d-index.py
+      - name: Validate patch
+        run: |
+          grep -q 'id="fpStaticFallback"' index.html
+          grep -q 'familypilot-module-registry.js' index.html
+          python - <<'PY'
+          from pathlib import Path
+          text=Path('index.html').read_text()
+          assert text.count('src="./familypilot-module-registry.js"') == 1
+          assert text.count('src="./familypilot-module-registry-ui.js"') == 1
+          assert text.index('fpStaticFallback') < text.index('familypilot-module-registry.js') < text.index('familypilot-scope.js')
+          PY
+      - name: Commit patched index
+        run: |
+          if git diff --quiet -- index.html; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add index.html
+          git commit -m 'Install Wave 1D registry before scope'
+          git push origin HEAD:agent/pf08a-wave1d-visible-degraded
