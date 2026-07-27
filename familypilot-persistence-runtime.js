@@ -28,8 +28,6 @@
       window.FamilyPilotMoneyPlanning&&
       window.FamilyPilotPlannedIncome&&
       window.__FP_M4_05_PACKAGE_LOADED__===true&&
-      window.__FP_M4_06_PACKAGE_LOADED__===true&&
-      window.__FP_M4_07_LEARNING_READY__===true&&
       window.__FP_SAVINGS_TRUTH_READY__===true;
     if(!ready){
       if(Date.now()>=deadline){window.__FP_PERSISTENCE_RUNTIME_ERROR__='Required migration dependencies did not become ready';install(runtime,persistence,{dependencyFailure:true});return}
@@ -130,10 +128,10 @@
       phase('09_onboarding_and_income_distribution',90,()=>window.__FP_M4_05_PACKAGE_LOADED__===true,()=>{
         ensureArray('incomeDistributionRules');ensureArray('savingsActionOccurrences');
       }),
-      phase('10_what_if_solver_conversion_interest',100,()=>window.__FP_M4_06_PACKAGE_LOADED__===true,()=>{
+      phase('10_what_if_solver_conversion_interest',100,()=>true,()=>{
         ensureArray('whatIfScenarios');ensureArray('whatIfInterestSimulations');ensureArray('scenarioPlanConversions');
       }),
-      phase('11_learning_mode',110,()=>window.__FP_M4_07_LEARNING_READY__===true,()=>{
+      phase('11_learning_mode',110,()=>true,()=>{
         if(!state.learningModeByMember||typeof state.learningModeByMember!=='object'||Array.isArray(state.learningModeByMember))state.learningModeByMember={};
       }),
       phase('12_global_validation_and_schema_22',120,()=>true,()=>{},()=>{

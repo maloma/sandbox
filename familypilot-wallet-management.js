@@ -37,6 +37,7 @@
       householdId,
       ownerMemberId:owner,
       allowedMemberIds:allowed,
+      visibleToMemberIds:uniq(raw?.visibleToMemberIds),
       includedInHouseholdCapital:included,
       openingBalance:Number.isFinite(Number(raw?.openingBalance))?Number(raw.openingBalance):0,
       moneyForm,

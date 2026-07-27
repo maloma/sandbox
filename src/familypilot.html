@@ -145,6 +145,7 @@ body.personal-wallet-scope .scope-context{color:color-mix(in srgb,var(--purple) 
 </style>
 </head>
 <body>
+<div id="fpStaticFallback" hidden style="width:min(100% - 24px,520px);margin:16px auto;padding:18px;border:1px solid #f03842;border-radius:18px;background:#fff;color:#10213b;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;box-shadow:0 8px 24px rgba(31,50,82,.12)"><h1 data-fp-fallback-title style="font-size:22px;margin:0">FamilyPilot не удалось запустить полностью</h1><p data-fp-fallback-message style="font-size:13px;line-height:1.5;margin:10px 0 0">Сохранённые данные не удалены из-за этой ошибки. Перезагрузите страницу.</p><p data-fp-fallback-code style="font-size:11px;font-weight:800;margin:10px 0 0"></p><button type="button" onclick="location.reload()" style="margin-top:14px;min-height:44px;border:0;border-radius:14px;background:#10a958;color:#fff;padding:9px 14px;font:inherit;font-weight:900">Перезагрузить FamilyPilot</button></div>
 <div class="app has-action-dock">
 <main>
 <section id="homeScreen" class="screen active">
@@ -214,6 +215,10 @@ body.personal-wallet-scope .scope-context{color:color-mix(in srgb,var(--purple) 
 <div id="obligationPayModal" class="modal"><div class="sheet"><div class="sheet-head"><h2>Оплатить обязательство</h2><button class="close" data-close="obligationPayModal">Закрыть</button></div><div class="field"><label for="obligationPayAmount">Фактическая сумма</label><input id="obligationPayAmount" inputmode="decimal"></div><div class="field"><label for="obligationPayDate">Дата оплаты</label><input id="obligationPayDate" type="date"></div><div class="obligation-help">Будет создана ровно одна операция Расход, связанная с этим платежом.</div><div id="obligationPayError" class="obligation-error"></div><div class="sheet-actions"><button class="btn secondary" data-close="obligationPayModal">Отмена</button><button id="obligationPaySave" class="btn primary">Создать расход</button></div></div></div>
 <div id="obligationPostponeModal" class="modal"><div class="sheet"><div class="sheet-head"><h2>Перенести платёж</h2><button class="close" data-close="obligationPostponeModal">Закрыть</button></div><div class="field"><label for="obligationPostponeDate">Новая дата</label><input id="obligationPostponeDate" type="date"></div><div class="obligation-help">Меняется только этот платёж. Правило следующих платежей не переписывается.</div><div id="obligationPostponeError" class="obligation-error"></div><div class="sheet-actions"><button class="btn secondary" data-close="obligationPostponeModal">Отмена</button><button id="obligationPostponeSave" class="btn primary">Перенести</button></div></div></div>
 <div id="toast" class="toast"></div>
+<script src="./familypilot-module-registry.js" onerror="const f=document.getElementById('fpStaticFallback');if(f)f.hidden=false"></script>
+<script src="./familypilot-module-registry-retry-correction.js" onerror="const f=document.getElementById('fpStaticFallback');if(f)f.hidden=false"></script>
+<script src="./familypilot-module-registry-ui.js" onerror="const f=document.getElementById('fpStaticFallback');if(f)f.hidden=false"></script>
+<script src="./familypilot-module-entry-bridge.js" onerror="const f=document.getElementById('fpStaticFallback');if(f)f.hidden=false"></script>
 <script src="./familypilot-scope.js"></script>
 <script src="./familypilot-analytics-state.js"></script>
 <script src="./familypilot-obligations.js"></script>
