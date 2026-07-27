@@ -18,7 +18,7 @@
     if(!m405DependenciesReady()){if(attempt<READY_LIMIT)setTimeout(()=>loadM405(attempt+1),25);else window.__FP_M4_05_BOOTSTRAP_ERROR__='M4-05 domain dependencies did not become ready';return}
     loadScript('familypilot-m4-05-onboarding-income-distribution.js',()=>loadScript('familypilot-m4-05-product-corrections.js',()=>loadScript('familypilot-m4-05-income-activation-correction.js',()=>loadScript('familypilot-m4-05-onboarding-income-distribution-ui.js',()=>loadScript('familypilot-m4-05-ui-corrections.js',()=>loadScript('familypilot-m4-05-current-state-actions.js',()=>{
       window.__FP_M4_05_PACKAGE_LOADED__=true;
-      loadScript('familypilot-m4-06-what-if.js',()=>loadScript('familypilot-m4-06-what-if-ui.js',()=>{window.__FP_M4_06_PACKAGE_LOADED__=true}));
+      loadScript('familypilot-m4-06-what-if.js',()=>loadScript('familypilot-m4-06-what-if-ui.js',()=>loadScript('familypilot-m4-06-goal-deficit-solver.js',()=>loadScript('familypilot-m4-06-goal-deficit-solver-ui.js',()=>{window.__FP_M4_06_PACKAGE_LOADED__=true;window.__FP_M4_06_SOLVER_PACKAGE_LOADED__=true}))));
     }))))));
   }
   loadScript('familypilot-m4-03-forecast-correction.js',()=>loadScript('familypilot-m4-03-budget-safety-correction.js',()=>loadScript('familypilot-m4-03-budget-designer.js',()=>loadScript('familypilot-m4-03-budget-designer-ui.js',()=>loadScript('familypilot-m4-03-additive-reserve-ui.js',()=>loadScript('familypilot-m4-04-money-planning.js',()=>{
