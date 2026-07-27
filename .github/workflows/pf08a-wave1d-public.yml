@@ -1,0 +1,97 @@
+name: PF-08A Wave 1D Public Verification
+
+on:
+  pull_request:
+    paths:
+      - 'tools/pf08a-wave1d-public-smoke.mjs'
+      - '.github/workflows/pf08a-wave1d-public.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'familypilot-module-registry.js'
+      - 'familypilot-module-registry-retry-correction.js'
+      - 'familypilot-module-registry-ui.js'
+      - 'familypilot-module-entry-bridge.js'
+      - 'familypilot-persistence-runtime.js'
+      - 'familypilot-wallet-management.js'
+      - 'tools/pf08a-wave1d-public-smoke.mjs'
+      - '.github/workflows/pf08a-wave1d-public.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  verify-public:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
+      - name: Verify published Wave 1D package
+        env:
+          PUBLIC_URL: https://maloma.github.io/sandbox/
+          EXPECTED_RUNTIME_PF08A_WAVE1D: 3b36f5a6be7950f215e4e7411664b82d558ce17a
+        run: |
+          node --check tools/pf08a-wave1d-public-smoke.mjs
+          node tools/pf08a-wave1d-public-smoke.mjs | tee /tmp/wave1d-public-result.txt
+          grep -q 'PF08A_WAVE1D_PUBLIC_PASS' /tmp/wave1d-public-result.txt
+          grep -q '"visible_module_failure_surface": true' /tmp/wave1d-public-result.txt
+          grep -q '"financial_isolation": true' /tmp/wave1d-public-result.txt
+          grep -q '"readiness_verdict": "NOT_READY"' /tmp/wave1d-public-result.txt
+      - name: Create and merge public evidence PR
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          VERIFICATION_MAIN: ${{ github.sha }}
+          VERIFIED_RUNTIME: 3b36f5a6be7950f215e4e7411664b82d558ce17a
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          short="${VERIFIED_RUNTIME:0:12}"
+          branch="evidence/pf08a-wave1d-public-${short}"
+          git switch -c "$branch"
+          mkdir -p evidence
+          python - <<'PY'
+          import json, os
+          data={
+            'status':'PUBLIC_PASS',
+            'package':'PF-08A Wave 1D Module Registry and Visible Degraded Mode',
+            'verified_runtime_main':os.environ['VERIFIED_RUNTIME'],
+            'verification_main':os.environ['VERIFICATION_MAIN'],
+            'workflow_run_id':int(os.environ['RUN_ID']),
+            'public_marker':'PF08A_WAVE1D_PUBLIC_PASS',
+            'registry_domain_marker':'PF08A_WAVE1D_MODULE_REGISTRY_DOMAIN_PASS',
+            'integrated_marker':'PF08A_WAVE1D_INTEGRATED_PASS',
+            'visible_degraded_marker':'PF08A_WAVE1D_VISIBLE_DEGRADED_PASS',
+            'visible_module_failure_surface':True,
+            'safe_recovery':True,
+            'financial_isolation':True,
+            'persistence_priority':True,
+            'persistence_recovery':True,
+            'single_savings_truth':True,
+            'readiness_verdict':'NOT_READY',
+            'runtime_exceptions':[],
+          }
+          path='evidence/pf08a-wave1d-public-'+os.environ['VERIFIED_RUNTIME'][:12]+'.json'
+          open(path,'w',encoding='utf-8').write(json.dumps(data,ensure_ascii=False,indent=2)+'\n')
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add evidence
+          git commit -m "Record PF-08A Wave 1D public PASS"
+          git push origin "$branch"
+          pr_url=$(gh pr create --repo "$REPOSITORY" --base main --head "$branch" --title "Verify published PF-08A Wave 1D visible degraded mode" --body "Read-only public verification passed for runtime main ${VERIFIED_RUNTIME}. Records the authoritative registry, visible degraded surfaces, safe recovery, financial isolation, persistence priority, no runtime exceptions, and the remaining NOT_READY verdict pending integrated P0 re-evaluation.")
+          gh pr merge "$pr_url" --squash --match-head-commit "$(git rev-parse HEAD)"
