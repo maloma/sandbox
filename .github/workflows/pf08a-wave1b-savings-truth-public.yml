@@ -1,0 +1,36 @@
+name: PF-08A Wave 1B Savings Truth Public Verification
+
+on:
+  pull_request:
+    paths:
+      - 'tools/pf08a-wave1b-savings-truth-public-smoke.mjs'
+      - '.github/workflows/pf08a-wave1b-savings-truth-public.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-public-package:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+      - name: Verify exact checked-out head
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
+      - name: Verify public Wave 1B package
+        env:
+          PUBLIC_URL: https://maloma.github.io/sandbox/
+          EXPECTED_MAIN_PF08A_WAVE1B: 860c16ae197aacb80c74fcb671c5745fefd809bb
+        run: |
+          node --check tools/pf08a-wave1b-savings-truth-public-smoke.mjs
+          node tools/pf08a-wave1b-savings-truth-public-smoke.mjs
