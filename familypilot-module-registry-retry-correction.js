@@ -6,6 +6,8 @@
   const registry=window.FamilyPilotModuleRegistry;
   if(!registry)return;
 
+  const terminalUnavailable=new Map();
+
   function clearGeneric(moduleId){
     const value=String(window.__FP_PACKAGE_BOOTSTRAP_ERROR__||'');
     if(value&&registry.moduleForPath(value)===moduleId)window.__FP_PACKAGE_BOOTSTRAP_ERROR__=null;
@@ -33,6 +35,29 @@
     }
   }
 
-  window.addEventListener('familypilot:module-state',event=>reconcileCompatibilityErrors(event.detail));
+  function preserveTerminalUnavailable(snapshot=registry.snapshot()){
+    for(const record of snapshot.catalogue||[]){
+      const terminal=record.state==='unavailable'&&record.retryClass==='never'&&!record.blockedByModuleId;
+      if(terminal){
+        terminalUnavailable.set(record.moduleId,{
+          reasonCode:record.reasonCode,
+          failureStage:record.failureStage,
+          diagnosticId:record.diagnosticId,
+          installStarted:record.installStarted,
+          rootFailureModuleId:record.rootFailureModuleId,
+          rootDiagnosticId:record.rootDiagnosticId,
+        });
+        continue;
+      }
+      const held=terminalUnavailable.get(record.moduleId);
+      if(held&&record.state==='ready')registry.markDegraded(record.moduleId,{...held,retryClass:'never',unavailable:true});
+    }
+  }
+
+  window.addEventListener('familypilot:module-state',event=>{
+    reconcileCompatibilityErrors(event.detail);
+    preserveTerminalUnavailable(event.detail);
+  });
   reconcileCompatibilityErrors();
+  preserveTerminalUnavailable();
 })();
