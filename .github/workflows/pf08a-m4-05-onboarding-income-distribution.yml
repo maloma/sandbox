@@ -10,6 +10,7 @@ on:
       - 'familypilot-m4-05-ui-corrections.js'
       - 'familypilot-viewport-anchor.js'
       - 'tools/pf08a-m4-05-onboarding-income-distribution-browser-smoke.mjs'
+      - 'tools/pf08a-m4-05-onboarding-income-distribution-browser-smoke-v2.mjs'
       - '.github/workflows/pf08a-m4-05-onboarding-income-distribution.yml'
 
 permissions:
@@ -42,5 +43,6 @@ jobs:
           node --check familypilot-m4-05-ui-corrections.js
           node --check familypilot-viewport-anchor.js
           node --check tools/pf08a-m4-05-onboarding-income-distribution-browser-smoke.mjs
+          node --check tools/pf08a-m4-05-onboarding-income-distribution-browser-smoke-v2.mjs
       - name: Verify M4-05 behavior
-        run: node tools/pf08a-m4-05-onboarding-income-distribution-browser-smoke.mjs
+        run: node tools/pf08a-m4-05-onboarding-income-distribution-browser-smoke-v2.mjs
