@@ -8,14 +8,23 @@
     const existing=[...document.scripts].find(script=>script.src&&script.src.endsWith(`/${path}`));
     if(existing){if(existing.dataset.loaded==='true')ready?.();else existing.addEventListener('load',()=>ready?.(),{once:true});return}
     const script=document.createElement('script');
-    script.src=`./${path}`;script.async=false;script.dataset.familyPilotPackage='m4-03-budget-designer';
+    script.src=`./${path}`;script.async=false;script.dataset.familyPilotPackage='m4-05-onboarding-income-distribution';
     script.addEventListener('load',()=>{script.dataset.loaded='true';ready?.()},{once:true});
-    script.addEventListener('error',()=>{window.__FP_M4_03_BUDGET_BOOTSTRAP_ERROR__=`Failed to load ${path}`},{once:true});
+    script.addEventListener('error',()=>{window.__FP_M4_05_BOOTSTRAP_ERROR__=`Failed to load ${path}`},{once:true});
     document.head.appendChild(script);
+  }
+  function m405DependenciesReady(){return window.__FP_M4_04_READY__===true&&window.__FP_RUNTIME__&&window.FamilyPilotMoneyPlanning&&window.FamilyPilotWalletManagement&&window.FamilyPilotWalletTransfers&&window.FamilyPilotSavingsGoals&&window.FamilyPilotSavingsAccounts&&window.FamilyPilotBudgetDesigner&&window.FamilyPilotPlannedIncome&&window.FamilyPilotObligations&&window.FamilyPilotDebts}
+  function loadM405(attempt=0){
+    if(!m405DependenciesReady()){if(attempt<READY_LIMIT)setTimeout(()=>loadM405(attempt+1),25);else window.__FP_M4_05_BOOTSTRAP_ERROR__='M4-05 domain dependencies did not become ready';return}
+    loadScript('familypilot-m4-05-onboarding-income-distribution.js',()=>loadScript('familypilot-m4-05-product-corrections.js',()=>loadScript('familypilot-m4-05-income-activation-correction.js',()=>loadScript('familypilot-m4-05-onboarding-income-distribution-ui.js',()=>loadScript('familypilot-m4-05-ui-corrections.js',()=>loadScript('familypilot-m4-05-current-state-actions.js',()=>{window.__FP_M4_05_PACKAGE_LOADED__=true}))))));
   }
   loadScript('familypilot-m4-03-forecast-correction.js',()=>loadScript('familypilot-m4-03-budget-safety-correction.js',()=>loadScript('familypilot-m4-03-budget-designer.js',()=>loadScript('familypilot-m4-03-budget-designer-ui.js',()=>loadScript('familypilot-m4-03-additive-reserve-ui.js',()=>loadScript('familypilot-m4-04-money-planning.js',()=>{
     window.DAY=window.FamilyPilotMoneyPlanning?.DAY||86400000;
-    loadScript('familypilot-m4-04-money-planning-ui.js',()=>{window.__FP_M4_03_BUDGET_PACKAGE_LOADED__=true;window.__FP_M4_04_PACKAGE_LOADED__=true});
+    loadScript('familypilot-m4-04-money-planning-ui.js',()=>{
+      window.__FP_M4_03_BUDGET_PACKAGE_LOADED__=true;
+      window.__FP_M4_04_PACKAGE_LOADED__=true;
+      loadM405();
+    });
   }))))));
 
   function boot(attempt=0){
