@@ -26,7 +26,8 @@ const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null
  await load(app,'/?test=1&persistenceTest=${token}-root&moduleFailure=what_if&moduleFailureStage=script_load&wave1d=1','injected app');
  await progress('injected app readiness');
  const w=app.contentWindow;
- await until(()=>{const registry=w.FamilyPilotModuleRegistry,r=registry?.get?.('what_if'),learning=registry?.get?.('learning');return w.__FP_MODULE_REGISTRY_UI_READY__&&w.__FP_MODULE_ENTRY_BRIDGE_READY__&&r?.state==='degraded'&&learning?.state==='degraded'&&learning?.rootDiagnosticId===r?.rootDiagnosticId&&learning?.blockedByModuleId==='what_if'&&w.__FP_TEST__?.moduleRegistry},'script failure and dependent propagation');
+ let baselineFingerprint='',baselineStableCount=0;
+ await until(()=>{const registry=w.FamilyPilotModuleRegistry,r=registry?.get?.('what_if'),learning=registry?.get?.('learning'),ui=w.__FP_TEST__?.moduleRegistry,catalogue=registry?.snapshot?.().catalogue||[];const ready=w.__FP_MODULE_REGISTRY_UI_READY__&&w.__FP_MODULE_ENTRY_BRIDGE_READY__&&w.__FP_PERSISTENCE_READY__===true&&r?.state==='degraded'&&learning?.state==='degraded'&&learning?.rootDiagnosticId===r?.rootDiagnosticId&&learning?.blockedByModuleId==='what_if'&&ui&&catalogue.every(item=>item.moduleId==='what_if'?item.state==='degraded':item.moduleId==='learning'?item.state==='degraded':item.state==='ready');if(!ready)return false;const current=ui.financialFingerprint();if(current===baselineFingerprint)baselineStableCount+=1;else{baselineFingerprint=current;baselineStableCount=0}return baselineStableCount>=2},'stable script failure and dependent propagation',120000);
  const registry=w.FamilyPilotModuleRegistry,ui=w.__FP_TEST__.moduleRegistry,before=ui.financialFingerprint(),rootRecord=registry.get('what_if'),learning=registry.get('learning');
  const failedEntry=()=>[...w.document.querySelectorAll('#m406PlanEntry,[data-m406-open],[data-fp-fallback-entry="what_if"]')].find(node=>!node.hidden&&getComputedStyle(node).display!=='none');
  await until(()=>failedEntry(),'failed module entry visibility');
@@ -56,7 +57,7 @@ const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null
  const attempt1=registry.retry('what_if'),attempt2=registry.retry('what_if');
  assert(attempt1&&attempt1===attempt2,'Repeated retry did not collapse to one attempt');
  await progress('safe retry recovery');
- await until(()=>registry.get('what_if')?.state==='ready'&&registry.get('learning')?.state==='ready'&&w.__FP_M4_07_LEARNING_READY__===true,'safe retry recovery',120000);
+ await until(()=>{const snapshot=registry.snapshot();return registry.get('what_if')?.state==='ready'&&registry.get('learning')?.state==='ready'&&w.__FP_M4_07_LEARNING_READY__===true&&snapshot.catalogue.every(item=>item.state==='ready')},'safe retry recovery',120000);
  ui.render();await wait(150);
  assert(!ui.summaryText().includes('Некоторые разделы временно недоступны'),'Global degraded summary remained after recovery');
  assert(w.document.querySelectorAll('#m406PlanEntry').length===1,'Duplicate What If entry after retry');
