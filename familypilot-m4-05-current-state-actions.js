@@ -39,8 +39,15 @@
       const current=state();current.m405NotifiedIncomeBatchIds=Array.isArray(current.m405NotifiedIncomeBatchIds)?current.m405NotifiedIncomeBatchIds:[];
       if(!current.m405NotifiedIncomeBatchIds.includes(latest.id)){current.m405NotifiedIncomeBatchIds.push(latest.id);runtime.save();toast('Доход сохранён. Проверьте распределение в накоплениях.')}
     }
+    function recordExecution(result){
+      const current=state(),item=result?.action;if(!item)return;
+      current.m405ActionExecutionLedger=Array.isArray(current.m405ActionExecutionLedger)?current.m405ActionExecutionLedger:[];
+      let entry=current.m405ActionExecutionLedger.find(value=>value.actionId===item.id);
+      const value={actionId:item.id,actualAmount:Number(item.actualAmount)||0,status:item.status,savingsTransferIds:[...(item.savingsTransferIds||[])],walletTransferIds:[...(item.walletTransferIds||[])],updatedAt:Number(item.updatedAt)||now(),dueAt:Number(item.dueAt)||null,sourceLocationId:item.sourceLocationId||'',destinationLocationId:item.destinationLocationId||'',incomeTriggerOperationId:item.incomeTriggerOperationId||'',note:String(item.note||'')};
+      if(entry)Object.assign(entry,value);else current.m405ActionExecutionLedger.push(value);
+    }
     function refreshCurrent(){distribution().normalizeState(state(),deps(),now());runtime.save();renderDistribution();renderHomePrompt()}
-    function complete(id,input){const current=state(),result=api.completeAction(current,id,input,current.currentMemberId,deps(),now());if(result.ok)refreshCurrent();return result}
+    function complete(id,input){const current=state(),result=api.completeAction(current,id,input,current.currentMemberId,deps(),now());if(result.ok){recordExecution(result);refreshCurrent()}return result}
     function openAction(id,outcome){const item=action(id);if(!item)return;activeActionId=id;activeOutcome=outcome;
       if(outcome==='skipped'){if(confirm('Отметить перевод как не выполненный?')){const result=complete(id,{outcome:'skipped'});toast(result.ok?'Отмечено как не выполнено':result.error)}return}
       if(outcome==='postponed'){$('m405CurrentPostponeDate').value=new Date(Math.max(now(),item.dueAt)+86400000).toISOString().slice(0,10);$('m405CurrentPostponeError').textContent='';open('m405CurrentPostponeModal');return}
