@@ -28,7 +28,7 @@
     if(rule.mode!==api.RESERVE_FIXED)return;
     const action=(state.savingsActionOccurrences||[]).find(item=>item.goalId===rule.goalId&&item.sourceId===`monthly:${rule.goalId}:${monthKey(at)}`&&!['completed','skipped'].includes(item.status));
     if(!action||action.status==='postponed')return;
-    const excluded=new Set(snapshot.excludedOperationIds||[]),eligible=(state.operations||[]).filter(item=>item?.status==='active'&&item.kind==='income'&&number(item.occurredAt)>=monthStart(at)&&!excluded.has(item.id)).sort((a,b)=>a.occurredAt-b.occurredAt);
+    const excluded=new Set(snapshot.excludedOperationIds||[]),eligible=(state.operations||[]).filter(item=>item?.status==='active'&&item.kind==='income'&&number(item.occurredAt)>=monthStart(at)&&number(item.createdAt,item.occurredAt)>=number(rule.createdAt)&&!excluded.has(item.id)).sort((a,b)=>a.occurredAt-b.occurredAt);
     if(!eligible.length){
       if(!action.actualAmount){action.status='inactive';action.note='waiting-for-actual-income';action.incomeTriggerOperationId=null}
       return;
