@@ -21,6 +21,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms)),assert=(v,m)=>{if(!v)throw Error
 const progress=phase=>fetch('/__wave1d_progress',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({phase})}).catch(()=>{});
 const load=(frame,src,label,ms=120000)=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error(label+' load timed out')),ms);frame.addEventListener('load',()=>{clearTimeout(timer);progress(label+' loaded');resolve()},{once:true});progress(label+' start');frame.src=src});
 const until=async(check,label,ms=110000)=>{const end=Date.now()+ms;let last;while(Date.now()<end){try{last=check();if(last)return last}catch(e){last=String(e)}await wait(100)}throw Error(label+' timed out: '+JSON.stringify(last))};
+const fingerprintDiff=(left,right)=>{const before=JSON.parse(left),after=JSON.parse(right),keys=[...new Set([...Object.keys(before),...Object.keys(after)])];return keys.filter(key=>JSON.stringify(before[key])!==JSON.stringify(after[key])).map(key=>({key,before:before[key],after:after[key]}))};
 const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null,2);document.body.dataset.status=status;try{await fetch('/__wave1d_result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({status,payload})})}catch{}};
 (async()=>{try{
  await load(app,'/?test=1&persistenceTest=${token}-root&moduleFailure=what_if&moduleFailureStage=script_load&wave1d=1','injected app');
@@ -64,7 +65,8 @@ const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null
  assert(w.document.querySelectorAll('#whatIfScreen').length===1,'Duplicate What If screen after retry');
  assert(w.document.querySelectorAll('meta[content="m4-06-what-if-scenario-foundation-v1"]').length===1,'Duplicate What If package marker after retry');
  assert(w.document.querySelectorAll('[data-fp-fallback-entry="what_if"]').length===0,'Fallback entry remained after recovery');
- assert(ui.financialFingerprint()===before,'Recovery changed financial state');
+ const afterRecovery=ui.financialFingerprint();
+ if(afterRecovery!==before)throw Error('Recovery changed financial state: '+JSON.stringify(fingerprintDiff(before,afterRecovery)));
  const errors=[w.__FP_PACKAGE_BOOTSTRAP_ERROR__,w.__FP_M4_05_BOOTSTRAP_ERROR__,w.__FP_M4_06_UI_ERROR__,w.__FP_M4_07_LEARNING_UI_ERROR__].filter(Boolean);
  assert(errors.length===0,'Runtime bootstrap errors after recovery: '+errors.join(' | '));
 
