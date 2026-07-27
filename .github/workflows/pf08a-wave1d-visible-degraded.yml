@@ -36,9 +36,10 @@ jobs:
           git fetch -q --depth=1 origin "${HEAD_SHA}"
           git checkout -q --detach FETCH_HEAD
           test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
+      - name: Verify normal integrated load
+        run: node tools/pf08a-wave1d-integrated-browser-smoke.mjs
       - name: Check syntax and mirrors
         run: |
-          set -euxo pipefail
           node --check familypilot-module-registry.js
           node --check familypilot-module-registry-retry-correction.js
           node --check familypilot-module-registry-ui.js
@@ -53,24 +54,15 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           text=Path('index.html').read_text()
-          names=[
-            'familypilot-module-registry.js',
-            'familypilot-module-registry-retry-correction.js',
-            'familypilot-module-registry-ui.js',
-            'familypilot-module-entry-bridge.js',
-            'familypilot-scope.js',
-          ]
+          names=['familypilot-module-registry.js','familypilot-module-registry-retry-correction.js','familypilot-module-registry-ui.js','familypilot-module-entry-bridge.js','familypilot-scope.js']
           counts={name:text.count(f'src="./{name}"') for name in names[:-1]}
           positions={name:text.index(name) for name in names}
           fallback=text.index('fpStaticFallback')
-          print({'counts':counts,'positions':positions,'fallback':fallback})
           assert all(value==1 for value in counts.values()), counts
           assert fallback < positions['familypilot-module-registry.js'] < positions['familypilot-module-registry-retry-correction.js'] < positions['familypilot-module-registry-ui.js'] < positions['familypilot-module-entry-bridge.js'] < positions['familypilot-scope.js'], positions
           PY
       - name: Verify registry domain
         run: node tools/pf08a-wave1d-module-registry-domain-smoke.mjs
-      - name: Verify normal integrated load
-        run: node tools/pf08a-wave1d-integrated-browser-smoke.mjs
       - name: Verify visible degraded and recovery behavior
         run: node tools/pf08a-wave1d-visible-degraded-browser-smoke.mjs
       - name: Run Wave 1C persistence regressions
