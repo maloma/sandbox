@@ -9,7 +9,7 @@
   const finite=(value,fallback=0)=>Number.isFinite(Number(value))?Number(value):fallback;
   const makeId=(prefix='id',at=Date.now())=>`${prefix}-${Number(at).toString(36)}-${Math.random().toString(36).slice(2,9)}`;
   const deps=extra=>({wallets:window.FamilyPilotWalletManagement,transfers:window.FamilyPilotWalletTransfers,savings:window.FamilyPilotSavingsGoals,accounts,scope:runtime.scopeApi,...extra});
-  const stateKeys=['purposeAllocations','purposeAllocationEvents','savingsLegacyReconciliationIssues','savingsPurposeMigrationResults','savingsPurposeMigrationSnapshots','savingsTransfers','walletTransfers','savingsActionOccurrences','purposeLocationAssignments'];
+  const stateKeys=['purposeAllocations','purposeAllocationEvents','savingsLegacyReconciliationIssues','savingsPurposeMigrationResults','savingsPurposeMigrationSnapshots','savingsTransfers','transfers','walletMovements','operations','savingsActionOccurrences','purposeLocationAssignments'];
   function snapshot(state){const data={};for(const key of stateKeys)data[key]=clone(state[key]||[]);data.goalCaches=(state.savingsGoals||[]).map(goal=>({id:goal.id,savedAmount:goal.savedAmount}));return data}
   function restore(state,data){for(const key of stateKeys)state[key]=data[key];for(const cache of data.goalCaches){const goal=(state.savingsGoals||[]).find(item=>item.id===cache.id);if(goal)goal.savedAmount=cache.savedAmount}}
   function normalizeState(state,inputDeps={},at=Date.now()){
