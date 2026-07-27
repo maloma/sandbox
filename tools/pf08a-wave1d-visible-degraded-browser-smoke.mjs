@@ -84,7 +84,7 @@ const until=async(check,label,ms=110000)=>{const end=Date.now()+ms;let last;whil
  assert(registry.snapshot().events.length<=50,'Registry event history exceeded bound');
  try{w.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.();o.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.();t.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.()}catch{}
  out.textContent=JSON.stringify({status:'PASS',marker:'${marker}',visible_global_card:true,visible_local_card:true,failed_entry_preserved:true,precise_data_wording:true,diagnostic_id:true,root_cause_grouping:true,unaffected_routes:true,one_active_attempt:true,safe_retry:true,no_duplicate_ui:true,financial_isolation:true,persistence_priority:true,injection_isolated:true,partial_install_reload_required:true,safe_events:true},null,2);document.body.dataset.status='PASS';
-}catch(error){out.textContent=String(error.stack||error);document.body.dataset.status='FAIL'}})();
+}catch(error){out.textContent=String(error.stack||error);document.body.dataset.status='FAIL'}})();})();
 </script></body></html>`;
 writeFileSync(path,harness,'utf8');
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8'};
