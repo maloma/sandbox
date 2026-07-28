@@ -1,0 +1,176 @@
+import {createServer} from 'node:http';
+import {existsSync,mkdtempSync,readFileSync,rmSync,unlinkSync,writeFileSync} from 'node:fs';
+import {extname,join,normalize,resolve,sep} from 'node:path';
+import {tmpdir} from 'node:os';
+import {spawn} from 'node:child_process';
+
+const root=process.cwd();
+const name='.pf08a-wave1d-recovery-reload-harness.html';
+const path=join(root,name);
+const profile=mkdtempSync(join(tmpdir(),'pf08a-wave1d-recovery-reload-'));
+const marker='PF08A_WAVE1D_RECOVERY_RELOAD_PASS';
+const token='wave1d-recovery-reload-'+Date.now();
+const wait=ms=>new Promise(resolveWait=>setTimeout(resolveWait,ms));
+let reportResult;
+const reportPromise=new Promise(resolveReport=>{reportResult=resolveReport});
+let lastProgress='not_started';
+
+const browserInstrumentation=`<script>(()=>{
+  const events=[];
+  const registrations=[];
+  const targets=new WeakMap();
+  let targetSequence=0;
+  const watchedSources=['familypilot-module-registry-retry-correction.js','familypilot-module-registry-ui.js','familypilot-module-entry-bridge.js'];
+  const describe=value=>{try{return String(value?.stack||value?.message||value||'unknown')}catch{return 'unprintable'}};
+  const targetLabel=target=>{
+    if(target===window)return'window';
+    if(target===document)return'document';
+    if(target?.id)return'#'+target.id;
+    if(!targets.has(target))targets.set(target,'target-'+(++targetSequence));
+    return targets.get(target);
+  };
+  const callsite=()=>{
+    const stack=String(new Error().stack||'').split('\n');
+    return stack.map(line=>line.trim()).find(line=>watchedSources.some(source=>line.includes(source)))||'';
+  };
+  const nativeAdd=EventTarget.prototype.addEventListener;
+  EventTarget.prototype.addEventListener=function(type,listener,options){
+    const source=callsite();
+    if(source){
+      const capture=typeof options==='boolean'?options:Boolean(options?.capture);
+      registrations.push({target:targetLabel(this),type:String(type),capture,source});
+    }
+    return nativeAdd.call(this,type,listener,options);
+  };
+  const duplicateRegistrations=()=>{
+    const counts=new Map();
+    for(const item of registrations){
+      const key=[item.target,item.type,item.capture,item.source].join('|');
+      counts.set(key,(counts.get(key)||0)+1);
+    }
+    return [...counts.entries()].filter(([,count])=>count>1).map(([key,count])=>({key,count}));
+  };
+  const sourceCounts=()=>Object.fromEntries(watchedSources.map(source=>[source,registrations.filter(item=>item.source.includes(source)).length]));
+  Object.defineProperty(window,'__FP_BROWSER_EVENTS__',{value:events,configurable:false});
+  Object.defineProperty(window,'__FP_LISTENER_SENTINEL__',{value:Object.freeze({registrations:()=>registrations.map(item=>({...item})),duplicates:duplicateRegistrations,sourceCounts}),configurable:false});
+  window.addEventListener('error',event=>events.push({type:'error',message:String(event.message||'unknown'),source:String(event.filename||''),line:Number(event.lineno||0),column:Number(event.colno||0),detail:describe(event.error)}));
+  window.addEventListener('unhandledrejection',event=>events.push({type:'unhandledrejection',detail:describe(event.reason)}));
+})();</script>`;
+const instrumentIndex=body=>{const text=body.toString('utf8'),match=text.match(/<head[^>]*>/i);return match?text.replace(match[0],match[0]+browserInstrumentation):browserInstrumentation+text};
+
+const harness=`<!doctype html><html lang="ru"><body data-status="PENDING"><iframe id="app" style="width:390px;height:844px;border:0"></iframe><pre id="result">PENDING</pre><script>(()=>{
+const frame=document.getElementById('app'),out=document.getElementById('result');
+const wait=ms=>new Promise(r=>setTimeout(r,ms)),assert=(value,message)=>{if(!value)throw Error(message)};
+const progress=phase=>fetch('/__wave1d_progress',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({phase})}).catch(()=>{});
+const load=(src,label,ms=120000)=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error(label+' load timed out')),ms);frame.addEventListener('load',()=>{clearTimeout(timer);progress(label+' loaded');resolve()},{once:true});progress(label+' start');frame.src=src});
+const nextLoad=(label,ms=120000)=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error(label+' load timed out')),ms);frame.addEventListener('load',()=>{clearTimeout(timer);progress(label+' loaded');resolve()},{once:true})});
+const until=async(check,label,ms=120000)=>{const end=Date.now()+ms;let last;while(Date.now()<end){try{last=check();if(last)return last}catch(error){last=String(error)}await wait(100)}throw Error(label+' timed out: '+JSON.stringify(last))};
+const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null,2);document.body.dataset.status=status;try{await fetch('/__wave1d_result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({status,payload})})}catch{}};
+const stateOf=w=>{try{return w.__FP_TEST__?.getState?.()||w.__FP_RUNTIME__?.state||{}}catch{return w.__FP_RUNTIME__?.state||{}}};
+const duplicateValues=values=>{const counts=new Map();for(const value of values)counts.set(value,(counts.get(value)||0)+1);return[...counts.entries()].filter(([,count])=>count>1).map(([value,count])=>({value,count}))};
+const structuralSnapshot=w=>{
+  const scriptPaths=[...w.document.scripts].map(node=>{try{return new URL(node.src,w.location.href).pathname}catch{return''}}).filter(Boolean);
+  const screenIds=[...w.document.querySelectorAll('.screen[id]')].map(node=>node.id).filter(Boolean);
+  const state=stateOf(w),operations=Array.isArray(state.operations)?state.operations:[];
+  return{
+    scriptPaths,
+    duplicateScripts:duplicateValues(scriptPaths),
+    duplicateScreenIds:duplicateValues(screenIds),
+    operationCount:operations.length,
+    operationIds:operations.map(item=>String(item?.id||'')),
+    duplicateOperationIds:duplicateValues(operations.map(item=>String(item?.id||'')).filter(Boolean)),
+    fallbackEntries:w.document.querySelectorAll('[data-fp-fallback-entry]').length,
+    staticFallbackHidden:w.document.getElementById('fpStaticFallback')?.hidden===true,
+  };
+};
+(async()=>{try{
+  await load('/?test=1&persistenceTest=${token}&moduleFailure=what_if&moduleFailureStage=readiness_timeout&wave1d=1','readiness-timeout app');
+  let w=frame.contentWindow;
+  await until(()=>{const registry=w.FamilyPilotModuleRegistry,record=registry?.get?.('what_if');return w.__FP_MODULE_REGISTRY_UI_READY__&&w.__FP_MODULE_ENTRY_BRIDGE_READY__&&w.__FP_PERSISTENCE_READY__===true&&record?.state==='degraded'&&record?.failureStage==='readiness_timeout'&&record?.retryClass==='reload_required'&&w.__FP_TEST__?.moduleRegistry},'readiness-timeout degraded state');
+  const registryBefore=w.FamilyPilotModuleRegistry,uiBefore=w.__FP_TEST__.moduleRegistry;
+  const activeWalletId=stateOf(w).activeWalletId||stateOf(w).wallets?.[0]?.id;
+  assert(activeWalletId,'No active wallet available for reload fixture');
+  const fixtureId=w.__FP_TEST__?.walletManagement?.seedOperation?.(activeWalletId,'income',17);
+  assert(fixtureId,'Financial reload fixture was not created');
+  await until(()=>stateOf(w).operations?.some(item=>item.id===fixtureId),'financial fixture persistence');
+  const fingerprintBefore=uiBefore.financialFingerprint();
+  const structureBefore=structuralSnapshot(w);
+  const browserEventsBefore=[...(w.__FP_BROWSER_EVENTS__||[])];
+  const listenerBefore=w.__FP_LISTENER_SENTINEL__;
+  assert(listenerBefore,'Listener sentinel missing before reload');
+  assert(listenerBefore.duplicates().length===0,'Duplicate production handlers before reload: '+JSON.stringify(listenerBefore.duplicates()));
+  const sourceCountsBefore=listenerBefore.sourceCounts();
+  assert(sourceCountsBefore['familypilot-module-registry-retry-correction.js']>0,'Correction production listeners were not observed');
+  assert(sourceCountsBefore['familypilot-module-registry-ui.js']>0,'Registry UI production listeners were not observed');
+  assert(browserEventsBefore.length===0,'Browser runtime events before reload: '+JSON.stringify(browserEventsBefore));
+  assert(structureBefore.duplicateScripts.length===0,'Duplicate scripts before reload: '+JSON.stringify(structureBefore.duplicateScripts));
+  assert(structureBefore.duplicateScreenIds.length===0,'Duplicate screens before reload: '+JSON.stringify(structureBefore.duplicateScreenIds));
+  assert(structureBefore.duplicateOperationIds.length===0,'Duplicate operations before reload: '+JSON.stringify(structureBefore.duplicateOperationIds));
+
+  registryBefore.test.clearFailure();
+  const reloaded=nextLoad('production recovery reload');
+  const attemptId=registryBefore.retry('what_if');
+  assert(attemptId,'Reload-required recovery did not start');
+  await reloaded;
+  w=frame.contentWindow;
+  await until(()=>{const registry=w.FamilyPilotModuleRegistry,snapshot=registry?.snapshot?.(),status=w.FamilyPilotPersistence?.currentStatus?.()?.status||'';return w.__FP_MODULE_REGISTRY_UI_READY__&&w.__FP_MODULE_ENTRY_BRIDGE_READY__&&w.__FP_PERSISTENCE_READY__===true&&snapshot?.catalogue?.length===11&&snapshot.catalogue.every(item=>item.state==='ready')&&(status==='healthy'||status.startsWith('recovered_'))},'healthy state after real reload');
+  const registryAfter=w.FamilyPilotModuleRegistry,uiAfter=w.__FP_TEST__.moduleRegistry,snapshotAfter=registryAfter.snapshot();
+  const fingerprintAfter=uiAfter.financialFingerprint();
+  const structureAfter=structuralSnapshot(w);
+  const browserEventsAfter=[...(w.__FP_BROWSER_EVENTS__||[])];
+  const listenerAfter=w.__FP_LISTENER_SENTINEL__;
+  assert(fingerprintAfter===fingerprintBefore,'Financial fingerprint changed across recovery reload');
+  assert(stateOf(w).operations?.some(item=>item.id===fixtureId),'Persisted fixture missing after reload');
+  assert(structureAfter.operationCount===structureBefore.operationCount,'Operation count changed across recovery reload');
+  assert(structureAfter.duplicateOperationIds.length===0,'Duplicate operations after reload: '+JSON.stringify(structureAfter.duplicateOperationIds));
+  assert(structureAfter.duplicateScripts.length===0,'Duplicate scripts after reload: '+JSON.stringify(structureAfter.duplicateScripts));
+  assert(structureAfter.duplicateScreenIds.length===0,'Duplicate screens after reload: '+JSON.stringify(structureAfter.duplicateScreenIds));
+  assert(structureAfter.fallbackEntries===0,'Fallback entries remained after healthy reload');
+  assert(structureAfter.staticFallbackHidden,'Static fallback visible after healthy reload');
+  assert(snapshotAfter.catalogue.length===11&&new Set(snapshotAfter.catalogue.map(item=>item.moduleId)).size===11,'Duplicate registry modules after reload');
+  assert(listenerAfter,'Listener sentinel missing after reload');
+  assert(listenerAfter.duplicates().length===0,'Duplicate production handlers after reload: '+JSON.stringify(listenerAfter.duplicates()));
+  const sourceCountsAfter=listenerAfter.sourceCounts();
+  assert(sourceCountsAfter['familypilot-module-registry-retry-correction.js']>0,'Correction production listeners missing after reload');
+  assert(sourceCountsAfter['familypilot-module-registry-ui.js']>0,'Registry UI production listeners missing after reload');
+  assert(browserEventsAfter.length===0,'Browser runtime events after reload: '+JSON.stringify(browserEventsAfter));
+  try{w.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.()}catch{}
+  await report('PASS',{status:'PASS',marker:'${marker}',scenario_g:'recovery_reload_healthy',real_reload:true,all_modules_ready:true,persistence_healthy:true,no_duplicate_scripts:true,no_duplicate_screens:true,no_duplicate_operations:true,no_duplicate_handlers:true,no_duplicate_fallback_entries:true,financial_fingerprint_unchanged:true,browser_runtime_events:[],listener_sources:sourceCountsAfter});
+}catch(error){await report('FAIL',{status:'FAIL',error:String(error.stack||error)})}})();
+})();</script></body></html>`;
+writeFileSync(path,harness,'utf8');
+const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8'};
+const server=createServer((req,res)=>{
+  try{
+    const url=new URL(req.url,'http://127.0.0.1');
+    if((url.pathname==='/__wave1d_result'||url.pathname==='/__wave1d_progress')&&req.method==='POST'){
+      let body='';req.setEncoding('utf8');req.on('data',chunk=>body+=chunk);req.on('end',()=>{try{const parsed=JSON.parse(body);if(url.pathname==='/__wave1d_progress')lastProgress=String(parsed.phase||'unknown');else reportResult(parsed)}catch(error){if(url.pathname==='/__wave1d_result')reportResult({status:'FAIL',payload:{error:String(error)}})}res.writeHead(204);res.end()});return;
+    }
+    const raw=url.pathname==='/'?'index.html':url.pathname.replace(/^\//,''),target=normalize(resolve(root,raw));
+    if(target!==root&&!target.startsWith(root+sep))throw Error('forbidden');
+    res.writeHead(200,{'content-type':mime[extname(target)]||'application/octet-stream','cache-control':'no-store'});
+    const body=readFileSync(target);res.end(raw==='index.html'?instrumentIndex(body):body);
+  }catch{if(!res.headersSent)res.writeHead(404);if(!res.writableEnded)res.end('Not found')}
+});
+const chrome=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'].find(existsSync);
+if(!chrome)throw Error('Chrome unavailable');
+await new Promise((resolveListen,rejectListen)=>{server.once('error',rejectListen);server.listen(0,'127.0.0.1',resolveListen)});
+try{
+  const port=server.address().port;
+  const outputPromise=new Promise((resolveOutput,rejectOutput)=>{
+    const child=spawn(chrome,['--headless=new','--no-sandbox','--disable-dev-shm-usage','--disable-gpu',`--user-data-dir=${profile}`,'--virtual-time-budget=300000','--dump-dom',`http://127.0.0.1:${port}/${name}`],{stdio:['ignore','pipe','pipe']});
+    let stdout='',stderr='';
+    const timer=setTimeout(()=>{child.kill('SIGKILL');rejectOutput(Error('Browser timeout at '+lastProgress+'\n'+stderr.slice(-8000)))},330000);
+    child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);child.once('error',rejectOutput);child.once('close',code=>{clearTimeout(timer);code?rejectOutput(Error(stderr.slice(-16000))):resolveOutput(stdout)});
+  });
+  const result=await Promise.race([reportPromise,outputPromise.then(output=>({status:'DOM',output}))]);
+  if(result.status==='FAIL')throw Error(result.payload?.error||JSON.stringify(result));
+  const output=result.status==='DOM'?result.output:await outputPromise;
+  const match=output.match(/<pre id="result">([\s\S]*?)<\/pre>/),decoded=(match?.[1]||'').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+  if(!output.includes('data-status="PASS"')||!output.includes(marker))throw Error(decoded||output.slice(-16000));
+  console.log(decoded);console.log(marker);
+}finally{
+  await new Promise(resolveClose=>server.close(resolveClose));
+  if(existsSync(path))unlinkSync(path);
+  rmSync(profile,{recursive:true,force:true});
+}

@@ -14,6 +14,8 @@ on:
       - 'src/familypilot-module-entry-bridge.js'
       - 'tools/pf08a-wave1d-module-registry-domain-smoke.mjs'
       - 'tools/pf08a-wave1d-financial-fingerprint-domain-smoke.mjs'
+      - 'tools/pf08a-wave1d-recovery-reload-browser-smoke.mjs'
+      - 'tools/pf08a-wave1d-listener-sentinel-domain-smoke.mjs'
       - 'tools/pf08a-wave1d-visible-degraded-browser-smoke.mjs'
       - 'tools/pf08a-wave1d-integrated-browser-smoke.mjs'
       - '.github/workflows/pf08a-wave1d-visible-degraded.yml'
@@ -47,6 +49,8 @@ jobs:
           node --check familypilot-module-entry-bridge.js
           node --check tools/pf08a-wave1d-module-registry-domain-smoke.mjs
           node --check tools/pf08a-wave1d-financial-fingerprint-domain-smoke.mjs
+          node --check tools/pf08a-wave1d-recovery-reload-browser-smoke.mjs
+          node --check tools/pf08a-wave1d-listener-sentinel-domain-smoke.mjs
           node --check tools/pf08a-wave1d-visible-degraded-browser-smoke.mjs
           node --check tools/pf08a-wave1d-integrated-browser-smoke.mjs
           cmp familypilot-module-registry.js src/familypilot-module-registry.js
@@ -67,8 +71,11 @@ jobs:
         run: |
           node tools/pf08a-wave1d-module-registry-domain-smoke.mjs
           node tools/pf08a-wave1d-financial-fingerprint-domain-smoke.mjs
+          node tools/pf08a-wave1d-listener-sentinel-domain-smoke.mjs
       - name: Verify visible degraded and recovery behavior
         run: node tools/pf08a-wave1d-visible-degraded-browser-smoke.mjs
+      - name: Verify recovery reload and production handler uniqueness
+        run: node tools/pf08a-wave1d-recovery-reload-browser-smoke.mjs
       - name: Run Wave 1C persistence regressions
         run: |
           node tools/pf08a-wave1c-persistence-browser-smoke.mjs
