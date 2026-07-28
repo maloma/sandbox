@@ -155,22 +155,25 @@ const server=createServer((req,res)=>{
 const chrome=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'].find(existsSync);
 if(!chrome)throw Error('Chrome unavailable');
 await new Promise((resolveListen,rejectListen)=>{server.once('error',rejectListen);server.listen(0,'127.0.0.1',resolveListen)});
+let child=null,stderr='',primaryError=null;
 try{
   const port=server.address().port;
-  const outputPromise=new Promise((resolveOutput,rejectOutput)=>{
-    const child=spawn(chrome,['--headless=new','--no-sandbox','--disable-dev-shm-usage','--disable-gpu',`--user-data-dir=${profile}`,'--virtual-time-budget=300000','--dump-dom',`http://127.0.0.1:${port}/${name}`],{stdio:['ignore','pipe','pipe']});
-    let stdout='',stderr='';
-    const timer=setTimeout(()=>{child.kill('SIGKILL');rejectOutput(Error('Browser timeout at '+lastProgress+'\n'+stderr.slice(-8000)))},330000);
-    child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);child.once('error',rejectOutput);child.once('close',code=>{clearTimeout(timer);code?rejectOutput(Error(stderr.slice(-16000))):resolveOutput(stdout)});
-  });
-  const result=await Promise.race([reportPromise,outputPromise.then(output=>({status:'DOM',output}))]);
-  if(result.status==='FAIL')throw Error(result.payload?.error||JSON.stringify(result));
-  const output=result.status==='DOM'?result.output:await outputPromise;
-  const match=output.match(/<pre id="result">([\s\S]*?)<\/pre>/),decoded=(match?.[1]||'').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
-  if(!output.includes('data-status="PASS"')||!output.includes(marker))throw Error(decoded||output.slice(-16000));
-  console.log(decoded);console.log(marker);
+  child=spawn(chrome,['--headless=new','--no-sandbox','--disable-dev-shm-usage','--disable-gpu',`--user-data-dir=${profile}`,`http://127.0.0.1:${port}/${name}`],{stdio:['ignore','ignore','pipe']});
+  child.stderr.on('data',chunk=>stderr+=chunk);
+  const childExit=new Promise(resolveExit=>child.once('close',code=>resolveExit({type:'exit',code})));
+  const timeoutResult=new Promise(resolveTimeout=>setTimeout(()=>resolveTimeout({type:'timeout'}),420000));
+  const outcome=await Promise.race([reportPromise.then(report=>({type:'report',report})),childExit,timeoutResult]);
+  if(outcome.type==='timeout')throw Error('Browser timeout at '+lastProgress+'\n'+stderr.slice(-12000));
+  if(outcome.type==='exit')throw Error(`Browser exited before reporting (${outcome.code})\n${stderr.slice(-12000)}`);
+  if(outcome.report.status!=='PASS')throw Error(outcome.report.payload?.error||JSON.stringify(outcome.report));
+  console.log(JSON.stringify(outcome.report.payload,null,2));
+  console.log(marker);
+}catch(error){
+  primaryError=error;
+  throw error;
 }finally{
+  if(child&&!child.killed){child.kill('SIGTERM');await wait(200);if(!child.killed)child.kill('SIGKILL')}
   await new Promise(resolveClose=>server.close(resolveClose));
   if(existsSync(path))unlinkSync(path);
-  rmSync(profile,{recursive:true,force:true});
+  try{rmSync(profile,{recursive:true,force:true,maxRetries:5,retryDelay:100})}catch(cleanupError){if(!primaryError)throw cleanupError;console.error('Profile cleanup failed after primary error:',String(cleanupError))}
 }
