@@ -13,6 +13,7 @@ on:
       - 'src/familypilot-module-registry-ui.js'
       - 'src/familypilot-module-entry-bridge.js'
       - 'tools/pf08a-wave1d-module-registry-domain-smoke.mjs'
+      - 'tools/pf08a-wave1d-financial-fingerprint-domain-smoke.mjs'
       - 'tools/pf08a-wave1d-visible-degraded-browser-smoke.mjs'
       - 'tools/pf08a-wave1d-integrated-browser-smoke.mjs'
       - '.github/workflows/pf08a-wave1d-visible-degraded.yml'
@@ -45,6 +46,7 @@ jobs:
           node --check familypilot-module-registry-ui.js
           node --check familypilot-module-entry-bridge.js
           node --check tools/pf08a-wave1d-module-registry-domain-smoke.mjs
+          node --check tools/pf08a-wave1d-financial-fingerprint-domain-smoke.mjs
           node --check tools/pf08a-wave1d-visible-degraded-browser-smoke.mjs
           node --check tools/pf08a-wave1d-integrated-browser-smoke.mjs
           cmp familypilot-module-registry.js src/familypilot-module-registry.js
@@ -62,7 +64,9 @@ jobs:
           assert fallback < positions['familypilot-module-registry.js'] < positions['familypilot-module-registry-retry-correction.js'] < positions['familypilot-module-registry-ui.js'] < positions['familypilot-module-entry-bridge.js'] < positions['familypilot-scope.js'], positions
           PY
       - name: Verify registry domain
-        run: node tools/pf08a-wave1d-module-registry-domain-smoke.mjs
+        run: |
+          node tools/pf08a-wave1d-module-registry-domain-smoke.mjs
+          node tools/pf08a-wave1d-financial-fingerprint-domain-smoke.mjs
       - name: Verify visible degraded and recovery behavior
         run: node tools/pf08a-wave1d-visible-degraded-browser-smoke.mjs
       - name: Run Wave 1C persistence regressions

@@ -6,6 +6,95 @@
   const registry=window.FamilyPilotModuleRegistry;
   if(!registry)return;
 
+  const financialObjectKeys=Object.freeze([
+    'household','config','giftFund','onboardingState',
+  ]);
+  const financialCollectionKeys=Object.freeze([
+    'members','wallets','categories','operations','transfers','walletMovements',
+    'obligationRules','obligationOccurrences','debts','debtEvents',
+    'savingsGoals','savingsPlans','savingsTransfers','purposeAllocations','purposeAllocationEvents',
+    'savingsLegacyReconciliationIssues','savingsPurposeMigrationResults',
+    'walletTransfers','investmentAccounts','balanceAdjustments',
+    'plannedIncomeRules','plannedIncomeOccurrences','incomeDistributionRules','savingsActionOccurrences',
+    'birthdays','whatIfScenarios','scenarioPlanConversions','whatIfInterestSimulations',
+  ]);
+  const financialKeys=Object.freeze([...financialObjectKeys,...financialCollectionKeys].sort());
+  const unorderedFinancialCollections=new Set(financialCollectionKeys);
+  const excludedFinancialStateKeys=Object.freeze([
+    'schemaVersion','currentMemberId','activeWalletId','learningModeByMember',
+  ]);
+  const identityKeys=Object.freeze([
+    'id','eventId','ruleId','occurrenceId','transferId','walletId','memberId','goalId','scenarioId',
+  ]);
+  const financialContract=Object.freeze({
+    version:2,
+    stateOwner:'window.__FP_RUNTIME__.state',
+    persistenceOwner:'FamilyPilotPersistence',
+    keys:financialKeys,
+    unorderedCollections:Object.freeze([...financialCollectionKeys].sort()),
+    excludedStateKeys:excludedFinancialStateKeys,
+    missingCollectionDefault:'empty_array',
+    missingObjectDefault:'empty_object',
+    recordTimestampsAndAuditMetadata:'included_without_normalization',
+    persistenceEnvelopeMetadata:'excluded',
+  });
+
+  function canonicalValue(value){
+    if(value===undefined)return null;
+    if(value===null||typeof value!=='object')return value;
+    if(Array.isArray(value))return value.map(canonicalValue);
+    const output={};
+    for(const key of Object.keys(value).sort())output[key]=canonicalValue(value[key]);
+    return output;
+  }
+
+  function compareText(left,right){
+    return left<right?-1:left>right?1:0;
+  }
+
+  function collectionItemKey(item){
+    const payload=JSON.stringify(item);
+    if(item&&typeof item==='object'&&!Array.isArray(item)){
+      for(const key of identityKeys){
+        if(item[key]!==undefined&&item[key]!==null)return `${key}:${String(item[key])}\u0000${payload}`;
+      }
+    }
+    return `payload:\u0000${payload}`;
+  }
+
+  function canonicalCollection(value){
+    const items=Array.isArray(value)?value:[];
+    return items.map(canonicalValue).sort((left,right)=>compareText(collectionItemKey(left),collectionItemKey(right)));
+  }
+
+  function financialState(){
+    try{
+      const testState=window.__FP_TEST__?.getState?.();
+      if(testState&&typeof testState==='object'&&!Array.isArray(testState))return testState;
+    }catch{}
+    return window.__FP_RUNTIME__?.state||{};
+  }
+
+  function financialFingerprint(){
+    const state=financialState();
+    const output={contractVersion:financialContract.version};
+    for(const key of financialKeys){
+      if(unorderedFinancialCollections.has(key))output[key]=canonicalCollection(state[key]);
+      else output[key]=canonicalValue(state[key]===undefined?{}:state[key]);
+    }
+    return JSON.stringify(canonicalValue(output));
+  }
+
+  function financialFingerprintContract(){
+    return JSON.parse(JSON.stringify(financialContract));
+  }
+
+  window.FamilyPilotModuleRegistry=Object.freeze({
+    ...registry,
+    financialFingerprint,
+    financialFingerprintContract,
+  });
+
   const terminalUnavailable=new Map();
   const shellControlState=new WeakMap();
   let shellMutationBlockCount=0;
@@ -158,6 +247,8 @@
         type:control.type||'',
       })),
       readOnlyControl:selector=>readOnlyControl(document.querySelector(selector)),
+      financialFingerprint,
+      financialFingerprintContract,
     };
   }
 })();
