@@ -69,7 +69,7 @@ const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null
 const stateOf=w=>{try{return w.__FP_TEST__?.getState?.()||w.__FP_RUNTIME__?.state||{}}catch{return w.__FP_RUNTIME__?.state||{}}};
 const duplicateValues=values=>{const counts=new Map();for(const value of values)counts.set(value,(counts.get(value)||0)+1);return[...counts.entries()].filter(([,count])=>count>1).map(([value,count])=>({value,count}))};
 const structuralSnapshot=w=>{
-  const scriptPaths=[...w.document.scripts].map(node=>{try{return new URL(node.src,w.location.href).pathname}catch{return''}}).filter(Boolean);
+  const scriptPaths=[...w.document.scripts].map(node=>{if(!node.src)return'';try{return new URL(node.src,w.location.href).pathname}catch{return''}}).filter(Boolean);
   const screenIds=[...w.document.querySelectorAll('.screen[id]')].map(node=>node.id).filter(Boolean);
   const state=stateOf(w),operations=Array.isArray(state.operations)?state.operations:[];
   return{
