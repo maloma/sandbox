@@ -2,6 +2,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 
 const source=readFileSync('familypilot-module-registry.js','utf8');
+const correctionSource=readFileSync('familypilot-module-registry-retry-correction.js','utf8');
 const marker='PF08A_WAVE1D_MODULE_REGISTRY_DOMAIN_PASS';
 const assert=(value,message)=>{if(!value)throw new Error(message)};
 
@@ -56,6 +57,72 @@ function createContext(search='?test=1'){
   context.window=context;
   context.globalThis=context;
   vm.runInNewContext(source,context,{filename:'familypilot-module-registry.js'});
+  return context;
+}
+
+function createBarrierContext(){
+  const documentListeners=new Map();
+  const windowListeners=new Map();
+  const bodyClasses=new Set();
+  let moduleState='degraded';
+
+  function control({id,readOnly=false,disabled=false}){
+    const attributes=new Map();
+    return {
+      id,tagName:'BUTTON',type:'button',disabled,dataset:{},
+      getAttribute(name){return attributes.has(name)?attributes.get(name):null},
+      setAttribute(name,value){attributes.set(name,String(value))},
+      removeAttribute(name){attributes.delete(name)},
+      closest(selector){
+        if(selector==='#actionDock')return null;
+        if(readOnly&&selector.includes('.nav'))return this;
+        if(selector.startsWith('button,input,select,textarea'))return this;
+        return null;
+      },
+    };
+  }
+
+  const mutationControl=control({id:'mutationOutsideDock'});
+  const readOnlyNavigation=control({id:'readOnlyNavigation',readOnly:true});
+  const preDisabledControl=control({id:'preDisabledControl',disabled:true});
+  const controls=[mutationControl,readOnlyNavigation,preDisabledControl];
+  const snapshot=()=>({catalogue:[{
+    moduleId:'base_finance',state:moduleState,containmentLevel:'application_shell_degraded',
+    retryClass:'reload_required',blockedByModuleId:null,lastRetryAt:null,attempt:1,
+  }]});
+  const registry={snapshot,moduleForPath(){return null},markDegraded(){throw new Error('Unexpected terminal restoration')}};
+  const document={
+    documentElement:{},
+    body:{classList:{toggle(name,active){active?bodyClasses.add(name):bodyClasses.delete(name)}}},
+    addEventListener(type,fn){const list=documentListeners.get(type)||[];list.push(fn);documentListeners.set(type,list)},
+    querySelectorAll(selector){
+      if(selector==='button,input,select,textarea')return controls;
+      if(selector==='[data-fp-shell-mutation-blocked="true"]')return controls.filter(item=>item.dataset.fpShellMutationBlocked==='true');
+      return [];
+    },
+    querySelector(selector){
+      if(selector==='#readOnlyNavigation')return readOnlyNavigation;
+      if(selector==='#mutationOutsideDock')return mutationControl;
+      return null;
+    },
+  };
+  class MutationObserver{constructor(fn){this.fn=fn}observe(){}}
+  const context={
+    console,URLSearchParams,Map,WeakMap,Number,String,Boolean,Array,Object,JSON,
+    location:{search:'?test=1'},document,MutationObserver,FamilyPilotModuleRegistry:registry,
+    addEventListener(type,fn){const list=windowListeners.get(type)||[];list.push(fn);windowListeners.set(type,list)},
+    dispatchEvent(event){for(const fn of windowListeners.get(event.type)||[])fn(event);return true},
+    __setModuleState(value){moduleState=value},
+    __documentListeners:documentListeners,
+    __bodyClasses:bodyClasses,
+    __mutationControl:mutationControl,
+    __readOnlyNavigation:readOnlyNavigation,
+    __preDisabledControl:preDisabledControl,
+    __snapshot:snapshot,
+  };
+  context.window=context;
+  context.globalThis=context;
+  vm.runInNewContext(correctionSource,context,{filename:'familypilot-module-registry-retry-correction.js'});
   return context;
 }
 
@@ -131,6 +198,33 @@ registry.beginLoad('contract_probe');
 const accepted=registry.markReady('contract_probe');
 assert(accepted.state==='ready','Valid ownership contract did not reach ready');
 
+const barrierContext=createBarrierContext();
+const barrier=barrierContext.__FP_TEST__?.moduleRegistryCorrection;
+assert(barrier,'Shell mutation barrier test API missing');
+assert(barrier.shellDegraded()===true,'Shell degradation was not detected');
+assert(barrierContext.__bodyClasses.has('fp-shell-mutation-barrier'),'Shell mutation body marker missing');
+assert(barrierContext.__mutationControl.closest('#actionDock')===null,'Mutation probe is not outside action dock');
+assert(barrierContext.__mutationControl.disabled===true,'Outside-dock mutation control was not disabled');
+assert(barrierContext.__mutationControl.dataset.fpShellMutationBlocked==='true','Outside-dock mutation marker missing');
+assert(barrierContext.__readOnlyNavigation.disabled===false,'Read-only navigation was disabled');
+assert(barrier.readOnlyControl('#readOnlyNavigation')===true,'Read-only navigation was not classified');
+assert(barrier.blockedControls().some(item=>item.id==='mutationOutsideDock'),'Blocked-control report omitted outside-dock mutation');
+const blockedBefore=barrier.blockedCount();
+const mutationEvent={target:barrierContext.__mutationControl,prevented:false,stopped:false,preventDefault(){this.prevented=true},stopImmediatePropagation(){this.stopped=true}};
+barrierContext.__documentListeners.get('click')[0](mutationEvent);
+assert(mutationEvent.prevented&&mutationEvent.stopped,'Mutation event was not intercepted');
+assert(barrier.blockedCount()===blockedBefore+1,'Mutation block counter did not increment');
+const navigationEvent={target:barrierContext.__readOnlyNavigation,prevented:false,stopped:false,preventDefault(){this.prevented=true},stopImmediatePropagation(){this.stopped=true}};
+barrierContext.__documentListeners.get('click')[0](navigationEvent);
+assert(!navigationEvent.prevented&&!navigationEvent.stopped,'Read-only navigation was intercepted');
+barrierContext.__setModuleState('ready');
+barrierContext.dispatchEvent({type:'familypilot:module-state',detail:barrierContext.__snapshot()});
+assert(barrier.shellDegraded()===false,'Shell mutation barrier did not recover');
+assert(barrierContext.__mutationControl.disabled===false,'Mutation control was not restored after recovery');
+assert(!('fpShellMutationBlocked' in barrierContext.__mutationControl.dataset),'Mutation marker remained after recovery');
+assert(barrierContext.__preDisabledControl.disabled===true,'Pre-disabled state was not preserved');
+assert(barrierContext.__readOnlyNavigation.disabled===false,'Read-only navigation changed after recovery');
+
 console.log(JSON.stringify({
   status:'PASS',
   marker,
@@ -142,5 +236,10 @@ console.log(JSON.stringify({
   injection_isolated:true,
   exact_test_mode:true,
   ownership_contract_enforced:true,
+  shell_mutation_barrier:true,
+  outside_action_dock_disabled:true,
+  mutation_intercepted:true,
+  read_only_navigation_preserved:true,
+  recovery_restored_controls:true,
 },null,2));
 console.log(marker);
