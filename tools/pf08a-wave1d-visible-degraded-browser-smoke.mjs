@@ -15,6 +15,9 @@ let reportResult;
 const reportPromise=new Promise(resolveReport=>{reportResult=resolveReport});
 let lastProgress='not_started';
 
+const browserCollector=`<script>(()=>{const events=[];const describe=value=>{try{return String(value?.stack||value?.message||value||'unknown')}catch{return 'unprintable'}};Object.defineProperty(window,'__FP_BROWSER_EVENTS__',{value:events,configurable:false});window.addEventListener('error',event=>events.push({type:'error',message:String(event.message||'unknown'),source:String(event.filename||''),line:Number(event.lineno||0),column:Number(event.colno||0),detail:describe(event.error)}));window.addEventListener('unhandledrejection',event=>events.push({type:'unhandledrejection',detail:describe(event.reason)}));})();</script>`;
+const instrumentIndex=body=>{const text=body.toString('utf8'),match=text.match(/<head[^>]*>/i);return match?text.replace(match[0],match[0]+browserCollector):browserCollector+text};
+
 const harness=`<!doctype html><html lang="ru"><body data-status="PENDING"><iframe id="app" style="width:390px;height:844px;border:0"></iframe><iframe id="ordinary" style="display:none"></iframe><iframe id="timeout" style="display:none"></iframe><pre id="result">PENDING</pre><script>(()=>{
 const out=document.getElementById('result'),app=document.getElementById('app'),ordinary=document.getElementById('ordinary'),timeout=document.getElementById('timeout');
 const wait=ms=>new Promise(r=>setTimeout(r,ms)),assert=(v,m)=>{if(!v)throw Error(m)};
@@ -110,8 +113,14 @@ const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null
  const eventSafe=registry.snapshot().events.every(e=>!('amount' in e)&&!('note' in e)&&!('stack' in e));
  assert(eventSafe,'Registry safe event history contains financial or stack payload');
  assert(registry.snapshot().events.length<=50,'Registry event history exceeded bound');
+ const browserEvents=[
+   ...(w.__FP_BROWSER_EVENTS__||[]).map(event=>({frame:'injected',...event})),
+   ...(o.__FP_BROWSER_EVENTS__||[]).map(event=>({frame:'ordinary',...event})),
+   ...(t.__FP_BROWSER_EVENTS__||[]).map(event=>({frame:'readiness_timeout',...event})),
+ ];
+ assert(browserEvents.length===0,'Browser runtime events: '+JSON.stringify(browserEvents));
  try{w.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.();o.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.();t.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.()}catch{}
- await report('PASS',{status:'PASS',marker:'${marker}',visible_global_card:true,visible_local_card:true,failed_entry_preserved:true,precise_data_wording:true,diagnostic_id:true,root_cause_grouping:true,unaffected_routes:true,one_active_attempt:true,safe_retry:true,no_duplicate_ui:true,financial_isolation:true,persistence_priority:true,shell_mutation_barrier:true,outside_action_dock_disabled:true,mutation_intercepted:true,read_only_navigation_preserved:true,injection_isolated:true,partial_install_reload_required:true,safe_events:true});
+ await report('PASS',{status:'PASS',marker:'${marker}',visible_global_card:true,visible_local_card:true,failed_entry_preserved:true,precise_data_wording:true,diagnostic_id:true,root_cause_grouping:true,unaffected_routes:true,one_active_attempt:true,safe_retry:true,no_duplicate_ui:true,financial_isolation:true,persistence_priority:true,shell_mutation_barrier:true,outside_action_dock_disabled:true,mutation_intercepted:true,read_only_navigation_preserved:true,injection_isolated:true,partial_install_reload_required:true,safe_events:true,runtime_exceptions:browserEvents});
 }catch(error){await report('FAIL',{status:'FAIL',error:String(error.stack||error)})}})();})();
 </script></body></html>`;
 writeFileSync(path,harness,'utf8');
@@ -132,7 +141,8 @@ const server=createServer((req,res)=>{
     const raw=url.pathname==='/'?'index.html':url.pathname.replace(/^\//,''),target=normalize(resolve(root,raw));
     if(target!==root&&!target.startsWith(root+sep))throw Error('forbidden');
     res.writeHead(200,{'content-type':mime[extname(target)]||'application/octet-stream','cache-control':'no-store'});
-    res.end(readFileSync(target));
+    const body=readFileSync(target);
+    res.end(raw==='index.html'?instrumentIndex(body):body);
   }catch{
     if(!res.headersSent)res.writeHead(404);
     if(!res.writableEnded)res.end('Not found');
