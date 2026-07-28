@@ -24,16 +24,34 @@ vm.runInContext(scriptMatch[1],context,{filename:'listener-sentinel-collector.js
 
 const sentinel=window.__FP_LISTENER_SENTINEL__;
 assert(sentinel,'Listener sentinel was not installed');
-const productionSource=`window.addEventListener('familypilot:module-state',()=>{});document.addEventListener('click',()=>{},true);`;
-vm.runInContext(productionSource,context,{filename:'familypilot-module-registry-ui.js'});
+const productionSources={
+  'familypilot-module-registry-retry-correction.js':`document.addEventListener('click',()=>{},true);document.addEventListener('submit',()=>{},true);window.addEventListener('familypilot:module-state',()=>{});`,
+  'familypilot-module-registry-ui.js':`window.addEventListener('familypilot:module-state',()=>{});document.addEventListener('click',()=>{},true);`,
+  'familypilot-module-entry-bridge.js':`window.addEventListener('familypilot:module-state',()=>{});`,
+};
+for(const [filename,productionSource] of Object.entries(productionSources)){
+  vm.runInContext(productionSource,context,{filename});
+}
 const observed=sentinel.sourceCounts();
-assert(observed['familypilot-module-registry-ui.js']===2,'Production registrations were not observed exactly once');
+assert(observed['familypilot-module-registry-retry-correction.js']===3,'Correction registrations were not observed exactly once');
+assert(observed['familypilot-module-registry-ui.js']===2,'Registry UI registrations were not observed exactly once');
+assert(observed['familypilot-module-entry-bridge.js']===1,'Entry bridge registration was not observed exactly once');
 assert(sentinel.duplicates().length===0,'Single production registration was classified as duplicate');
 
-vm.runInContext(productionSource,context,{filename:'familypilot-module-registry-ui.js'});
+const expectedDuplicateCounts={
+  'familypilot-module-registry-retry-correction.js':3,
+  'familypilot-module-registry-ui.js':2,
+  'familypilot-module-entry-bridge.js':1,
+};
+for(const [filename,productionSource] of Object.entries(productionSources)){
+  vm.runInContext(productionSource,context,{filename});
+  const sourceDuplicates=sentinel.duplicates().filter(item=>item.key.includes(filename));
+  assert(sourceDuplicates.length===expectedDuplicateCounts[filename],filename+' repeated production callsites were not detected');
+  assert(sourceDuplicates.every(item=>item.count===2),filename+' duplicate registration count is incorrect');
+  assert(sourceDuplicates.every(item=>item.key.includes(filename)),filename+' duplicate output identified the wrong source');
+}
 const duplicates=sentinel.duplicates();
-assert(duplicates.length===2,'Repeated production callsites were not detected');
-assert(duplicates.every(item=>item.count===2),'Duplicate registration count is incorrect');
+assert(duplicates.length===6,'Deterministic duplicate total is incorrect');
 
 console.log(JSON.stringify({
   status:'PASS',
@@ -41,6 +59,9 @@ console.log(JSON.stringify({
   evaluated_browser_template:true,
   production_registrations_observed:true,
   single_registration_accepted:true,
+  all_three_production_sources_observed:true,
+  duplicate_source_identification:true,
+  source_specific_counts_deterministic:true,
   duplicate_window_handler_detected:true,
   duplicate_document_handler_detected:true,
   deterministic_callsite_count:true,

@@ -35,22 +35,23 @@ const browserInstrumentation=`<script>(()=>{
   };
   const nativeAdd=EventTarget.prototype.addEventListener;
   EventTarget.prototype.addEventListener=function(type,listener,options){
-    const source=callsite();
-    if(source){
+    const callsiteValue=callsite();
+    if(callsiteValue){
       const capture=typeof options==='boolean'?options:Boolean(options?.capture);
-      registrations.push({target:targetLabel(this),type:String(type),capture,source});
+      const source=watchedSources.find(name=>callsiteValue.includes(name))||'';
+      registrations.push({target:targetLabel(this),type:String(type),capture,source,callsite:callsiteValue});
     }
     return nativeAdd.call(this,type,listener,options);
   };
   const duplicateRegistrations=()=>{
     const counts=new Map();
     for(const item of registrations){
-      const key=[item.target,item.type,item.capture,item.source].join('|');
+      const key=[item.target,item.type,item.capture,item.source,item.callsite].join('|');
       counts.set(key,(counts.get(key)||0)+1);
     }
     return [...counts.entries()].filter(([,count])=>count>1).map(([key,count])=>({key,count}));
   };
-  const sourceCounts=()=>Object.fromEntries(watchedSources.map(source=>[source,registrations.filter(item=>item.source.includes(source)).length]));
+  const sourceCounts=()=>Object.fromEntries(watchedSources.map(source=>[source,registrations.filter(item=>item.source===source).length]));
   Object.defineProperty(window,'__FP_BROWSER_EVENTS__',{value:events,configurable:false});
   Object.defineProperty(window,'__FP_LISTENER_SENTINEL__',{value:Object.freeze({registrations:()=>registrations.map(item=>({...item})),duplicates:duplicateRegistrations,sourceCounts}),configurable:false});
   window.addEventListener('error',event=>events.push({type:'error',message:String(event.message||'unknown'),source:String(event.filename||''),line:Number(event.lineno||0),column:Number(event.colno||0),detail:describe(event.error)}));
@@ -68,6 +69,29 @@ const until=async(check,label,ms=120000)=>{const end=Date.now()+ms;let last;whil
 const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null,2);document.body.dataset.status=status;try{await fetch('/__wave1d_result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({status,payload})})}catch{}};
 const stateOf=w=>{try{return w.__FP_TEST__?.getState?.()||w.__FP_RUNTIME__?.state||{}}catch{return w.__FP_RUNTIME__?.state||{}}};
 const duplicateValues=values=>{const counts=new Map();for(const value of values)counts.set(value,(counts.get(value)||0)+1);return[...counts.entries()].filter(([,count])=>count>1).map(([value,count])=>({value,count}))};
+const requiredListenerSignatures=[
+  ['familypilot-module-registry-retry-correction.js','document','click',true],
+  ['familypilot-module-registry-retry-correction.js','document','submit',true],
+  ['familypilot-module-registry-retry-correction.js','document','beforeinput',true],
+  ['familypilot-module-registry-retry-correction.js','document','input',true],
+  ['familypilot-module-registry-retry-correction.js','document','change',true],
+  ['familypilot-module-registry-retry-correction.js','document','keydown',true],
+  ['familypilot-module-registry-retry-correction.js','window','familypilot:module-state',false],
+  ['familypilot-module-registry-ui.js','document','click',true],
+  ['familypilot-module-registry-ui.js','window','familypilot:module-state',false],
+  ['familypilot-module-entry-bridge.js','window','familypilot:module-state',false],
+].map(([source,target,type,capture])=>({source,target,type,capture}));
+const listenerSignature=item=>[item.source,item.target,item.type,String(item.capture)].join('|');
+const listenerContract=(sentinel,label)=>{
+  const registrations=sentinel.registrations();
+  const longLived=registrations.filter(item=>item.type!=='DOMContentLoaded').map(listenerSignature).sort();
+  const counts=new Map();for(const signature of longLived)counts.set(signature,(counts.get(signature)||0)+1);
+  const missing=requiredListenerSignatures.map(listenerSignature).filter(signature=>(counts.get(signature)||0)!==1);
+  assert(missing.length===0,label+' required production listener signatures missing or non-unique: '+JSON.stringify({missing,counts:Object.fromEntries(counts)}));
+  const duplicates=sentinel.duplicates();
+  assert(duplicates.length===0,label+' duplicate production handlers: '+JSON.stringify(duplicates));
+  return longLived;
+};
 const structuralSnapshot=w=>{
   const scriptPaths=[...w.document.scripts].map(node=>{if(!node.src)return'';try{return new URL(node.src,w.location.href).pathname}catch{return''}}).filter(Boolean);
   const screenIds=[...w.document.querySelectorAll('.screen[id]')].map(node=>node.id).filter(Boolean);
@@ -98,10 +122,11 @@ const structuralSnapshot=w=>{
   const browserEventsBefore=[...(w.__FP_BROWSER_EVENTS__||[])];
   const listenerBefore=w.__FP_LISTENER_SENTINEL__;
   assert(listenerBefore,'Listener sentinel missing before reload');
-  assert(listenerBefore.duplicates().length===0,'Duplicate production handlers before reload: '+JSON.stringify(listenerBefore.duplicates()));
+  const listenerContractBefore=listenerContract(listenerBefore,'Before reload');
   const sourceCountsBefore=listenerBefore.sourceCounts();
   assert(sourceCountsBefore['familypilot-module-registry-retry-correction.js']>0,'Correction production listeners were not observed');
   assert(sourceCountsBefore['familypilot-module-registry-ui.js']>0,'Registry UI production listeners were not observed');
+  assert(sourceCountsBefore['familypilot-module-entry-bridge.js']>0,'Entry bridge production listeners were not observed');
   assert(browserEventsBefore.length===0,'Browser runtime events before reload: '+JSON.stringify(browserEventsBefore));
   assert(structureBefore.duplicateScripts.length===0,'Duplicate scripts before reload: '+JSON.stringify(structureBefore.duplicateScripts));
   assert(structureBefore.duplicateScreenIds.length===0,'Duplicate screens before reload: '+JSON.stringify(structureBefore.duplicateScreenIds));
@@ -129,13 +154,15 @@ const structuralSnapshot=w=>{
   assert(structureAfter.staticFallbackHidden,'Static fallback visible after healthy reload');
   assert(snapshotAfter.catalogue.length===11&&new Set(snapshotAfter.catalogue.map(item=>item.moduleId)).size===11,'Duplicate registry modules after reload');
   assert(listenerAfter,'Listener sentinel missing after reload');
-  assert(listenerAfter.duplicates().length===0,'Duplicate production handlers after reload: '+JSON.stringify(listenerAfter.duplicates()));
+  const listenerContractAfter=listenerContract(listenerAfter,'After reload');
   const sourceCountsAfter=listenerAfter.sourceCounts();
   assert(sourceCountsAfter['familypilot-module-registry-retry-correction.js']>0,'Correction production listeners missing after reload');
   assert(sourceCountsAfter['familypilot-module-registry-ui.js']>0,'Registry UI production listeners missing after reload');
+  assert(sourceCountsAfter['familypilot-module-entry-bridge.js']>0,'Entry bridge production listeners missing after reload');
+  assert(JSON.stringify(listenerContractAfter)===JSON.stringify(listenerContractBefore),'Production listener contract changed across reload: '+JSON.stringify({before:listenerContractBefore,after:listenerContractAfter}));
   assert(browserEventsAfter.length===0,'Browser runtime events after reload: '+JSON.stringify(browserEventsAfter));
   try{w.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.()}catch{}
-  await report('PASS',{status:'PASS',marker:'${marker}',scenario_g:'recovery_reload_healthy',real_reload:true,all_modules_ready:true,persistence_healthy:true,no_duplicate_scripts:true,no_duplicate_screens:true,no_duplicate_operations:true,no_duplicate_handlers:true,no_duplicate_fallback_entries:true,financial_fingerprint_unchanged:true,browser_runtime_events:[],listener_sources:sourceCountsAfter});
+  await report('PASS',{status:'PASS',marker:'${marker}',scenario_g:'recovery_reload_healthy',real_reload:true,all_modules_ready:true,persistence_healthy:true,no_duplicate_scripts:true,no_duplicate_screens:true,no_duplicate_operations:true,no_duplicate_handlers:true,no_duplicate_fallback_entries:true,financial_fingerprint_unchanged:true,browser_runtime_events:[],listener_sources:sourceCountsAfter,all_production_listener_sources_observed:true,required_listener_signatures_unique:true,listener_contract_stable_across_reload:true});
 }catch(error){await report('FAIL',{status:'FAIL',error:String(error.stack||error)})}})();
 })();</script></body></html>`;
 writeFileSync(path,harness,'utf8');
