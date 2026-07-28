@@ -4,8 +4,11 @@ import vm from 'node:vm';
 const source=readFileSync('tools/pf08a-wave1d-recovery-reload-browser-smoke.mjs','utf8');
 const marker='PF08A_WAVE1D_LISTENER_SENTINEL_DOMAIN_PASS';
 const assert=(value,message)=>{if(!value)throw new Error(message)};
-const match=source.match(/const browserInstrumentation=`<script>\(\(\)=>\{([\s\S]*?)\}\)\(\);<\/script>`;/);
-assert(match,'Listener instrumentation source missing');
+const templateMatch=source.match(/const browserInstrumentation=(`[^`]*`);\nconst instrumentIndex=/s);
+assert(templateMatch,'Listener instrumentation template missing');
+const generated=vm.runInNewContext(templateMatch[1]);
+const scriptMatch=generated.match(/^<script>([\s\S]*)<\/script>$/);
+assert(scriptMatch,'Evaluated listener instrumentation script missing');
 
 class EventTarget{
   addEventListener(){}
@@ -17,7 +20,7 @@ const context={window,document,EventTarget,WeakMap,Map,Object,Array,String,Numbe
 window.window=window;
 window.document=document;
 vm.createContext(context);
-vm.runInContext(`(()=>{${match[1]}})();`,context,{filename:'listener-sentinel-collector.js'});
+vm.runInContext(scriptMatch[1],context,{filename:'listener-sentinel-collector.js'});
 
 const sentinel=window.__FP_LISTENER_SENTINEL__;
 assert(sentinel,'Listener sentinel was not installed');
@@ -35,6 +38,7 @@ assert(duplicates.every(item=>item.count===2),'Duplicate registration count is i
 console.log(JSON.stringify({
   status:'PASS',
   marker,
+  evaluated_browser_template:true,
   production_registrations_observed:true,
   single_registration_accepted:true,
   duplicate_window_handler_detected:true,
