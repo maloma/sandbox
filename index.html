@@ -219,14 +219,14 @@ body.personal-wallet-scope .scope-context{color:color-mix(in srgb,var(--purple) 
 <script src="./familypilot-module-registry-retry-correction.js" onerror="const f=document.getElementById('fpStaticFallback');if(f)f.hidden=false"></script>
 <script src="./familypilot-module-registry-ui.js" onerror="const f=document.getElementById('fpStaticFallback');if(f)f.hidden=false"></script>
 <script src="./familypilot-module-entry-bridge.js" onerror="const f=document.getElementById('fpStaticFallback');if(f)f.hidden=false"></script>
-<script src="./familypilot-scope.js" onerror="const f=document.getElementById('fpStaticFallback');if(f)f.hidden=false"></script>
+<script src="./familypilot-scope.js" onerror="window.__FP_SCOPE_LOAD_FAILED__=true;const f=document.getElementById('fpStaticFallback');if(f)f.hidden=false"></script>
 <script src="./familypilot-analytics-state.js"></script>
 <script src="./familypilot-obligations.js"></script>
 <script src="./familypilot-debts.js"></script>
 <script src="./familypilot-savings-goals.js"></script>
 <script src="./familypilot-wallet-management.js"></script>
 <script>
-(()=>{'use strict';
+(()=>{'use strict';if(window.__FP_SCOPE_LOAD_FAILED__)return;
 const APP_KEY='familypilot.operations.foundation.v2',OLD_KEY='familypilot.main.v7',PERIOD_KEY='familypilot.period.selection.v5',THEME_KEY='familypilot.theme';
 const $=id=>document.getElementById(id),uid=(p='id')=>p+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),now=()=>Date.now();
 const MEMBERS=[{id:'member-anna',name:'Анна'},{id:'member-martin',name:'Мартин'}];
