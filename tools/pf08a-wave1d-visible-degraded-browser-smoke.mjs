@@ -73,6 +73,23 @@ const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null
  registry.test.forceUnavailable('persistence','persistence_recovery_locked');registry.reconcile();ui.render();await wait(80);
  assert(ui.shellDegraded(),'Persistence critical failure did not degrade application shell');
  assert(getComputedStyle(w.document.getElementById('actionDock')).display==='none','Financial mutation dock remained visible during shell degradation');
+ const barrier=w.__FP_TEST__?.moduleRegistryCorrection;
+ assert(barrier,'Shell mutation barrier test API missing in browser runtime');
+ await until(()=>barrier.shellDegraded()&&barrier.blockedControls().length>0,'browser shell mutation barrier activation');
+ const blockedNodes=[...w.document.querySelectorAll('[data-fp-shell-mutation-blocked="true"]')];
+ const outsideDock=blockedNodes.find(node=>!node.closest('#actionDock'));
+ assert(outsideDock,'No financial mutation control outside actionDock was blocked');
+ assert(outsideDock.disabled===true,'Outside-dock financial mutation control was not disabled');
+ const blockedBefore=barrier.blockedCount();
+ const mutationEvent=new w.MouseEvent('click',{bubbles:true,cancelable:true});
+ const mutationDispatch=outsideDock.dispatchEvent(mutationEvent);
+ assert(mutationEvent.defaultPrevented||mutationDispatch===false,'Outside-dock mutation event was not intercepted');
+ assert(barrier.blockedCount()===blockedBefore+1,'Browser mutation block counter did not increment');
+ const readOnlyNav=w.document.querySelector('.nav');
+ assert(readOnlyNav&&!readOnlyNav.disabled,'Read-only navigation was disabled by shell barrier');
+ assert(barrier.readOnlyControl('.nav')===true,'Read-only navigation was not classified by shell barrier');
+ w.__FP_RUNTIME__.showScreen('more');
+ assert(w.document.getElementById('moreScreen').classList.contains('active'),'Unaffected read-only route unavailable during shell degradation');
  assert(registry.get('persistence').retryClass==='never','Persistence lock exposed unsafe retry');
  assert(ui.financialFingerprint()===before,'Persistence containment changed financial state');
 
@@ -99,7 +116,7 @@ const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null
  assert(eventSafe,'Registry safe event history contains financial or stack payload');
  assert(registry.snapshot().events.length<=50,'Registry event history exceeded bound');
  try{w.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.();o.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.();t.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.()}catch{}
- await report('PASS',{status:'PASS',marker:'${marker}',visible_global_card:true,visible_local_card:true,failed_entry_preserved:true,precise_data_wording:true,diagnostic_id:true,root_cause_grouping:true,unaffected_routes:true,one_active_attempt:true,safe_retry:true,no_duplicate_ui:true,financial_isolation:true,persistence_priority:true,injection_isolated:true,partial_install_reload_required:true,safe_events:true});
+ await report('PASS',{status:'PASS',marker:'${marker}',visible_global_card:true,visible_local_card:true,failed_entry_preserved:true,precise_data_wording:true,diagnostic_id:true,root_cause_grouping:true,unaffected_routes:true,one_active_attempt:true,safe_retry:true,no_duplicate_ui:true,financial_isolation:true,persistence_priority:true,shell_mutation_barrier:true,outside_action_dock_disabled:true,mutation_intercepted:true,read_only_navigation_preserved:true,injection_isolated:true,partial_install_reload_required:true,safe_events:true});
 }catch(error){await report('FAIL',{status:'FAIL',error:String(error.stack||error)})}})();})();
 </script></body></html>`;
 writeFileSync(path,harness,'utf8');
