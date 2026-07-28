@@ -30,7 +30,7 @@ const browserInstrumentation=`<script>(()=>{
     return targets.get(target);
   };
   const callsite=()=>{
-    const stack=String(new Error().stack||'').split('\n');
+    const stack=String(new Error().stack||'').split('\\n');
     return stack.map(line=>line.trim()).find(line=>watchedSources.some(source=>line.includes(source)))||'';
   };
   const nativeAdd=EventTarget.prototype.addEventListener;
