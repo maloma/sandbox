@@ -174,6 +174,64 @@ const emptyContext=createContext('?test=&moduleFailure=what_if&moduleFailureStag
 assert(!emptyContext.FamilyPilotModuleRegistry.test,'empty test value enabled test API');
 assert(emptyContext.FamilyPilotModuleRegistry.get('what_if').state!=='degraded','empty test value activated failure injection');
 
+const detachedProbeId='register_detached_probe';
+const beforeDetachedRegistration=registry.snapshot();
+const firstRegisterReturn=registry.register({
+  moduleId:detachedProbeId, userName:'Register detached probe', criticality:'supporting',
+  containmentLevel:'module_degraded', retryClass:'reload_required', dependencies:['base_finance'], routes:[], unaffectedRoutes:[],
+  ownershipContract:{
+    navigationSelectors:[],
+    screenSelectors:[],
+    packageMarkers:['global:__REGISTER_DETACHED_PROBE_READY__'],
+    listenerSentinel:null,
+  },
+});
+const authoritativeAfterFirstRegistration=registry.get(detachedProbeId);
+assert(firstRegisterReturn!==authoritativeAfterFirstRegistration,'First register return was not detached');
+assert(firstRegisterReturn.dependencies!==authoritativeAfterFirstRegistration.dependencies,'First register dependencies were not detached');
+assert(firstRegisterReturn.ownershipContract!==authoritativeAfterFirstRegistration.ownershipContract,'First register ownership contract was not detached');
+assert(firstRegisterReturn.ownershipContract.packageMarkers!==authoritativeAfterFirstRegistration.ownershipContract.packageMarkers,'First register package markers were not detached');
+assert(firstRegisterReturn.loadedScripts!==authoritativeAfterFirstRegistration.loadedScripts,'First register loaded scripts were not detached');
+firstRegisterReturn.state='degraded';
+firstRegisterReturn.userName='Externally mutated first return';
+firstRegisterReturn.dependencies.push('what_if');
+firstRegisterReturn.ownershipContract.packageMarkers.push('global:__EXTERNAL_FIRST_MUTATION__');
+firstRegisterReturn.loadedScripts.push('/external-first-mutation.js');
+const afterFirstMutation=registry.get(detachedProbeId);
+assert(afterFirstMutation.state==='registered','First return mutation changed authoritative state');
+assert(afterFirstMutation.userName==='Register detached probe','First return mutation changed authoritative user name');
+assert(afterFirstMutation.dependencies.length===1&&afterFirstMutation.dependencies[0]==='base_finance','First return mutation changed authoritative dependencies');
+assert(afterFirstMutation.ownershipContract.packageMarkers.length===1&&afterFirstMutation.ownershipContract.packageMarkers[0]==='global:__REGISTER_DETACHED_PROBE_READY__','First return mutation changed authoritative package markers');
+assert(afterFirstMutation.loadedScripts.length===0,'First return mutation changed authoritative loaded scripts');
+const afterFirstRegistration=registry.snapshot();
+assert(afterFirstRegistration.catalogue.length===beforeDetachedRegistration.catalogue.length+1,'First registration did not add exactly one catalogue record');
+
+const eventsBeforeDuplicate=JSON.stringify(afterFirstRegistration.events);
+const duplicateRegisterReturn=registry.register({
+  moduleId:detachedProbeId, userName:'Duplicate definition must be ignored', dependencies:['learning'],
+});
+assert(duplicateRegisterReturn!==firstRegisterReturn,'Duplicate register return shared the first return object');
+assert(duplicateRegisterReturn!==afterFirstMutation,'Duplicate register return was not detached from authoritative read');
+assert(duplicateRegisterReturn.dependencies!==afterFirstMutation.dependencies,'Duplicate register dependencies were not detached');
+assert(duplicateRegisterReturn.ownershipContract!==afterFirstMutation.ownershipContract,'Duplicate register ownership contract was not detached');
+assert(duplicateRegisterReturn.ownershipContract.packageMarkers!==afterFirstMutation.ownershipContract.packageMarkers,'Duplicate register package markers were not detached');
+assert(duplicateRegisterReturn.loadedScripts!==afterFirstMutation.loadedScripts,'Duplicate register loaded scripts were not detached');
+duplicateRegisterReturn.state='unavailable';
+duplicateRegisterReturn.userName='Externally mutated duplicate return';
+duplicateRegisterReturn.dependencies.push('learning');
+duplicateRegisterReturn.ownershipContract.packageMarkers.push('global:__EXTERNAL_DUPLICATE_MUTATION__');
+duplicateRegisterReturn.loadedScripts.push('/external-duplicate-mutation.js');
+const afterDuplicateMutation=registry.get(detachedProbeId);
+const snapshotAfterDuplicate=registry.snapshot();
+assert(afterDuplicateMutation.state==='registered','Duplicate return mutation changed authoritative state');
+assert(afterDuplicateMutation.userName==='Register detached probe','Duplicate return mutation changed authoritative user name');
+assert(afterDuplicateMutation.dependencies.length===1&&afterDuplicateMutation.dependencies[0]==='base_finance','Duplicate return mutation changed authoritative dependencies');
+assert(afterDuplicateMutation.ownershipContract.packageMarkers.length===1&&afterDuplicateMutation.ownershipContract.packageMarkers[0]==='global:__REGISTER_DETACHED_PROBE_READY__','Duplicate return mutation changed authoritative package markers');
+assert(afterDuplicateMutation.loadedScripts.length===0,'Duplicate return mutation changed authoritative loaded scripts');
+assert(snapshotAfterDuplicate.catalogue.length===afterFirstRegistration.catalogue.length,'Duplicate registration added a catalogue record');
+assert(snapshotAfterDuplicate.catalogue.filter(item=>item.moduleId===detachedProbeId).length===1,'Duplicate registration created a second module record');
+assert(JSON.stringify(snapshotAfterDuplicate.events)===eventsBeforeDuplicate,'Duplicate registration added an event');
+
 const probeContract={
   navigationSelectors:['[data-probe-entry]'],
   screenSelectors:['#probeScreen'],
@@ -236,6 +294,9 @@ console.log(JSON.stringify({
   injection_isolated:true,
   exact_test_mode:true,
   ownership_contract_enforced:true,
+  register_returns_detached_clone:true,
+  duplicate_register_returns_detached_clone:true,
+  external_mutation_cannot_change_registry:true,
   shell_mutation_barrier:true,
   outside_action_dock_disabled:true,
   mutation_intercepted:true,
