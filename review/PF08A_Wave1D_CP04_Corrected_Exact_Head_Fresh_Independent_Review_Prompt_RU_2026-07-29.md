@@ -4,9 +4,12 @@
 
 Проведи fresh independent clean-room runtime acceptance review исправленного кандидата FamilyPilot PF-08A Wave 1D CP-04.
 
-Работай с нуля. Не наследуй выводы автора исправлений, Codex, Coordination Chat, предыдущих чатов или прежнего review result. Предыдущие findings считаются только обязательствами для повторной независимой проверки, а не доказательством их закрытия.
+Работай с нуля. Не наследуй выводы автора исправлений, Codex, Coordination Chat, предыдущих чатов или прежнего review result. Предыдущий review result используется только как immutable источник точных findings и binding criteria, но его verdict нельзя переносить на исправленный candidate без новой проверки.
 
-Используй только приложенный immutable review bundle.
+Используй только два приложенных immutable источника:
+
+1. `PF08A_Wave1D_CP04_Corrected_Exact_Head_Fresh_Independent_Review_Bundle_2026-07-29.zip`;
+2. `PF08A_Wave1D_CP04_Fresh_Independent_Runtime_Acceptance_Result.md`.
 
 Запрещено:
 
@@ -40,26 +43,43 @@ PUBLIC_ARTIFACT_ID = 8709583866
 PUBLIC_JSON_SHA256 = 4c0069077b5a10b7db51878d71db566199fd8cd100ff6636ac025fb5174292fb
 DURABLE_EVIDENCE_COMMIT = db311481a3839a49c3391e34b90427a89b2a00d4
 DURABLE_EVIDENCE_PATH = evidence/pf08a-wave1d-correction-durable-a4ecf55c4bba.json
-CANONICAL_REPOSITORY = maloma/FamilyPilot
-CANONICAL_COMMIT = 3b8b15ed3f79cccd6f67c4f9060de6a6901bd98a
+PRIOR_REVIEW_FILE = PF08A_Wave1D_CP04_Fresh_Independent_Runtime_Acceptance_Result.md
+PRIOR_REVIEW_SHA256 = 751d5644a7a3395a95660a0ebdfcd7f41e9f33ad565908a84cea4a9f2a249bc2
+PRIOR_REVIEW_SIZE = 32343
 ```
 
-Canonical source hierarchy:
+Source hierarchy for this correction-closure review:
 
-1. `canonical/docs/119_PF-08A_Wave_1D_Visible_Degraded_Mode_Binding_Corrections.md` supersedes conflicting wording in document 117.
-2. Documents 117, 118 and 119 define the binding architecture and corrections.
-3. Document 120 authorizes the architecture and defines required runtime evidence; it is not itself runtime acceptance evidence.
-4. Candidate source, executable tests, exact-head runs, public verifier output and durable evidence must agree.
+1. The prior independent review file is authoritative for the exact original findings, binding criteria and source interpretation.
+2. Its old FAIL verdict is historical only and must not be inherited.
+3. The corrected candidate source and executable tests must independently prove that every finding is closed.
+4. Exact-head runtime evidence, public verification and durable evidence must agree with the reviewed candidate.
+5. A green run or a recorded PASS field is not sufficient when its assertions do not enforce the binding requirement.
 
-## 2. Mandatory bundle integrity gate
+## 2. Mandatory integrity gate
 
 Before substantive review:
 
-1. Read `BUNDLE_METADATA.json`.
-2. Run `sha256sum -c SHA256SUMS` from the bundle root.
-3. Confirm exact candidate SHA using `candidate/CANDIDATE_HEAD.txt` and supplied Git metadata.
-4. Confirm public artifact JSON SHA-256 equals the pinned value.
-5. Confirm durable evidence pins the same candidate, verifier run/job and public JSON hash.
+1. Verify the prior review file:
+
+```bash
+sha256sum PF08A_Wave1D_CP04_Fresh_Independent_Runtime_Acceptance_Result.md
+wc -c PF08A_Wave1D_CP04_Fresh_Independent_Runtime_Acceptance_Result.md
+```
+
+Require exactly:
+
+```text
+SHA-256 = 751d5644a7a3395a95660a0ebdfcd7f41e9f33ad565908a84cea4a9f2a249bc2
+Size = 32343 bytes
+```
+
+2. Extract the review bundle.
+3. Read `BUNDLE_METADATA.json`.
+4. Run `sha256sum -c SHA256SUMS` from the extracted bundle root.
+5. Confirm exact candidate SHA using `candidate/CANDIDATE_HEAD.txt` and supplied metadata.
+6. Confirm public artifact JSON SHA-256 equals the pinned value.
+7. Confirm durable evidence pins the same candidate, verifier run/job and public JSON hash.
 
 If any integrity check fails, stop with:
 
@@ -69,7 +89,7 @@ RUNTIME_ACCEPTANCE = PROHIBITED
 P0_04 = OPEN
 ```
 
-Do not continue from a damaged or mismatched bundle.
+Do not continue from a damaged or mismatched source.
 
 ## 3. Authoritative prior findings to re-evaluate independently
 
@@ -111,7 +131,7 @@ A real `familypilot-scope.js` load failure must reveal the existing minimal stat
 
 First and duplicate `FamilyPilotModuleRegistry.register()` returns must be detached clones. Top-level and nested external mutation must not alter authoritative metadata. Duplicate registration must not add catalogue entries or registration events.
 
-Do not treat the implementation log or green CI as proof that any finding is closed. Inspect source and tests and execute the required checks independently.
+Read the full prior review file. Do not rely only on the summaries above. Do not treat implementation logs, Codex returns or green CI as proof that any finding is closed.
 
 ## 4. Complete review scope
 
@@ -152,13 +172,10 @@ Also inspect:
 candidate.patch
 candidate-name-status.txt
 candidate-log.txt
-canonical/docs/117_*.md
-canonical/docs/118_*.md
-canonical/docs/119_*.md
-canonical/docs/120_*.md
 evidence/public-artifact/*
 evidence/durable/*.json
 metadata/*.json
+PF08A_Wave1D_CP04_Fresh_Independent_Runtime_Acceptance_Result.md
 ```
 
 Enumerate every changed path from `candidate-name-status.txt` and account for each path in a complete coverage matrix.
@@ -258,7 +275,7 @@ Use only `PASS`, `FAIL` or `BLOCKED` per criterion. A green test whose assertion
 
 Return `PASS` only if:
 
-- bundle integrity is complete;
+- source and bundle integrity are complete;
 - every changed path is reviewed;
 - no binding implementation failure remains;
 - every acceptance obligation has direct and adequate source plus executable evidence;
@@ -297,7 +314,7 @@ P0_04 = OPEN
 The output file must contain:
 
 1. Executive conclusion.
-2. Bundle integrity and source-access confirmation.
+2. Source and bundle integrity confirmation.
 3. Exact immutable sources reviewed.
 4. Complete changed-scope coverage matrix.
 5. Acceptance-criteria matrix.
@@ -311,7 +328,8 @@ The output file must contain:
 Final fields must be exactly:
 
 ```text
-REVIEW_MODE = FRESH / INDEPENDENT / CLEAN_ROOM / READ_ONLY / IMMUTABLE_BUNDLE_ONLY
+REVIEW_MODE = FRESH / INDEPENDENT / CLEAN_ROOM / READ_ONLY / IMMUTABLE_SOURCES_ONLY
+PRIOR_REVIEW_INTEGRITY = PASS | FAIL
 BUNDLE_INTEGRITY = PASS | FAIL
 CANDIDATE_SHA = a4ecf55c4bbaabf3b258ee86e1c6a7ba55b65e0c
 REVIEW_STATUS = PASS | RETURN_WITH_FINDINGS | BLOCKED
