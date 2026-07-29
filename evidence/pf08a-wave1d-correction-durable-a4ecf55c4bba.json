@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "status": "DURABLE_PUBLIC_EXACT_HEAD_PASS",
+  "candidate_repository": "maloma/sandbox",
+  "candidate_pr": 141,
+  "candidate_sha": "a4ecf55c4bbaabf3b258ee86e1c6a7ba55b65e0c",
+  "verifier_pr": 142,
+  "verifier_head": "515b902ddcb6b23f1606306bcf4d916a40fb9ae8",
+  "verifier_workflow_run": 30413575358,
+  "verifier_workflow_job": 90455010165,
+  "source_artifact": {
+    "artifact_id": 8709583866,
+    "artifact_name": "pf08a-wave1d-correction-public-a4ecf55c4bba.json",
+    "artifact_json_sha256": "4c0069077b5a10b7db51878d71db566199fd8cd100ff6636ac025fb5174292fb",
+    "artifact_zip_digest": "sha256:eb97526bc13861f8fcd096102b9f95e4f94af8210068c83565f04673edabac82",
+    "artifact_expired_at_recording": false,
+    "artifact_expires_at": "2026-08-28T01:32:50Z"
+  },
+  "public_verification": {
+    "schema_version": 1,
+    "status": "PUBLIC_EXACT_HEAD_PASS",
+    "candidate_repository": "maloma/sandbox",
+    "candidate_pr": 141,
+    "candidate_sha": "a4ecf55c4bbaabf3b258ee86e1c6a7ba55b65e0c",
+    "runtime_workflow_run": 30410818364,
+    "runtime_workflow_job": 90446242760,
+    "verifier_repository": "maloma/sandbox",
+    "verifier_pr": 142,
+    "verifier_head": "515b902ddcb6b23f1606306bcf4d916a40fb9ae8",
+    "verifier_workflow_run": 30413575358,
+    "exact_candidate_checkout": true,
+    "register_returns_detached_clone": true,
+    "duplicate_register_returns_detached_clone": true,
+    "external_mutation_cannot_change_registry": true,
+    "financial_isolation": true,
+    "browser_errors": [],
+    "unhandled_rejections": [],
+    "scope_fallback_direct": true,
+    "recovery_reload_healthy": true,
+    "production_handler_uniqueness": true,
+    "wave1c_regressions": true,
+    "terminal_diff_review": {
+      "result": "PASS",
+      "candidate_changed_paths": [
+        ".github/workflows/pf08a-wave1d-visible-degraded.yml",
+        "familypilot-module-registry-retry-correction.js",
+        "familypilot-module-registry.js",
+        "familypilot-planned-income-amount-model.js",
+        "index.html",
+        "src/familypilot-module-registry-retry-correction.js",
+        "src/familypilot-module-registry.js",
+        "src/familypilot.html",
+        "tools/pf08a-wave1d-financial-fingerprint-domain-smoke.mjs",
+        "tools/pf08a-wave1d-integrated-browser-smoke.mjs",
+        "tools/pf08a-wave1d-listener-sentinel-domain-smoke.mjs",
+        "tools/pf08a-wave1d-module-registry-domain-smoke.mjs",
+        "tools/pf08a-wave1d-recovery-reload-browser-smoke.mjs",
+        "tools/pf08a-wave1d-scope-fallback-browser-smoke.mjs",
+        "tools/pf08a-wave1d-visible-degraded-browser-smoke.mjs"
+      ],
+      "confined_to": "CP-04 findings and required tests",
+      "workflow_drift": false,
+      "successful_exact_head_run": true
+    },
+    "mirror_identities": [
+      {
+        "root": "index.html",
+        "source": "src/familypilot.html",
+        "identical": true,
+        "sha256": "bcd81961a64a83d8c1998a047d53584168d6feb5a9e0023bf1af99486142474d"
+      },
+      {
+        "root": "familypilot-scope.js",
+        "source": "src/familypilot-scope.js",
+        "identical": true,
+        "sha256": "20316ad7143f6f1078bd07fe7ff01c1c224c7c3af7079887f625b67156ec990c"
+      },
+      {
+        "root": "familypilot-module-registry.js",
+        "source": "src/familypilot-module-registry.js",
+        "identical": true,
+        "sha256": "49b5b86fa266d51745d84a9387fc58db86dd8c07ac9d63baa6f22a78e9c4ea8b"
+      },
+      {
+        "root": "familypilot-module-registry-retry-correction.js",
+        "source": "src/familypilot-module-registry-retry-correction.js",
+        "identical": true,
+        "sha256": "7d9436560917cc7dfb10ae607a4c279a3439db9aec66017ea1d88c5d72509d06"
+      },
+      {
+        "root": "familypilot-module-registry-ui.js",
+        "source": "src/familypilot-module-registry-ui.js",
+        "identical": true,
+        "sha256": "45abbe1fa21502fa346901df326e9d6bf65687753e404a73dfc199260e63900f"
+      },
+      {
+        "root": "familypilot-module-entry-bridge.js",
+        "source": "src/familypilot-module-entry-bridge.js",
+        "identical": true,
+        "sha256": "3eb25784f23106d5bb828679abd935314d966af7196ae9b19753863ad14c1474"
+      }
+    ],
+    "runtime_exceptions": [],
+    "marker_results": {
+      "tools/pf08a-wave1d-module-registry-domain-smoke.mjs": {
+        "marker": "PF08A_WAVE1D_MODULE_REGISTRY_DOMAIN_PASS",
+        "pass": true,
+        "elapsed_ms": 80
+      },
+      "tools/pf08a-wave1d-financial-fingerprint-domain-smoke.mjs": {
+        "marker": "PF08A_WAVE1D_FINANCIAL_FINGERPRINT_DOMAIN_PASS",
+        "pass": true,
+        "elapsed_ms": 36
+      },
+      "tools/pf08a-wave1d-listener-sentinel-domain-smoke.mjs": {
+        "marker": "PF08A_WAVE1D_LISTENER_SENTINEL_DOMAIN_PASS",
+        "pass": true,
+        "elapsed_ms": 35
+      },
+      "tools/pf08a-wave1d-integrated-browser-smoke.mjs": {
+        "marker": "PF08A_WAVE1D_INTEGRATED_PASS",
+        "pass": true,
+        "elapsed_ms": 35647
+      },
+      "tools/pf08a-wave1d-visible-degraded-browser-smoke.mjs": {
+        "marker": "PF08A_WAVE1D_VISIBLE_DEGRADED_PASS",
+        "pass": true,
+        "elapsed_ms": 420114
+      },
+      "tools/pf08a-wave1d-scope-fallback-browser-smoke.mjs": {
+        "marker": "PF08A_WAVE1D_SCOPE_FALLBACK_PASS",
+        "pass": true,
+        "elapsed_ms": 30079
+      },
+      "tools/pf08a-wave1d-recovery-reload-browser-smoke.mjs": {
+        "marker": "PF08A_WAVE1D_RECOVERY_RELOAD_PASS",
+        "pass": true,
+        "elapsed_ms": 420127
+      },
+      "tools/pf08a-wave1c-persistence-browser-smoke.mjs": {
+        "marker": "PF08A_WAVE1C_PERSISTENCE_PASS",
+        "pass": true,
+        "elapsed_ms": 4661
+      },
+      "tools/pf08a-wave1c-compatibility-migration-smoke.mjs": {
+        "marker": "PF08A_WAVE1C_COMPAT_MIGRATION_PASS",
+        "pass": true,
+        "elapsed_ms": 39155
+      },
+      "tools/pf08a-wave1c-integrated-browser-smoke.mjs": {
+        "marker": "PF08A_FIRST_VERSION_WAVE1C_INTEGRATED_PASS",
+        "pass": true,
+        "elapsed_ms": 53006
+      }
+    },
+    "readiness_verdict": "NOT_READY",
+    "generated_at_utc": "2026-07-29T01:32:49.966Z"
+  },
+  "readiness_verdict": "NOT_READY",
+  "p0_04_closed": false,
+  "fresh_independent_review_completed": false,
+  "recorded_at_utc": "2026-07-29T07:10:47.909911Z"
+}
