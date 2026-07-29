@@ -1,0 +1,1 @@
+This file exists only to trigger the staging pull-request validation workflow and must not be propagated to PR #141.
