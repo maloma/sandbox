@@ -197,13 +197,13 @@ const server=createServer((req,res)=>{
 const chrome=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'].find(existsSync);
 if(!chrome)throw Error('Chrome unavailable');
 await new Promise((resolveListen,rejectListen)=>{server.once('error',rejectListen);server.listen(0,'127.0.0.1',resolveListen)});
-let child=null,stderr='',primaryError=null;
+let child=null,stderr='',primaryError=null,timeoutHandle=null;
 try{
   const port=server.address().port;
   child=spawn(chrome,['--headless=new','--no-sandbox','--disable-dev-shm-usage','--disable-gpu',`--user-data-dir=${profile}`,`http://127.0.0.1:${port}/${name}`],{stdio:['ignore','ignore','pipe']});
   child.stderr.on('data',chunk=>stderr+=chunk);
   const childExit=new Promise(resolveExit=>child.once('close',code=>resolveExit({type:'exit',code})));
-  const timeoutResult=new Promise(resolveTimeout=>setTimeout(()=>resolveTimeout({type:'timeout'}),420000));
+  const timeoutResult=new Promise(resolveTimeout=>{timeoutHandle=setTimeout(()=>resolveTimeout({type:'timeout'}),420000)});
   const outcome=await Promise.race([reportPromise.then(report=>({type:'report',report})),childExit,timeoutResult]);
   if(outcome.type==='timeout')throw Error('Browser timeout at '+lastProgress+'\n'+stderr.slice(-12000));
   if(outcome.type==='exit')throw Error(`Browser exited before reporting (${outcome.code})\n${stderr.slice(-12000)}`);
@@ -214,7 +214,16 @@ try{
   primaryError=error;
   throw error;
 }finally{
-  if(child&&!child.killed){child.kill('SIGTERM');await wait(200);if(!child.killed)child.kill('SIGKILL')}
+  if(timeoutHandle!==null)clearTimeout(timeoutHandle);
+  if(child&&child.exitCode===null&&child.signalCode===null){
+    child.kill('SIGTERM');
+    await Promise.race([new Promise(resolveExit=>child.once('close',resolveExit)),wait(1000)]);
+    if(child.exitCode===null&&child.signalCode===null){
+      child.kill('SIGKILL');
+      await Promise.race([new Promise(resolveExit=>child.once('close',resolveExit)),wait(1000)]);
+    }
+  }
+  server.closeAllConnections?.();
   await new Promise(resolveClose=>server.close(resolveClose));
   if(existsSync(path))unlinkSync(path);
   try{rmSync(profile,{recursive:true,force:true,maxRetries:5,retryDelay:100})}catch(cleanupError){if(!primaryError)throw cleanupError;console.error('Profile cleanup failed after primary error:',String(cleanupError))}
