@@ -53,7 +53,7 @@ jobs:
         working-directory: candidate
         run: |
           set -euo pipefail
-          awk '/^PATCH_B64$/{capture=!capture;next} capture' ../builder/.github/workflows/pf08a-assistant-attempt1-stage.yml > /tmp/attempt1.patch.xz.b64
+          awk '/<<'"'"'PATCH_B64'"'"'/{capture=1;next} /^PATCH_B64$/{capture=0} capture' ../builder/.github/workflows/pf08a-assistant-attempt1-stage.yml > /tmp/attempt1.patch.xz.b64
           tr -d '\n\r' < /tmp/attempt1.patch.xz.b64 | base64 -d | xz -d > /tmp/attempt1.patch
           git apply --check /tmp/attempt1.patch
           git apply /tmp/attempt1.patch
