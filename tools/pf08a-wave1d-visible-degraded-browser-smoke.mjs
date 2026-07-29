@@ -132,14 +132,15 @@ const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null
  await progress('readiness-timeout app load');
  await load(timeout,'/?test=1&persistenceTest=${token}-timeout&moduleFailure=what_if&moduleFailureStage=readiness_timeout','readiness-timeout app');
  const t=timeout.contentWindow;
- await until(()=>t.__FP_MODULE_REGISTRY_UI_READY__&&t.FamilyPilotModuleRegistry?.get?.('what_if')?.state==='degraded','readiness timeout degraded state',120000);
+ await until(()=>t.__FP_MODULE_REGISTRY_UI_READY__&&t.__FP_PERSISTENCE_READY__===true&&t.FamilyPilotModuleRegistry?.get?.('what_if')?.state==='degraded','readiness timeout degraded state',120000);
  const timeoutRecord=t.FamilyPilotModuleRegistry.get('what_if'),timeoutUi=t.__FP_TEST__.moduleRegistry,timeoutBefore=timeoutUi.financialFingerprint();
  assert(timeoutRecord.failureStage==='readiness_timeout','Readiness timeout stage missing');
  assert(timeoutRecord.installStarted===true,'Partial installation was not recorded');
  assert(timeoutRecord.retryClass==='reload_required','Partial installation did not require reload');
  timeoutUi.open('what_if');await wait(60);
  assert(timeoutUi.degradedText().includes('Перезагрузить FamilyPilot'),'Reload-required action missing');
- assert(timeoutUi.financialFingerprint()===timeoutBefore,'Readiness-timeout card changed financial state');
+ const timeoutAfter=timeoutUi.financialFingerprint();
+ if(timeoutAfter!==timeoutBefore)throw Error('Readiness-timeout card changed financial state: '+JSON.stringify(fingerprintDiff(timeoutBefore,timeoutAfter)));
 
  const eventSafe=registry.snapshot().events.every(e=>!('amount' in e)&&!('note' in e)&&!('stack' in e));
  assert(eventSafe,'Registry safe event history contains financial or stack payload');
