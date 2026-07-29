@@ -82,10 +82,13 @@ function displayStatus(state,item,at=Date.now()){
 const api=Object.freeze({...base,activeOperations,summary,sync,normalizeState,attach,createOperation,detach,clearAll,skip,unskip,displayStatus});
 window.FamilyPilotPlannedIncome=api;
 const runtime=window.__FP_RUNTIME__;
-if(runtime?.toast&&!runtime.__plannedIncomeAmountToastPatched){
-  const original=runtime.toast.bind(runtime);
-  runtime.toast=message=>original(message==='Приход отмечен полученным.'||message==='Частичный приход добавлен.'?'Поступление записано.':message);
-  runtime.__plannedIncomeAmountToastPatched=true;
+if(runtime?.toast&&!window.__FP_PLANNED_INCOME_AMOUNT_TOAST_PATCHED__){
+  const descriptor=Object.getOwnPropertyDescriptor(runtime,'toast');
+  if(descriptor&&(descriptor.writable||descriptor.set)){
+    const original=runtime.toast.bind(runtime);
+    runtime.toast=message=>original(message==='Приход отмечен полученным.'||message==='Частичный приход добавлен.'?'Поступление записано.':message);
+  }
+  window.__FP_PLANNED_INCOME_AMOUNT_TOAST_PATCHED__=true;
 }
 window.__FP_PLANNED_INCOME_AMOUNT_MODEL__=true;
 window.__FP_M4_02_AMOUNT_MODEL_READY__=true;

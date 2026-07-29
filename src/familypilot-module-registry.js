@@ -199,7 +199,12 @@
   }
 
   function normalizedRecord(definition){
+    const accepted=clone(definition||{});
+    const ownershipContract=clone(ownershipContracts[accepted.moduleId] || accepted.ownershipContract || {
+      navigationSelectors:[], screenSelectors:[], packageMarkers:[], listenerSentinel:null,
+    });
     return {
+      ...accepted,
       version:1,
       state:'registered',
       reasonCode:null,
@@ -216,22 +221,23 @@
       rootFailureModuleId:null,
       rootDiagnosticId:null,
       blockedByModuleId:null,
+      dependencies:Array.isArray(accepted.dependencies)?accepted.dependencies:[],
+      scripts:Array.isArray(accepted.scripts)?accepted.scripts:[],
+      routes:Array.isArray(accepted.routes)?accepted.routes:[],
+      unaffectedRoutes:Array.isArray(accepted.unaffectedRoutes)?accepted.unaffectedRoutes:[],
       loadedScripts:[],
-      ownershipContract:clone(ownershipContracts[definition.moduleId] || definition.ownershipContract || {
-        navigationSelectors:[], screenSelectors:[], packageMarkers:[], listenerSentinel:null,
-      }),
-      ...definition,
+      ownershipContract,
     };
   }
 
   function register(definition){
     const moduleId = String(definition?.moduleId || '');
     if(!moduleId) throw new Error('moduleId required');
-    if(records.has(moduleId)) return records.get(moduleId);
+    if(records.has(moduleId)) return clone(records.get(moduleId));
     const record = normalizedRecord(definition);
     records.set(moduleId, record);
     emit(record, null, 'registered');
-    return record;
+    return clone(record);
   }
 
   moduleDefinitions.forEach(register);

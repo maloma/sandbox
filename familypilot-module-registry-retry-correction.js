@@ -6,7 +6,144 @@
   const registry=window.FamilyPilotModuleRegistry;
   if(!registry)return;
 
+  const fallbackExcludedFinancialStateKeys=Object.freeze([
+    'schemaVersion','currentMemberId','activeWalletId','learningModeByMember',
+  ]);
+  const identityKeys=Object.freeze([
+    'id','eventId','ruleId','occurrenceId','transferId','walletId','memberId','goalId','scenarioId',
+  ]);
+  const financialContractMetadata=Object.freeze({
+    version:3,
+    stateOwner:'window.__FP_RUNTIME__.state',
+    persistenceOwner:'FamilyPilotPersistence',
+    keyPolicy:'persistence_contract_plus_observed_runtime_keys',
+    missingCollectionDefault:'empty_array',
+    missingObjectDefault:'empty_object',
+    missingScalarDefault:'null',
+    recordTimestampsAndAuditMetadata:'included_without_normalization',
+    persistenceEnvelopeMetadata:'excluded',
+  });
+
+  function canonicalValue(value){
+    if(value===undefined)return null;
+    if(value===null||typeof value!=='object')return value;
+    if(Array.isArray(value))return value.map(canonicalValue);
+    const output={};
+    for(const key of Object.keys(value).sort())output[key]=canonicalValue(value[key]);
+    return output;
+  }
+
+  function compareText(left,right){
+    return left<right?-1:left>right?1:0;
+  }
+
+  function collectionItemKey(item){
+    const payload=JSON.stringify(item);
+    if(item&&typeof item==='object'&&!Array.isArray(item)){
+      for(const key of identityKeys){
+        if(item[key]!==undefined&&item[key]!==null)return `${key}:${String(item[key])}\u0000${payload}`;
+      }
+    }
+    return `payload:\u0000${payload}`;
+  }
+
+  function canonicalCollection(value){
+    const items=Array.isArray(value)?value:[];
+    return items.map(canonicalValue).sort((left,right)=>compareText(collectionItemKey(left),collectionItemKey(right)));
+  }
+
+  function financialState(){
+    try{
+      const testState=window.__FP_TEST__?.getState?.();
+      if(testState&&typeof testState==='object'&&!Array.isArray(testState))return testState;
+    }catch{}
+    return window.__FP_RUNTIME__?.state||{};
+  }
+
+  function resolvedFinancialContract(state=financialState()){
+    let contract=null;
+    try{contract=window.FamilyPilotPersistence?.financialStateContract?.()||null}catch{}
+    const objectKeys=new Set(Array.isArray(contract?.objectKeys)?contract.objectKeys:[]);
+    const collectionKeys=new Set(Array.isArray(contract?.collectionKeys)?contract.collectionKeys:[]);
+    const scalarKeys=new Set(Array.isArray(contract?.scalarKeys)?contract.scalarKeys:[]);
+    const excludedStateKeys=new Set(Array.isArray(contract?.excludedStateKeys)?contract.excludedStateKeys:fallbackExcludedFinancialStateKeys);
+    const canonicalKeys=new Set([...objectKeys,...collectionKeys,...scalarKeys]);
+    const observedRuntimeKeys=Object.keys(state||{}).filter(key=>!excludedStateKeys.has(key));
+    const keys=[...new Set([...canonicalKeys,...observedRuntimeKeys])].sort();
+    for(const key of observedRuntimeKeys){
+      if(canonicalKeys.has(key))continue;
+      const value=state[key];
+      if(Array.isArray(value))collectionKeys.add(key);
+      else if(value&&typeof value==='object')objectKeys.add(key);
+      else scalarKeys.add(key);
+    }
+    return{
+      ...financialContractMetadata,
+      schemaContractVersion:Number(contract?.version)||0,
+      schemaContractOwner:String(contract?.owner||'runtime-observation-fallback'),
+      keys,
+      objectKeys:[...objectKeys].sort(),
+      collectionKeys:[...collectionKeys].sort(),
+      scalarKeys:[...scalarKeys].sort(),
+      unorderedCollections:[...collectionKeys].sort(),
+      excludedStateKeys:[...excludedStateKeys].sort(),
+    };
+  }
+
+  function financialFingerprint(){
+    const state=financialState();
+    const contract=resolvedFinancialContract(state);
+    const collections=new Set(contract.collectionKeys);
+    const objects=new Set(contract.objectKeys);
+    const output={contractVersion:contract.version,schemaContractVersion:contract.schemaContractVersion};
+    for(const key of contract.keys){
+      if(collections.has(key))output[key]=canonicalCollection(state[key]);
+      else if(objects.has(key))output[key]=canonicalValue(state[key]===undefined?{}:state[key]);
+      else output[key]=canonicalValue(state[key]===undefined?null:state[key]);
+    }
+    return JSON.stringify(canonicalValue(output));
+  }
+
+  function financialFingerprintContract(){
+    return JSON.parse(JSON.stringify(resolvedFinancialContract()));
+  }
+
+  window.FamilyPilotModuleRegistry=Object.freeze({
+    ...registry,
+    financialFingerprint,
+    financialFingerprintContract,
+  });
+
   const terminalUnavailable=new Map();
+  const shellControlState=new WeakMap();
+  let shellMutationBlockCount=0;
+  const mutationControlSelector='button,input,select,textarea,[role="button"],[contenteditable="true"],form';
+  const readOnlyControlSelector=[
+    'a[href]',
+    '.nav',
+    '.nav-btn',
+    '.back',
+    '.close',
+    '.link',
+    '.analytics-link',
+    '.filter-button',
+    '.trash-button',
+    '.wallet-context',
+    '.info',
+    '.round',
+    '.debt',
+    '.filters button',
+    '.range button',
+    '.period-nav button',
+    '[data-screen]',
+    '[data-plan-module]',
+    '[data-fp-module]',
+    '[data-fp-module-back]',
+    '[data-fp-module-details]',
+    '[data-fp-module-retry]',
+    '[data-persistence-open]',
+    '[data-persistence-diagnostic]',
+  ].join(',');
 
   function clearGeneric(moduleId){
     const value=String(window.__FP_PACKAGE_BOOTSTRAP_ERROR__||'');
@@ -54,10 +191,83 @@
     }
   }
 
+  function shellDegraded(snapshot=registry.snapshot()){
+    return Boolean((snapshot.catalogue||[]).some(record=>
+      ['degraded','unavailable'].includes(record.state)&&record.containmentLevel==='application_shell_degraded'
+    ));
+  }
+
+  function readOnlyControl(target){
+    return Boolean(target?.closest?.(readOnlyControlSelector));
+  }
+
+  function restoreControl(control,held){
+    control.disabled=held.disabled;
+    if(held.ariaDisabled===null)control.removeAttribute('aria-disabled');
+    else control.setAttribute('aria-disabled',held.ariaDisabled);
+    delete control.dataset.fpShellMutationBlocked;
+    shellControlState.delete(control);
+  }
+
+  function syncShellMutationBarrier(snapshot=registry.snapshot()){
+    const active=shellDegraded(snapshot);
+    document.body?.classList.toggle('fp-shell-mutation-barrier',active);
+    for(const control of document.querySelectorAll('button,input,select,textarea')){
+      const held=shellControlState.get(control);
+      if(active&&!readOnlyControl(control)){
+        if(!held)shellControlState.set(control,{
+          disabled:Boolean(control.disabled),
+          ariaDisabled:control.getAttribute('aria-disabled'),
+        });
+        control.disabled=true;
+        control.setAttribute('aria-disabled','true');
+        control.dataset.fpShellMutationBlocked='true';
+      }else if(held){
+        restoreControl(control,held);
+      }
+    }
+    return active;
+  }
+
+  function blockShellMutation(event){
+    if(!shellDegraded()||readOnlyControl(event.target)||!event.target?.closest?.(mutationControlSelector))return false;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    shellMutationBlockCount+=1;
+    return true;
+  }
+
+  for(const type of ['click','submit','beforeinput','input','change']){
+    document.addEventListener(type,blockShellMutation,true);
+  }
+  document.addEventListener('keydown',event=>{
+    if((event.key==='Enter'||event.key===' ')&&blockShellMutation(event))return;
+  },true);
+
   window.addEventListener('familypilot:module-state',event=>{
     reconcileCompatibilityErrors(event.detail);
     preserveTerminalUnavailable(event.detail);
+    syncShellMutationBarrier(event.detail);
   });
+  new MutationObserver(()=>syncShellMutationBarrier()).observe(document.documentElement,{subtree:true,childList:true});
   reconcileCompatibilityErrors();
   preserveTerminalUnavailable();
+  syncShellMutationBarrier();
+
+  if(new URLSearchParams(location.search).get('test')==='1'){
+    const test=window.__FP_TEST__=window.__FP_TEST__||{};
+    test.moduleRegistryCorrection={
+      shellDegraded,
+      syncShellMutationBarrier,
+      blockedCount:()=>shellMutationBlockCount,
+      blockedControls:()=>[...document.querySelectorAll('[data-fp-shell-mutation-blocked="true"]')].map(control=>({
+        id:control.id||'',
+        tag:control.tagName,
+        type:control.type||'',
+      })),
+      readOnlyControl:selector=>readOnlyControl(document.querySelector(selector)),
+      financialFingerprint,
+      financialFingerprintContract,
+    };
+  }
 })();

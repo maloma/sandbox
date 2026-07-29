@@ -4,6 +4,34 @@
 
   const CURRENT_SCHEMA=22;
   const CURRENT_STATE_SCHEMA_VERSION=CURRENT_SCHEMA;
+  const FINANCIAL_STATE_CONTRACT=Object.freeze({
+    version:1,
+    owner:'FamilyPilotPersistence',
+    keyPolicy:'canonical_schema_plus_observed_runtime_keys',
+    objectKeys:Object.freeze([
+      'household','config','giftFundSettings','specialPurposeGoalIds','starterOnboarding',
+    ]),
+    collectionKeys:Object.freeze([
+      'members','wallets','categories','operations','transfers','walletMovements',
+      'obligationRules','obligationOccurrences','debtChains','debtCounterparties','debtEvents',
+      'savingsGoals','savingsAccountPlans','savingsContributionOverrides','savingsGoalPolicies',
+      'savingsMonthlyPlanReviews','savingsReserveDesigns','savingsReservePolicies','savingsRules',
+      'savingsTransfers','purposeAllocations','purposeAllocationEvents','savingsLegacyReconciliationIssues',
+      'savingsPurposeMigrationResults','savingsPurposeMigrationSnapshots','walletTransfers',
+      'investmentAccounts','investmentValuations','investmentLocationAssignments','purposeLocationAssignments',
+      'reserveContributionRules','giftFundReserveBridges','balanceAdjustments','plannedIncomeRules',
+      'plannedIncomeOccurrences','incomeDistributionRules','incomeRuleActivationSnapshots',
+      'savingsActionOccurrences','birthdayEvents','whatIfScenarios','whatIfPlanConversions',
+      'whatIfInterestSimulations','persistenceMigrationLedger','m405ActionExecutionLedger',
+      'm405NotifiedIncomeBatchIds',
+    ]),
+    scalarKeys:Object.freeze([
+      'defaultOperatingLocationId','reserveSavingsGoalId','selectedPartyId',
+    ]),
+    excludedStateKeys:Object.freeze([
+      'schemaVersion','currentMemberId','activeWalletId','learningModeByMember',
+    ]),
+  });
   const ENVELOPE_VERSION=1;
   const query=new URLSearchParams(root.location?.search||'');
   const testMode=query.has('test');
@@ -78,6 +106,7 @@
   }
   function fnv1a32(text){let hash=0x811c9dc5;for(let i=0;i<text.length;i++){hash^=text.charCodeAt(i);hash=Math.imul(hash,0x01000193)}return(hash>>>0).toString(16).padStart(8,'0')}
   function clone(value){return JSON.parse(canonicalSerialize(value))}
+  function financialStateContract(){return clone(FINANCIAL_STATE_CONTRACT)}
   function parseObject(raw){if(typeof raw!=='string'||!raw.trim())return{ok:false,empty:true,error:'empty'};try{const value=JSON.parse(raw);return isPlainObject(value)?{ok:true,value}:{ok:false,error:'root_not_object'}}catch{return{ok:false,error:'malformed_json'}}}
   const criticalArrayKeys=['wallets','operations','walletMovements','transfers','purposeAllocations','savingsTransfers','obligationRules','obligationOccurrences'];
   function structuralValidate(state){
@@ -246,7 +275,7 @@
 
   const selected=selectLoadSource();
   if(selected.ok)pendingCandidate=selected.raw;
-  const api=Object.freeze({CURRENT_SCHEMA,CURRENT_STATE_SCHEMA_VERSION,storageNamespace,canonicalSerialize,fnv1a32,structuralValidate,finalizeBootstrap,currentStatus:()=>clone(currentStatusValue),inspectSlots,isRecoveryLocked:()=>recoveryLocked,diagnosticReport,downloadDiagnostic,commitState,test:testMode?Object.freeze({cleanup:cleanupTest,failNextWriteAt:point=>{failNext=String(point||'')},corruptActiveSlot,seedMalformedCompatibilityPayload,seedFutureSchemaPayload,retryRecovery,nativeGetItem,nativeSetItem,keys:()=>({...keys})}):undefined});
+  const api=Object.freeze({CURRENT_SCHEMA,CURRENT_STATE_SCHEMA_VERSION,storageNamespace,canonicalSerialize,fnv1a32,financialStateContract,structuralValidate,finalizeBootstrap,currentStatus:()=>clone(currentStatusValue),inspectSlots,isRecoveryLocked:()=>recoveryLocked,diagnosticReport,downloadDiagnostic,commitState,test:testMode?Object.freeze({cleanup:cleanupTest,failNextWriteAt:point=>{failNext=String(point||'')},corruptActiveSlot,seedMalformedCompatibilityPayload,seedFutureSchemaPayload,retryRecovery,nativeGetItem,nativeSetItem,keys:()=>({...keys})}):undefined});
   root.FamilyPilotPersistence=api;
   root.__FP_PERSISTENCE_CORE_READY__=true;
 })(typeof window!=='undefined'?window:globalThis);

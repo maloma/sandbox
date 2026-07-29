@@ -15,6 +15,34 @@ let reportResult;
 const reportPromise=new Promise(resolveReport=>{reportResult=resolveReport});
 let lastProgress='not_started';
 
+const browserCollector=`<script>(()=>{
+  const events=[];
+  const registrations=[];
+  const targets=new WeakMap();
+  let targetSequence=0;
+  const watchedSources=['familypilot-m4-06-what-if-ui.js','familypilot-m4-07-learning-mode-ui.js'];
+  const describe=value=>{try{return String(value?.stack||value?.message||value||'unknown')}catch{return 'unprintable'}};
+  const targetLabel=target=>{if(target===window)return'window';if(target===document)return'document';if(target?.id)return'#'+target.id;if(!targets.has(target))targets.set(target,'target-'+(++targetSequence));return targets.get(target)};
+  const callsite=()=>String(new Error().stack||'').split('\\n').map(line=>line.trim()).find(line=>watchedSources.some(source=>line.includes(source)))||'';
+  const nativeAdd=EventTarget.prototype.addEventListener;
+  EventTarget.prototype.addEventListener=function(type,listener,options){
+    const callsiteValue=callsite();
+    if(callsiteValue){
+      const capture=typeof options==='boolean'?options:Boolean(options?.capture);
+      const source=watchedSources.find(name=>callsiteValue.includes(name))||'';
+      registrations.push({target:targetLabel(this),type:String(type),capture,source,callsite:callsiteValue});
+    }
+    return nativeAdd.call(this,type,listener,options);
+  };
+  const duplicates=()=>{const counts=new Map();for(const item of registrations){const key=[item.target,item.type,item.capture,item.source,item.callsite].join('|');counts.set(key,(counts.get(key)||0)+1)}return[...counts.entries()].filter(([,count])=>count>1).map(([key,count])=>({key,count}))};
+  const sourceCounts=()=>Object.fromEntries(watchedSources.map(source=>[source,registrations.filter(item=>item.source===source).length]));
+  Object.defineProperty(window,'__FP_BROWSER_EVENTS__',{value:events,configurable:false});
+  Object.defineProperty(window,'__FP_LISTENER_SENTINEL__',{value:Object.freeze({registrations:()=>registrations.map(item=>({...item})),duplicates,sourceCounts}),configurable:false});
+  window.addEventListener('error',event=>events.push({type:'error',message:String(event.message||'unknown'),source:String(event.filename||''),line:Number(event.lineno||0),column:Number(event.colno||0),detail:describe(event.error)}));
+  window.addEventListener('unhandledrejection',event=>events.push({type:'unhandledrejection',detail:describe(event.reason)}));
+})();</script>`;
+const instrumentIndex=body=>{const text=body.toString('utf8'),match=text.match(/<head[^>]*>/i);return match?text.replace(match[0],match[0]+browserCollector):browserCollector+text};
+
 const harness=`<!doctype html><html lang="ru"><body data-status="PENDING"><iframe id="app" style="width:390px;height:844px;border:0"></iframe><iframe id="ordinary" style="display:none"></iframe><iframe id="timeout" style="display:none"></iframe><pre id="result">PENDING</pre><script>(()=>{
 const out=document.getElementById('result'),app=document.getElementById('app'),ordinary=document.getElementById('ordinary'),timeout=document.getElementById('timeout');
 const wait=ms=>new Promise(r=>setTimeout(r,ms)),assert=(v,m)=>{if(!v)throw Error(m)};
@@ -69,10 +97,28 @@ const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null
  if(afterRecovery!==before)throw Error('Recovery changed financial state: '+JSON.stringify(fingerprintDiff(before,afterRecovery)));
  const errors=[w.__FP_PACKAGE_BOOTSTRAP_ERROR__,w.__FP_M4_05_BOOTSTRAP_ERROR__,w.__FP_M4_06_UI_ERROR__,w.__FP_M4_07_LEARNING_UI_ERROR__].filter(Boolean);
  assert(errors.length===0,'Runtime bootstrap errors after recovery: '+errors.join(' | '));
+ const recoveryListenerSentinel=w.__FP_LISTENER_SENTINEL__;
+ assert(recoveryListenerSentinel,'Listener sentinel missing after same-page recovery');
+ const recoveryListenerCounts=recoveryListenerSentinel.sourceCounts();
+ assert(recoveryListenerCounts['familypilot-m4-06-what-if-ui.js']===1,'What If long-lived handler was not installed exactly once after same-page recovery');
+ assert(recoveryListenerCounts['familypilot-m4-07-learning-mode-ui.js']===1,'Learning long-lived handler was not installed exactly once after same-page recovery');
+ assert(recoveryListenerSentinel.duplicates().length===0,'Duplicate retryable-module handlers after same-page recovery: '+JSON.stringify(recoveryListenerSentinel.duplicates()));
 
  registry.test.forceUnavailable('persistence','persistence_recovery_locked');registry.reconcile();ui.render();await wait(80);
  assert(ui.shellDegraded(),'Persistence critical failure did not degrade application shell');
  assert(getComputedStyle(w.document.getElementById('actionDock')).display==='none','Financial mutation dock remained visible during shell degradation');
+ await until(()=>w.document.querySelectorAll('[data-fp-shell-mutation-blocked="true"]').length>0,'browser shell mutation barrier activation');
+ const blockedNodes=[...w.document.querySelectorAll('[data-fp-shell-mutation-blocked="true"]')];
+ const outsideDock=blockedNodes.find(node=>!node.closest('#actionDock'));
+ assert(outsideDock,'No financial mutation control outside actionDock was blocked');
+ assert(outsideDock.disabled===true,'Outside-dock financial mutation control was not disabled');
+ const mutationEvent=new w.MouseEvent('click',{bubbles:true,cancelable:true});
+ const mutationDispatch=outsideDock.dispatchEvent(mutationEvent);
+ assert(mutationEvent.defaultPrevented||mutationDispatch===false,'Outside-dock mutation event was not intercepted');
+ const readOnlyNav=w.document.querySelector('.nav');
+ assert(readOnlyNav&&!readOnlyNav.disabled,'Read-only navigation was disabled by shell barrier');
+ w.__FP_RUNTIME__.showScreen('more');
+ assert(w.document.getElementById('moreScreen').classList.contains('active'),'Unaffected read-only route unavailable during shell degradation');
  assert(registry.get('persistence').retryClass==='never','Persistence lock exposed unsafe retry');
  assert(ui.financialFingerprint()===before,'Persistence containment changed financial state');
 
@@ -86,20 +132,27 @@ const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null
  await progress('readiness-timeout app load');
  await load(timeout,'/?test=1&persistenceTest=${token}-timeout&moduleFailure=what_if&moduleFailureStage=readiness_timeout','readiness-timeout app');
  const t=timeout.contentWindow;
- await until(()=>t.__FP_MODULE_REGISTRY_UI_READY__&&t.FamilyPilotModuleRegistry?.get?.('what_if')?.state==='degraded','readiness timeout degraded state',120000);
+ await until(()=>t.__FP_MODULE_REGISTRY_UI_READY__&&t.__FP_PERSISTENCE_READY__===true&&t.FamilyPilotModuleRegistry?.get?.('what_if')?.state==='degraded','readiness timeout degraded state',120000);
  const timeoutRecord=t.FamilyPilotModuleRegistry.get('what_if'),timeoutUi=t.__FP_TEST__.moduleRegistry,timeoutBefore=timeoutUi.financialFingerprint();
  assert(timeoutRecord.failureStage==='readiness_timeout','Readiness timeout stage missing');
  assert(timeoutRecord.installStarted===true,'Partial installation was not recorded');
  assert(timeoutRecord.retryClass==='reload_required','Partial installation did not require reload');
  timeoutUi.open('what_if');await wait(60);
  assert(timeoutUi.degradedText().includes('Перезагрузить FamilyPilot'),'Reload-required action missing');
- assert(timeoutUi.financialFingerprint()===timeoutBefore,'Readiness-timeout card changed financial state');
+ const timeoutAfter=timeoutUi.financialFingerprint();
+ if(timeoutAfter!==timeoutBefore)throw Error('Readiness-timeout card changed financial state: '+JSON.stringify(fingerprintDiff(timeoutBefore,timeoutAfter)));
 
  const eventSafe=registry.snapshot().events.every(e=>!('amount' in e)&&!('note' in e)&&!('stack' in e));
  assert(eventSafe,'Registry safe event history contains financial or stack payload');
  assert(registry.snapshot().events.length<=50,'Registry event history exceeded bound');
+ const browserEvents=[
+   ...(w.__FP_BROWSER_EVENTS__||[]).map(event=>({frame:'injected',...event})),
+   ...(o.__FP_BROWSER_EVENTS__||[]).map(event=>({frame:'ordinary',...event})),
+   ...(t.__FP_BROWSER_EVENTS__||[]).map(event=>({frame:'readiness_timeout',...event})),
+ ];
+ assert(browserEvents.length===0,'Browser runtime events: '+JSON.stringify(browserEvents));
  try{w.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.();o.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.();t.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.()}catch{}
- await report('PASS',{status:'PASS',marker:'${marker}',visible_global_card:true,visible_local_card:true,failed_entry_preserved:true,precise_data_wording:true,diagnostic_id:true,root_cause_grouping:true,unaffected_routes:true,one_active_attempt:true,safe_retry:true,no_duplicate_ui:true,financial_isolation:true,persistence_priority:true,injection_isolated:true,partial_install_reload_required:true,safe_events:true});
+ await report('PASS',{status:'PASS',marker:'${marker}',visible_global_card:true,visible_local_card:true,failed_entry_preserved:true,precise_data_wording:true,diagnostic_id:true,root_cause_grouping:true,unaffected_routes:true,one_active_attempt:true,safe_retry:true,no_duplicate_ui:true,no_duplicate_handlers_after_same_page_recovery:true,what_if_listener_unique:true,learning_listener_unique:true,financial_isolation:true,persistence_priority:true,shell_mutation_barrier:true,outside_action_dock_disabled:true,mutation_intercepted:true,read_only_navigation_preserved:true,injection_isolated:true,partial_install_reload_required:true,safe_events:true,runtime_exceptions:browserEvents});
 }catch(error){await report('FAIL',{status:'FAIL',error:String(error.stack||error)})}})();})();
 </script></body></html>`;
 writeFileSync(path,harness,'utf8');
@@ -120,7 +173,8 @@ const server=createServer((req,res)=>{
     const raw=url.pathname==='/'?'index.html':url.pathname.replace(/^\//,''),target=normalize(resolve(root,raw));
     if(target!==root&&!target.startsWith(root+sep))throw Error('forbidden');
     res.writeHead(200,{'content-type':mime[extname(target)]||'application/octet-stream','cache-control':'no-store'});
-    res.end(readFileSync(target));
+    const body=readFileSync(target);
+    res.end(raw==='index.html'?instrumentIndex(body):body);
   }catch{
     if(!res.headersSent)res.writeHead(404);
     if(!res.writableEnded)res.end('Not found');
@@ -129,13 +183,13 @@ const server=createServer((req,res)=>{
 const chrome=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser'].find(existsSync);
 if(!chrome)throw Error('Chrome unavailable');
 await new Promise((resolveListen,rejectListen)=>{server.once('error',rejectListen);server.listen(0,'127.0.0.1',resolveListen)});
-let child=null,stderr='',primaryError=null;
+let child=null,stderr='',primaryError=null,timeoutHandle=null;
 try{
   const port=server.address().port;
   child=spawn(chrome,['--headless=new','--no-sandbox','--disable-dev-shm-usage','--disable-gpu',`--user-data-dir=${profile}`,`http://127.0.0.1:${port}/${name}`],{stdio:['ignore','ignore','pipe']});
   child.stderr.on('data',chunk=>stderr+=chunk);
   const childExit=new Promise(resolveExit=>child.once('close',code=>resolveExit({type:'exit',code})));
-  const timeoutResult=new Promise(resolveTimeout=>setTimeout(()=>resolveTimeout({type:'timeout'}),420000));
+  const timeoutResult=new Promise(resolveTimeout=>{timeoutHandle=setTimeout(()=>resolveTimeout({type:'timeout'}),420000)});
   const outcome=await Promise.race([reportPromise.then(report=>({type:'report',report})),childExit,timeoutResult]);
   if(outcome.type==='timeout')throw Error('Browser timeout at '+lastProgress+'\n'+stderr.slice(-12000));
   if(outcome.type==='exit')throw Error(`Browser exited before reporting (${outcome.code})\n${stderr.slice(-12000)}`);
@@ -146,7 +200,16 @@ try{
   primaryError=error;
   throw error;
 }finally{
-  if(child&&!child.killed){child.kill('SIGTERM');await wait(200);if(!child.killed)child.kill('SIGKILL')}
+  if(timeoutHandle!==null)clearTimeout(timeoutHandle);
+  if(child&&child.exitCode===null&&child.signalCode===null){
+    child.kill('SIGTERM');
+    await Promise.race([new Promise(resolveExit=>child.once('close',resolveExit)),wait(1000)]);
+    if(child.exitCode===null&&child.signalCode===null){
+      child.kill('SIGKILL');
+      await Promise.race([new Promise(resolveExit=>child.once('close',resolveExit)),wait(1000)]);
+    }
+  }
+  server.closeAllConnections?.();
   await new Promise(resolveClose=>server.close(resolveClose));
   if(existsSync(path))unlinkSync(path);
   try{rmSync(profile,{recursive:true,force:true,maxRetries:5,retryDelay:100})}catch(cleanupError){if(!primaryError)throw cleanupError;console.error('Profile cleanup failed after primary error:',String(cleanupError))}
