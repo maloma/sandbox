@@ -1,0 +1,77 @@
+name: FamilyPilot PF-08A Wave 1D Exact-Head Public Verifier b30b574
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/familypilot-pf08a-wave1d-public-b30b574.yml'
+      - 'tools/familypilot-pf08a-wave1d-public-b30b574-smoke.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-exact-head:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout verifier head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: verifier
+          persist-credentials: false
+
+      - name: Fetch exact candidate
+        env:
+          CANDIDATE_REPOSITORY: maloma/sandbox
+          CANDIDATE_SHA: b30b57405126527e66415a851e1f6bbe90f6bd98
+        run: |
+          git init -q candidate
+          git -C candidate remote add origin "https://github.com/${CANDIDATE_REPOSITORY}.git"
+          git -C candidate fetch -q --depth=1 origin "${CANDIDATE_SHA}"
+          git -C candidate checkout -q --detach FETCH_HEAD
+          test "$(git -C candidate rev-parse HEAD)" = "${CANDIDATE_SHA}"
+
+      - name: Check candidate syntax and mirrors
+        working-directory: candidate
+        run: |
+          node --check familypilot-module-registry.js
+          node --check familypilot-module-registry-retry-correction.js
+          node --check familypilot-module-registry-ui.js
+          node --check familypilot-module-entry-bridge.js
+          node --check familypilot-planned-income-amount-model.js
+          node --check familypilot-scope.js
+          node --check tools/pf08a-wave1d-module-registry-domain-smoke.mjs
+          node --check tools/pf08a-wave1d-financial-fingerprint-domain-smoke.mjs
+          node --check tools/pf08a-wave1d-listener-sentinel-domain-smoke.mjs
+          node --check tools/pf08a-wave1d-integrated-browser-smoke.mjs
+          node --check tools/pf08a-wave1d-visible-degraded-browser-smoke.mjs
+          node --check tools/pf08a-wave1d-scope-fallback-browser-smoke.mjs
+          node --check tools/pf08a-wave1d-recovery-reload-browser-smoke.mjs
+          node --check tools/pf08a-wave1c-persistence-browser-smoke.mjs
+          node --check tools/pf08a-wave1c-compatibility-migration-smoke.mjs
+          node --check tools/pf08a-wave1c-integrated-browser-smoke.mjs
+          cmp index.html src/familypilot.html
+          cmp familypilot-scope.js src/familypilot-scope.js
+          cmp familypilot-module-registry.js src/familypilot-module-registry.js
+          cmp familypilot-module-registry-retry-correction.js src/familypilot-module-registry-retry-correction.js
+          cmp familypilot-module-registry-ui.js src/familypilot-module-registry-ui.js
+          cmp familypilot-module-entry-bridge.js src/familypilot-module-entry-bridge.js
+
+      - name: Verify exact candidate
+        env:
+          VERIFIER_REPOSITORY: ${{ github.repository }}
+          VERIFIER_PR: ${{ github.event.pull_request.number }}
+          VERIFIER_HEAD: ${{ github.event.pull_request.head.sha }}
+          VERIFIER_WORKFLOW_RUN: ${{ github.run_id }}
+        run: |
+          node --check verifier/tools/familypilot-pf08a-wave1d-public-b30b574-smoke.mjs
+          node verifier/tools/familypilot-pf08a-wave1d-public-b30b574-smoke.mjs candidate verifier-artifacts/FamilyPilot_PF08A_Wave1D_Public_b30b574_Evidence.json
+
+      - name: Upload exact-head evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: FamilyPilot_PF08A_Wave1D_Public_b30b574_Evidence.json
+          path: verifier-artifacts/FamilyPilot_PF08A_Wave1D_Public_b30b574_Evidence.json
+          if-no-files-found: error
+          retention-days: 30
