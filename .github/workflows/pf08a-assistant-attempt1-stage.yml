@@ -1,0 +1,125 @@
+name: PF-08A Assistant Attempt 1 Stage
+
+on:
+  push:
+    branches:
+      - coord/pf08a-wave1d-assistant-attempt1
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  apply-test-stage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      EXPECTED_HEAD: a4ecf55c4bbaabf3b258ee86e1c6a7ba55b65e0c
+      TARGET_BRANCH: agent/pf08a-wave1d-cp04-corrections
+      RESULT_BRANCH: coord/pf08a-wave1d-assistant-attempt1-result
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify immutable pre-write state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          pr="$(gh api repos/${{ github.repository }}/pulls/141)"
+          test "$(jq -r .state <<<"$pr")" = open
+          test "$(jq -r .draft <<<"$pr")" = true
+          test "$(jq -r .merged <<<"$pr")" = false
+          test "$(jq -r .head.ref <<<"$pr")" = "$TARGET_BRANCH"
+          test "$(jq -r .head.sha <<<"$pr")" = "$EXPECTED_HEAD"
+          test "$(jq -r .base.ref <<<"$pr")" = main
+
+      - name: Apply bounded correction patch
+        run: |
+          set -euo pipefail
+          cat > /tmp/attempt1.patch.xz.b64 <<'PATCH_B64'
+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
+PATCH_B64
+          tr -d '\n\r' < /tmp/attempt1.patch.xz.b64 | base64 -d | xz -d > /tmp/attempt1.patch
+          git apply --check /tmp/attempt1.patch
+          git apply /tmp/attempt1.patch
+          git diff --check
+
+      - name: Verify syntax mirrors and domain contracts
+        run: |
+          set -euo pipefail
+          node --check familypilot-scope.js
+          node --check src/familypilot-scope.js
+          node --check familypilot-module-registry.js
+          node --check src/familypilot-module-registry.js
+          node --check familypilot-module-registry-retry-correction.js
+          node --check src/familypilot-module-registry-retry-correction.js
+          node --check familypilot-planned-income-amount-model.js
+          node --check tools/pf08a-wave1d-module-registry-domain-smoke.mjs
+          node --check tools/pf08a-wave1d-financial-fingerprint-domain-smoke.mjs
+          node --check tools/pf08a-wave1d-listener-sentinel-domain-smoke.mjs
+          node --check tools/pf08a-wave1d-integrated-browser-smoke.mjs
+          node --check tools/pf08a-wave1d-visible-degraded-browser-smoke.mjs
+          node --check tools/pf08a-wave1d-scope-fallback-browser-smoke.mjs
+          node --check tools/pf08a-wave1d-recovery-reload-browser-smoke.mjs
+          cmp familypilot-scope.js src/familypilot-scope.js
+          cmp familypilot-module-registry.js src/familypilot-module-registry.js
+          cmp familypilot-module-registry-retry-correction.js src/familypilot-module-registry-retry-correction.js
+          node tools/pf08a-wave1d-module-registry-domain-smoke.mjs
+          node tools/pf08a-wave1d-financial-fingerprint-domain-smoke.mjs
+          node tools/pf08a-wave1d-listener-sentinel-domain-smoke.mjs
+
+      - name: Verify Wave 1D browser contracts
+        run: |
+          set -euo pipefail
+          node tools/pf08a-wave1d-integrated-browser-smoke.mjs
+          node tools/pf08a-wave1d-visible-degraded-browser-smoke.mjs
+          node tools/pf08a-wave1d-scope-fallback-browser-smoke.mjs
+          node tools/pf08a-wave1d-recovery-reload-browser-smoke.mjs
+
+      - name: Verify Wave 1C regressions
+        run: |
+          set -euo pipefail
+          node tools/pf08a-wave1c-persistence-browser-smoke.mjs
+          node tools/pf08a-wave1c-compatibility-migration-smoke.mjs
+          node tools/pf08a-wave1c-integrated-browser-smoke.mjs
+
+      - name: Create one staged correction commit
+        run: |
+          set -euo pipefail
+          git config user.name "FamilyPilot Coordination"
+          git config user.email "coordination@familypilot.invalid"
+          git add .github/workflows/pf08a-wave1d-visible-degraded.yml \
+            familypilot-module-registry-retry-correction.js familypilot-module-registry.js familypilot-scope.js \
+            src/familypilot-module-registry-retry-correction.js src/familypilot-module-registry.js src/familypilot-scope.js \
+            tools/pf08a-wave1d-financial-fingerprint-domain-smoke.mjs \
+            tools/pf08a-wave1d-listener-sentinel-domain-smoke.mjs \
+            tools/pf08a-wave1d-module-registry-domain-smoke.mjs \
+            tools/pf08a-wave1d-recovery-reload-browser-smoke.mjs \
+            tools/pf08a-wave1d-visible-degraded-browser-smoke.mjs
+          test "$(git diff --cached --name-only | wc -l)" -eq 12
+          git commit -m "Correct remaining PF-08A Wave 1D review findings"
+          git push origin "HEAD:refs/heads/$RESULT_BRANCH"
+          git rev-parse HEAD | tee /tmp/result-sha.txt
+
+      - name: Upload attempt evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pf08a-assistant-attempt1-evidence
+          path: |
+            /tmp/result-sha.txt
+            /tmp/attempt1.patch
+          retention-days: 30
