@@ -15,7 +15,32 @@ let reportResult;
 const reportPromise=new Promise(resolveReport=>{reportResult=resolveReport});
 let lastProgress='not_started';
 
-const browserCollector=`<script>(()=>{const events=[];const describe=value=>{try{return String(value?.stack||value?.message||value||'unknown')}catch{return 'unprintable'}};Object.defineProperty(window,'__FP_BROWSER_EVENTS__',{value:events,configurable:false});window.addEventListener('error',event=>events.push({type:'error',message:String(event.message||'unknown'),source:String(event.filename||''),line:Number(event.lineno||0),column:Number(event.colno||0),detail:describe(event.error)}));window.addEventListener('unhandledrejection',event=>events.push({type:'unhandledrejection',detail:describe(event.reason)}));})();</script>`;
+const browserCollector=`<script>(()=>{
+  const events=[];
+  const registrations=[];
+  const targets=new WeakMap();
+  let targetSequence=0;
+  const watchedSources=['familypilot-m4-06-what-if-ui.js','familypilot-m4-07-learning-mode-ui.js'];
+  const describe=value=>{try{return String(value?.stack||value?.message||value||'unknown')}catch{return 'unprintable'}};
+  const targetLabel=target=>{if(target===window)return'window';if(target===document)return'document';if(target?.id)return'#'+target.id;if(!targets.has(target))targets.set(target,'target-'+(++targetSequence));return targets.get(target)};
+  const callsite=()=>String(new Error().stack||'').split('\\n').map(line=>line.trim()).find(line=>watchedSources.some(source=>line.includes(source)))||'';
+  const nativeAdd=EventTarget.prototype.addEventListener;
+  EventTarget.prototype.addEventListener=function(type,listener,options){
+    const callsiteValue=callsite();
+    if(callsiteValue){
+      const capture=typeof options==='boolean'?options:Boolean(options?.capture);
+      const source=watchedSources.find(name=>callsiteValue.includes(name))||'';
+      registrations.push({target:targetLabel(this),type:String(type),capture,source,callsite:callsiteValue});
+    }
+    return nativeAdd.call(this,type,listener,options);
+  };
+  const duplicates=()=>{const counts=new Map();for(const item of registrations){const key=[item.target,item.type,item.capture,item.source,item.callsite].join('|');counts.set(key,(counts.get(key)||0)+1)}return[...counts.entries()].filter(([,count])=>count>1).map(([key,count])=>({key,count}))};
+  const sourceCounts=()=>Object.fromEntries(watchedSources.map(source=>[source,registrations.filter(item=>item.source===source).length]));
+  Object.defineProperty(window,'__FP_BROWSER_EVENTS__',{value:events,configurable:false});
+  Object.defineProperty(window,'__FP_LISTENER_SENTINEL__',{value:Object.freeze({registrations:()=>registrations.map(item=>({...item})),duplicates,sourceCounts}),configurable:false});
+  window.addEventListener('error',event=>events.push({type:'error',message:String(event.message||'unknown'),source:String(event.filename||''),line:Number(event.lineno||0),column:Number(event.colno||0),detail:describe(event.error)}));
+  window.addEventListener('unhandledrejection',event=>events.push({type:'unhandledrejection',detail:describe(event.reason)}));
+})();</script>`;
 const instrumentIndex=body=>{const text=body.toString('utf8'),match=text.match(/<head[^>]*>/i);return match?text.replace(match[0],match[0]+browserCollector):browserCollector+text};
 
 const harness=`<!doctype html><html lang="ru"><body data-status="PENDING"><iframe id="app" style="width:390px;height:844px;border:0"></iframe><iframe id="ordinary" style="display:none"></iframe><iframe id="timeout" style="display:none"></iframe><pre id="result">PENDING</pre><script>(()=>{
@@ -72,6 +97,12 @@ const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null
  if(afterRecovery!==before)throw Error('Recovery changed financial state: '+JSON.stringify(fingerprintDiff(before,afterRecovery)));
  const errors=[w.__FP_PACKAGE_BOOTSTRAP_ERROR__,w.__FP_M4_05_BOOTSTRAP_ERROR__,w.__FP_M4_06_UI_ERROR__,w.__FP_M4_07_LEARNING_UI_ERROR__].filter(Boolean);
  assert(errors.length===0,'Runtime bootstrap errors after recovery: '+errors.join(' | '));
+ const recoveryListenerSentinel=w.__FP_LISTENER_SENTINEL__;
+ assert(recoveryListenerSentinel,'Listener sentinel missing after same-page recovery');
+ const recoveryListenerCounts=recoveryListenerSentinel.sourceCounts();
+ assert(recoveryListenerCounts['familypilot-m4-06-what-if-ui.js']===1,'What If long-lived handler was not installed exactly once after same-page recovery');
+ assert(recoveryListenerCounts['familypilot-m4-07-learning-mode-ui.js']===1,'Learning long-lived handler was not installed exactly once after same-page recovery');
+ assert(recoveryListenerSentinel.duplicates().length===0,'Duplicate retryable-module handlers after same-page recovery: '+JSON.stringify(recoveryListenerSentinel.duplicates()));
 
  registry.test.forceUnavailable('persistence','persistence_recovery_locked');registry.reconcile();ui.render();await wait(80);
  assert(ui.shellDegraded(),'Persistence critical failure did not degrade application shell');
@@ -120,7 +151,7 @@ const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null
  ];
  assert(browserEvents.length===0,'Browser runtime events: '+JSON.stringify(browserEvents));
  try{w.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.();o.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.();t.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.()}catch{}
- await report('PASS',{status:'PASS',marker:'${marker}',visible_global_card:true,visible_local_card:true,failed_entry_preserved:true,precise_data_wording:true,diagnostic_id:true,root_cause_grouping:true,unaffected_routes:true,one_active_attempt:true,safe_retry:true,no_duplicate_ui:true,financial_isolation:true,persistence_priority:true,shell_mutation_barrier:true,outside_action_dock_disabled:true,mutation_intercepted:true,read_only_navigation_preserved:true,injection_isolated:true,partial_install_reload_required:true,safe_events:true,runtime_exceptions:browserEvents});
+ await report('PASS',{status:'PASS',marker:'${marker}',visible_global_card:true,visible_local_card:true,failed_entry_preserved:true,precise_data_wording:true,diagnostic_id:true,root_cause_grouping:true,unaffected_routes:true,one_active_attempt:true,safe_retry:true,no_duplicate_ui:true,no_duplicate_handlers_after_same_page_recovery:true,what_if_listener_unique:true,learning_listener_unique:true,financial_isolation:true,persistence_priority:true,shell_mutation_barrier:true,outside_action_dock_disabled:true,mutation_intercepted:true,read_only_navigation_preserved:true,injection_isolated:true,partial_install_reload_required:true,safe_events:true,runtime_exceptions:browserEvents});
 }catch(error){await report('FAIL',{status:'FAIL',error:String(error.stack||error)})}})();})();
 </script></body></html>`;
 writeFileSync(path,harness,'utf8');

@@ -19,8 +19,9 @@ const browserInstrumentation=`<script>(()=>{
   const events=[];
   const registrations=[];
   const targets=new WeakMap();
-  let targetSequence=0;
-  const watchedSources=['familypilot-module-registry-retry-correction.js','familypilot-module-registry-ui.js','familypilot-module-entry-bridge.js'];
+  const listenerIds=new WeakMap();
+  let targetSequence=0,listenerSequence=0;
+  const watchedSources=['familypilot-module-registry-retry-correction.js','familypilot-module-registry-ui.js','familypilot-module-entry-bridge.js','familypilot-m4-06-what-if-ui.js','familypilot-m4-07-learning-mode-ui.js'];
   const describe=value=>{try{return String(value?.stack||value?.message||value||'unknown')}catch{return 'unprintable'}};
   const targetLabel=target=>{
     if(target===window)return'window';
@@ -28,6 +29,11 @@ const browserInstrumentation=`<script>(()=>{
     if(target?.id)return'#'+target.id;
     if(!targets.has(target))targets.set(target,'target-'+(++targetSequence));
     return targets.get(target);
+  };
+  const listenerLabel=listener=>{
+    if(listener===null||listener===undefined)return'null';
+    if(!listenerIds.has(listener))listenerIds.set(listener,'listener-'+(++listenerSequence));
+    return listenerIds.get(listener);
   };
   const callsite=()=>{
     const stack=String(new Error().stack||'').split('\\n');
@@ -39,7 +45,7 @@ const browserInstrumentation=`<script>(()=>{
     if(callsiteValue){
       const capture=typeof options==='boolean'?options:Boolean(options?.capture);
       const source=watchedSources.find(name=>callsiteValue.includes(name))||'';
-      registrations.push({target:targetLabel(this),type:String(type),capture,source,callsite:callsiteValue});
+      registrations.push({target:targetLabel(this),type:String(type),capture,source,callsite:callsiteValue,listenerId:listenerLabel(listener)});
     }
     return nativeAdd.call(this,type,listener,options);
   };
@@ -69,7 +75,7 @@ const until=async(check,label,ms=120000)=>{const end=Date.now()+ms;let last;whil
 const report=async(status,payload)=>{out.textContent=JSON.stringify(payload,null,2);document.body.dataset.status=status;try{await fetch('/__wave1d_result',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({status,payload})})}catch{}};
 const stateOf=w=>{try{return w.__FP_TEST__?.getState?.()||w.__FP_RUNTIME__?.state||{}}catch{return w.__FP_RUNTIME__?.state||{}}};
 const duplicateValues=values=>{const counts=new Map();for(const value of values)counts.set(value,(counts.get(value)||0)+1);return[...counts.entries()].filter(([,count])=>count>1).map(([value,count])=>({value,count}))};
-const requiredListenerSignatures=[
+const infrastructureListenerSignatures=[
   ['familypilot-module-registry-retry-correction.js','document','click',true],
   ['familypilot-module-registry-retry-correction.js','document','submit',true],
   ['familypilot-module-registry-retry-correction.js','document','beforeinput',true],
@@ -81,12 +87,16 @@ const requiredListenerSignatures=[
   ['familypilot-module-registry-ui.js','window','familypilot:module-state',false],
   ['familypilot-module-entry-bridge.js','window','familypilot:module-state',false],
 ].map(([source,target,type,capture])=>({source,target,type,capture}));
+const whatIfListenerSignature={source:'familypilot-m4-06-what-if-ui.js',target:'document',type:'click',capture:true};
+const learningListenerSignature={source:'familypilot-m4-07-learning-mode-ui.js',target:'document',type:'click',capture:true};
+const degradedListenerSignatures=[...infrastructureListenerSignatures,whatIfListenerSignature];
+const healthyListenerSignatures=[...degradedListenerSignatures,learningListenerSignature];
 const listenerSignature=item=>[item.source,item.target,item.type,String(item.capture)].join('|');
-const listenerContract=(sentinel,label)=>{
+const listenerContract=(sentinel,label,requiredSignatures)=>{
   const registrations=sentinel.registrations();
   const longLived=registrations.filter(item=>item.type!=='DOMContentLoaded').map(listenerSignature).sort();
   const counts=new Map();for(const signature of longLived)counts.set(signature,(counts.get(signature)||0)+1);
-  const missing=requiredListenerSignatures.map(listenerSignature).filter(signature=>(counts.get(signature)||0)!==1);
+  const missing=requiredSignatures.map(listenerSignature).filter(signature=>(counts.get(signature)||0)!==1);
   assert(missing.length===0,label+' required production listener signatures missing or non-unique: '+JSON.stringify({missing,counts:Object.fromEntries(counts)}));
   const duplicates=sentinel.duplicates();
   assert(duplicates.length===0,label+' duplicate production handlers: '+JSON.stringify(duplicates));
@@ -122,11 +132,13 @@ const structuralSnapshot=w=>{
   const browserEventsBefore=[...(w.__FP_BROWSER_EVENTS__||[])];
   const listenerBefore=w.__FP_LISTENER_SENTINEL__;
   assert(listenerBefore,'Listener sentinel missing before reload');
-  const listenerContractBefore=listenerContract(listenerBefore,'Before reload');
+  const listenerContractBefore=listenerContract(listenerBefore,'Before reload',degradedListenerSignatures);
   const sourceCountsBefore=listenerBefore.sourceCounts();
   assert(sourceCountsBefore['familypilot-module-registry-retry-correction.js']>0,'Correction production listeners were not observed');
   assert(sourceCountsBefore['familypilot-module-registry-ui.js']>0,'Registry UI production listeners were not observed');
   assert(sourceCountsBefore['familypilot-module-entry-bridge.js']>0,'Entry bridge production listeners were not observed');
+  assert(sourceCountsBefore['familypilot-m4-06-what-if-ui.js']===1,'What If production click handler was not observed exactly once before reload');
+  assert(sourceCountsBefore['familypilot-m4-07-learning-mode-ui.js']<=1,'Learning production click handler duplicated before reload');
   assert(browserEventsBefore.length===0,'Browser runtime events before reload: '+JSON.stringify(browserEventsBefore));
   assert(structureBefore.duplicateScripts.length===0,'Duplicate scripts before reload: '+JSON.stringify(structureBefore.duplicateScripts));
   assert(structureBefore.duplicateScreenIds.length===0,'Duplicate screens before reload: '+JSON.stringify(structureBefore.duplicateScreenIds));
@@ -154,15 +166,18 @@ const structuralSnapshot=w=>{
   assert(structureAfter.staticFallbackHidden,'Static fallback visible after healthy reload');
   assert(snapshotAfter.catalogue.length===11&&new Set(snapshotAfter.catalogue.map(item=>item.moduleId)).size===11,'Duplicate registry modules after reload');
   assert(listenerAfter,'Listener sentinel missing after reload');
-  const listenerContractAfter=listenerContract(listenerAfter,'After reload');
+  const listenerContractAfter=listenerContract(listenerAfter,'After reload',healthyListenerSignatures);
   const sourceCountsAfter=listenerAfter.sourceCounts();
   assert(sourceCountsAfter['familypilot-module-registry-retry-correction.js']>0,'Correction production listeners missing after reload');
   assert(sourceCountsAfter['familypilot-module-registry-ui.js']>0,'Registry UI production listeners missing after reload');
   assert(sourceCountsAfter['familypilot-module-entry-bridge.js']>0,'Entry bridge production listeners missing after reload');
-  assert(JSON.stringify(listenerContractAfter)===JSON.stringify(listenerContractBefore),'Production listener contract changed across reload: '+JSON.stringify({before:listenerContractBefore,after:listenerContractAfter}));
+  assert(sourceCountsAfter['familypilot-m4-06-what-if-ui.js']===1,'What If production click handler was not observed exactly once after reload');
+  assert(sourceCountsAfter['familypilot-m4-07-learning-mode-ui.js']===1,'Learning production click handler was not observed exactly once after reload');
+  const listenerContractAfterCommon=listenerContractAfter.filter(signature=>degradedListenerSignatures.map(listenerSignature).includes(signature));
+  assert(JSON.stringify(listenerContractAfterCommon)===JSON.stringify(listenerContractBefore),'Common production listener contract changed across reload: '+JSON.stringify({before:listenerContractBefore,after:listenerContractAfterCommon}));
   assert(browserEventsAfter.length===0,'Browser runtime events after reload: '+JSON.stringify(browserEventsAfter));
   try{w.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.()}catch{}
-  await report('PASS',{status:'PASS',marker:'${marker}',scenario_g:'recovery_reload_healthy',real_reload:true,all_modules_ready:true,persistence_healthy:true,no_duplicate_scripts:true,no_duplicate_screens:true,no_duplicate_operations:true,no_duplicate_handlers:true,no_duplicate_fallback_entries:true,financial_fingerprint_unchanged:true,browser_runtime_events:[],listener_sources:sourceCountsAfter,all_production_listener_sources_observed:true,required_listener_signatures_unique:true,listener_contract_stable_across_reload:true});
+  await report('PASS',{status:'PASS',marker:'${marker}',scenario_g:'recovery_reload_healthy',real_reload:true,all_modules_ready:true,persistence_healthy:true,no_duplicate_scripts:true,no_duplicate_screens:true,no_duplicate_operations:true,no_duplicate_handlers:true,no_duplicate_fallback_entries:true,financial_fingerprint_unchanged:true,browser_runtime_events:[],listener_sources:sourceCountsAfter,all_production_listener_sources_observed:true,what_if_listener_observed:true,learning_listener_observed:true,required_listener_signatures_unique:true,common_listener_contract_stable_across_reload:true});
 }catch(error){await report('FAIL',{status:'FAIL',error:String(error.stack||error)})}})();
 })();</script></body></html>`;
 writeFileSync(path,harness,'utf8');

@@ -11,6 +11,7 @@ on:
       - 'familypilot-module-registry-retry-correction.js'
       - 'familypilot-module-registry-ui.js'
       - 'familypilot-module-entry-bridge.js'
+      - 'familypilot-planned-income-amount-model.js'
       - 'src/familypilot-module-registry.js'
       - 'src/familypilot-module-registry-retry-correction.js'
       - 'src/familypilot-module-registry-ui.js'
@@ -51,6 +52,7 @@ jobs:
           node --check familypilot-module-registry-retry-correction.js
           node --check familypilot-module-registry-ui.js
           node --check familypilot-module-entry-bridge.js
+          node --check familypilot-planned-income-amount-model.js
           node --check tools/pf08a-wave1d-module-registry-domain-smoke.mjs
           node --check tools/pf08a-wave1d-financial-fingerprint-domain-smoke.mjs
           node --check tools/pf08a-wave1d-recovery-reload-browser-smoke.mjs

@@ -176,22 +176,41 @@ assert(emptyContext.FamilyPilotModuleRegistry.get('what_if').state!=='degraded',
 
 const detachedProbeId='register_detached_probe';
 const beforeDetachedRegistration=registry.snapshot();
-const firstRegisterReturn=registry.register({
+const detachedDefinition={
   moduleId:detachedProbeId, userName:'Register detached probe', criticality:'supporting',
-  containmentLevel:'module_degraded', retryClass:'reload_required', dependencies:['base_finance'], routes:[], unaffectedRoutes:[],
+  containmentLevel:'module_degraded', retryClass:'reload_required', dependencies:['base_finance'], scripts:['/register-detached-probe.js'], routes:['probe'], unaffectedRoutes:['home'],
   ownershipContract:{
-    navigationSelectors:[],
-    screenSelectors:[],
+    navigationSelectors:['[data-register-detached-probe]'],
+    screenSelectors:['#registerDetachedProbeScreen'],
     packageMarkers:['global:__REGISTER_DETACHED_PROBE_READY__'],
-    listenerSentinel:null,
+    listenerSentinel:{target:'document',type:'click',capture:true},
   },
-});
+};
+const firstRegisterReturn=registry.register(detachedDefinition);
 const authoritativeAfterFirstRegistration=registry.get(detachedProbeId);
 assert(firstRegisterReturn!==authoritativeAfterFirstRegistration,'First register return was not detached');
 assert(firstRegisterReturn.dependencies!==authoritativeAfterFirstRegistration.dependencies,'First register dependencies were not detached');
 assert(firstRegisterReturn.ownershipContract!==authoritativeAfterFirstRegistration.ownershipContract,'First register ownership contract was not detached');
 assert(firstRegisterReturn.ownershipContract.packageMarkers!==authoritativeAfterFirstRegistration.ownershipContract.packageMarkers,'First register package markers were not detached');
 assert(firstRegisterReturn.loadedScripts!==authoritativeAfterFirstRegistration.loadedScripts,'First register loaded scripts were not detached');
+const authoritativeBeforeDefinitionMutation=registry.get(detachedProbeId);
+detachedDefinition.userName='Mutated source definition';
+detachedDefinition.dependencies.push('learning');
+detachedDefinition.scripts.push('/external-definition-script.js');
+detachedDefinition.routes.push('external-route');
+detachedDefinition.unaffectedRoutes.push('external-safe-route');
+detachedDefinition.ownershipContract.navigationSelectors.push('[data-external-navigation]');
+detachedDefinition.ownershipContract.packageMarkers.push('global:__EXTERNAL_DEFINITION_MARKER__');
+detachedDefinition.ownershipContract.listenerSentinel.target='window';
+const authoritativeAfterDefinitionMutation=registry.get(detachedProbeId);
+assert(authoritativeAfterDefinitionMutation.userName===authoritativeBeforeDefinitionMutation.userName,'Original definition top-level mutation changed authoritative metadata');
+assert(JSON.stringify(authoritativeAfterDefinitionMutation.dependencies)===JSON.stringify(['base_finance']),'Original definition dependencies remained aliased');
+assert(JSON.stringify(authoritativeAfterDefinitionMutation.scripts)===JSON.stringify(['/register-detached-probe.js']),'Original definition scripts remained aliased');
+assert(JSON.stringify(authoritativeAfterDefinitionMutation.routes)===JSON.stringify(['probe']),'Original definition routes remained aliased');
+assert(JSON.stringify(authoritativeAfterDefinitionMutation.unaffectedRoutes)===JSON.stringify(['home']),'Original definition unaffected routes remained aliased');
+assert(JSON.stringify(authoritativeAfterDefinitionMutation.ownershipContract.navigationSelectors)===JSON.stringify(['[data-register-detached-probe]']),'Original definition ownership navigation remained aliased');
+assert(JSON.stringify(authoritativeAfterDefinitionMutation.ownershipContract.packageMarkers)===JSON.stringify(['global:__REGISTER_DETACHED_PROBE_READY__']),'Original definition package markers remained aliased');
+assert(authoritativeAfterDefinitionMutation.ownershipContract.listenerSentinel.target==='document','Original definition nested listener sentinel remained aliased');
 firstRegisterReturn.state='degraded';
 firstRegisterReturn.userName='Externally mutated first return';
 firstRegisterReturn.dependencies.push('what_if');
@@ -201,6 +220,7 @@ const afterFirstMutation=registry.get(detachedProbeId);
 assert(afterFirstMutation.state==='registered','First return mutation changed authoritative state');
 assert(afterFirstMutation.userName==='Register detached probe','First return mutation changed authoritative user name');
 assert(afterFirstMutation.dependencies.length===1&&afterFirstMutation.dependencies[0]==='base_finance','First return mutation changed authoritative dependencies');
+assert(afterFirstMutation.scripts.length===1&&afterFirstMutation.scripts[0]==='/register-detached-probe.js','First return mutation changed authoritative scripts');
 assert(afterFirstMutation.ownershipContract.packageMarkers.length===1&&afterFirstMutation.ownershipContract.packageMarkers[0]==='global:__REGISTER_DETACHED_PROBE_READY__','First return mutation changed authoritative package markers');
 assert(afterFirstMutation.loadedScripts.length===0,'First return mutation changed authoritative loaded scripts');
 const afterFirstRegistration=registry.snapshot();
@@ -226,6 +246,7 @@ const snapshotAfterDuplicate=registry.snapshot();
 assert(afterDuplicateMutation.state==='registered','Duplicate return mutation changed authoritative state');
 assert(afterDuplicateMutation.userName==='Register detached probe','Duplicate return mutation changed authoritative user name');
 assert(afterDuplicateMutation.dependencies.length===1&&afterDuplicateMutation.dependencies[0]==='base_finance','Duplicate return mutation changed authoritative dependencies');
+assert(afterDuplicateMutation.scripts.length===1&&afterDuplicateMutation.scripts[0]==='/register-detached-probe.js','Duplicate return mutation changed authoritative scripts');
 assert(afterDuplicateMutation.ownershipContract.packageMarkers.length===1&&afterDuplicateMutation.ownershipContract.packageMarkers[0]==='global:__REGISTER_DETACHED_PROBE_READY__','Duplicate return mutation changed authoritative package markers');
 assert(afterDuplicateMutation.loadedScripts.length===0,'Duplicate return mutation changed authoritative loaded scripts');
 assert(snapshotAfterDuplicate.catalogue.length===afterFirstRegistration.catalogue.length,'Duplicate registration added a catalogue record');
@@ -297,6 +318,8 @@ console.log(JSON.stringify({
   register_returns_detached_clone:true,
   duplicate_register_returns_detached_clone:true,
   external_mutation_cannot_change_registry:true,
+  original_definition_top_level_detached:true,
+  original_definition_nested_detached:true,
   shell_mutation_barrier:true,
   outside_action_dock_disabled:true,
   mutation_intercepted:true,

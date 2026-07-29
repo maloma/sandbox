@@ -6,35 +6,20 @@
   const registry=window.FamilyPilotModuleRegistry;
   if(!registry)return;
 
-  const financialObjectKeys=Object.freeze([
-    'household','config','giftFund','onboardingState',
-  ]);
-  const financialCollectionKeys=Object.freeze([
-    'members','wallets','categories','operations','transfers','walletMovements',
-    'obligationRules','obligationOccurrences','debts','debtEvents',
-    'savingsGoals','savingsPlans','savingsTransfers','purposeAllocations','purposeAllocationEvents',
-    'savingsLegacyReconciliationIssues','savingsPurposeMigrationResults',
-    'walletTransfers','investmentAccounts','balanceAdjustments',
-    'plannedIncomeRules','plannedIncomeOccurrences','incomeDistributionRules','savingsActionOccurrences',
-    'birthdays','whatIfScenarios','scenarioPlanConversions','whatIfInterestSimulations',
-  ]);
-  const financialKeys=Object.freeze([...financialObjectKeys,...financialCollectionKeys].sort());
-  const unorderedFinancialCollections=new Set(financialCollectionKeys);
-  const excludedFinancialStateKeys=Object.freeze([
+  const fallbackExcludedFinancialStateKeys=Object.freeze([
     'schemaVersion','currentMemberId','activeWalletId','learningModeByMember',
   ]);
   const identityKeys=Object.freeze([
     'id','eventId','ruleId','occurrenceId','transferId','walletId','memberId','goalId','scenarioId',
   ]);
-  const financialContract=Object.freeze({
-    version:2,
+  const financialContractMetadata=Object.freeze({
+    version:3,
     stateOwner:'window.__FP_RUNTIME__.state',
     persistenceOwner:'FamilyPilotPersistence',
-    keys:financialKeys,
-    unorderedCollections:Object.freeze([...financialCollectionKeys].sort()),
-    excludedStateKeys:excludedFinancialStateKeys,
+    keyPolicy:'persistence_contract_plus_observed_runtime_keys',
     missingCollectionDefault:'empty_array',
     missingObjectDefault:'empty_object',
+    missingScalarDefault:'null',
     recordTimestampsAndAuditMetadata:'included_without_normalization',
     persistenceEnvelopeMetadata:'excluded',
   });
@@ -75,18 +60,52 @@
     return window.__FP_RUNTIME__?.state||{};
   }
 
+  function resolvedFinancialContract(state=financialState()){
+    let contract=null;
+    try{contract=window.FamilyPilotPersistence?.financialStateContract?.()||null}catch{}
+    const objectKeys=new Set(Array.isArray(contract?.objectKeys)?contract.objectKeys:[]);
+    const collectionKeys=new Set(Array.isArray(contract?.collectionKeys)?contract.collectionKeys:[]);
+    const scalarKeys=new Set(Array.isArray(contract?.scalarKeys)?contract.scalarKeys:[]);
+    const excludedStateKeys=new Set(Array.isArray(contract?.excludedStateKeys)?contract.excludedStateKeys:fallbackExcludedFinancialStateKeys);
+    const canonicalKeys=new Set([...objectKeys,...collectionKeys,...scalarKeys]);
+    const observedRuntimeKeys=Object.keys(state||{}).filter(key=>!excludedStateKeys.has(key));
+    const keys=[...new Set([...canonicalKeys,...observedRuntimeKeys])].sort();
+    for(const key of observedRuntimeKeys){
+      if(canonicalKeys.has(key))continue;
+      const value=state[key];
+      if(Array.isArray(value))collectionKeys.add(key);
+      else if(value&&typeof value==='object')objectKeys.add(key);
+      else scalarKeys.add(key);
+    }
+    return{
+      ...financialContractMetadata,
+      schemaContractVersion:Number(contract?.version)||0,
+      schemaContractOwner:String(contract?.owner||'runtime-observation-fallback'),
+      keys,
+      objectKeys:[...objectKeys].sort(),
+      collectionKeys:[...collectionKeys].sort(),
+      scalarKeys:[...scalarKeys].sort(),
+      unorderedCollections:[...collectionKeys].sort(),
+      excludedStateKeys:[...excludedStateKeys].sort(),
+    };
+  }
+
   function financialFingerprint(){
     const state=financialState();
-    const output={contractVersion:financialContract.version};
-    for(const key of financialKeys){
-      if(unorderedFinancialCollections.has(key))output[key]=canonicalCollection(state[key]);
-      else output[key]=canonicalValue(state[key]===undefined?{}:state[key]);
+    const contract=resolvedFinancialContract(state);
+    const collections=new Set(contract.collectionKeys);
+    const objects=new Set(contract.objectKeys);
+    const output={contractVersion:contract.version,schemaContractVersion:contract.schemaContractVersion};
+    for(const key of contract.keys){
+      if(collections.has(key))output[key]=canonicalCollection(state[key]);
+      else if(objects.has(key))output[key]=canonicalValue(state[key]===undefined?{}:state[key]);
+      else output[key]=canonicalValue(state[key]===undefined?null:state[key]);
     }
     return JSON.stringify(canonicalValue(output));
   }
 
   function financialFingerprintContract(){
-    return JSON.parse(JSON.stringify(financialContract));
+    return JSON.parse(JSON.stringify(resolvedFinancialContract()));
   }
 
   window.FamilyPilotModuleRegistry=Object.freeze({
