@@ -1,0 +1,152 @@
+name: FamilyPilot PF-08A Wave 1D Fresh Review Bundle b30b574
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/familypilot-pf08a-wave1d-fresh-review-bundle-b30b574.yml'
+      - 'review/FamilyPilot_PF08A_Wave1D_CP04_b30b574_Fresh_Independent_Review_Prompt_RU_2026-07-29.md'
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+jobs:
+  build-immutable-review-bundle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CANDIDATE_REPOSITORY: maloma/sandbox
+      CANDIDATE_PR: '141'
+      CANDIDATE_BASE: 1af3694a75230488270dbc6aa8e30ca642f7fb41
+      CANDIDATE_SHA: b30b57405126527e66415a851e1f6bbe90f6bd98
+      RUNTIME_RUN: '30450934784'
+      RUNTIME_JOB: '90574680443'
+      PUBLIC_VERIFIER_PR: '147'
+      PUBLIC_VERIFIER_HEAD: 0cc6c9a6ef680e63b8f25f138f26b930054b4c39
+      PUBLIC_RUN: '30455085639'
+      PUBLIC_JOB: '90586497024'
+      PUBLIC_ARTIFACT_ID: '8725668649'
+      PUBLIC_JSON_SHA256: c18b095c24ba4d15a34b59b32af1fcf3ec01e8019bea8bd0a3c7b7ebbfd51da1
+      PUBLIC_ZIP_SHA256: eed91601bb926dd78366e8d7ba6d0dc9bbd8cf110dc102c0b086c00f9b30dcbc
+      DURABLE_COMMIT: 6af436728e8a16a7c284ac85fe9e5989cd73e1eb
+      DURABLE_PATH: evidence/FamilyPilot_PF08A_Wave1D_Durable_b30b574_Evidence.json
+      PRIOR_REVIEW_NAME: FamilyPilot_PF08A_Wave1D_CP04_Previous_Fresh_Independent_Runtime_Acceptance_Result_981cdf7_2026-07-29.md
+      PRIOR_REVIEW_SHA256: ea68cb88611f682d04c5cf0145d5dba532a6673c882ec0a1bbeb9d027bb2d752
+      PRIOR_REVIEW_SIZE: '35285'
+      BUNDLE_NAME: FamilyPilot_PF08A_Wave1D_CP04_b30b574_Fresh_Independent_Review_Bundle_2026-07-29
+      PROMPT_NAME: FamilyPilot_PF08A_Wave1D_CP04_b30b574_Fresh_Independent_Review_Prompt_RU_2026-07-29.md
+    steps:
+      - name: Checkout bundle definition
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: builder
+          persist-credentials: false
+
+      - name: Assemble immutable sources
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          root="$PWD/out/$BUNDLE_NAME"
+          mkdir -p "$root"/{candidate,evidence/public-artifact,evidence/durable,metadata,review}
+
+          git init -q source
+          git -C source remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${CANDIDATE_REPOSITORY}.git"
+          git -C source fetch -q --depth=1 origin "$CANDIDATE_BASE"
+          git -C source fetch -q --depth=1 origin "$CANDIDATE_SHA"
+          git -C source fetch -q --depth=1 origin "$DURABLE_COMMIT"
+          test "$(git -C source rev-parse "$CANDIDATE_SHA")" = "$CANDIDATE_SHA"
+          test "$(git -C source rev-parse "$DURABLE_COMMIT")" = "$DURABLE_COMMIT"
+
+          git -C source archive "$CANDIDATE_SHA" | tar -x -C "$root/candidate"
+          printf '%s\n' "$CANDIDATE_SHA" > "$root/candidate/CANDIDATE_HEAD.txt"
+          git -C source diff --binary "$CANDIDATE_BASE" "$CANDIDATE_SHA" > "$root/candidate.patch"
+          git -C source diff --name-status "$CANDIDATE_BASE" "$CANDIDATE_SHA" > "$root/candidate-name-status.txt"
+          git -C source log --reverse --format='%H %s' "$CANDIDATE_BASE..$CANDIDATE_SHA" > "$root/candidate-log.txt"
+          git -C source show "$DURABLE_COMMIT:$DURABLE_PATH" > "$root/evidence/durable/$(basename "$DURABLE_PATH")"
+
+          gh api "repos/${CANDIDATE_REPOSITORY}/pulls/141" > "$root/metadata/pr141.json"
+          gh api "repos/${CANDIDATE_REPOSITORY}/pulls/147" > "$root/metadata/pr147.json"
+          gh api "repos/${CANDIDATE_REPOSITORY}/pulls/148" > "$root/metadata/pr148.json"
+          gh api "repos/${CANDIDATE_REPOSITORY}/actions/runs/${RUNTIME_RUN}" > "$root/metadata/runtime-run-${RUNTIME_RUN}.json"
+          gh api "repos/${CANDIDATE_REPOSITORY}/actions/jobs/${RUNTIME_JOB}" > "$root/metadata/runtime-job-${RUNTIME_JOB}.json"
+          gh api "repos/${CANDIDATE_REPOSITORY}/actions/runs/${PUBLIC_RUN}" > "$root/metadata/public-run-${PUBLIC_RUN}.json"
+          gh api "repos/${CANDIDATE_REPOSITORY}/actions/jobs/${PUBLIC_JOB}" > "$root/metadata/public-job-${PUBLIC_JOB}.json"
+          cp "$GITHUB_EVENT_PATH" "$root/metadata/bundle-builder-event.json"
+
+          gh api "repos/${CANDIDATE_REPOSITORY}/actions/artifacts/${PUBLIC_ARTIFACT_ID}/zip" > "$root/evidence/public-artifact/FamilyPilot_PF08A_Wave1D_Public_b30b574_Evidence.zip"
+          echo "${PUBLIC_ZIP_SHA256}  $root/evidence/public-artifact/FamilyPilot_PF08A_Wave1D_Public_b30b574_Evidence.zip" | sha256sum -c -
+          unzip -q "$root/evidence/public-artifact/FamilyPilot_PF08A_Wave1D_Public_b30b574_Evidence.zip" -d "$root/evidence/public-artifact/extracted"
+          public_json="$(find "$root/evidence/public-artifact/extracted" -type f -name '*.json' -print -quit)"
+          test -n "$public_json"
+          echo "${PUBLIC_JSON_SHA256}  ${public_json}" | sha256sum -c -
+
+          cp "builder/review/$PROMPT_NAME" "$root/review/"
+          cat > "$root/review/PRIOR_REVIEW_REQUIRED.txt" <<EOF
+          Attach beside this bundle:
+          ${PRIOR_REVIEW_NAME}
+          SHA-256: ${PRIOR_REVIEW_SHA256}
+          Size: ${PRIOR_REVIEW_SIZE} bytes
+          Use it only for exact findings and binding criteria. Do not inherit its verdict.
+          EOF
+
+          python3 - "$root" <<'PY'
+          import json, os, pathlib, sys
+          root=pathlib.Path(sys.argv[1])
+          data={
+            'schema_version':2,
+            'project':'FamilyPilot',
+            'checkpoint':'PF08A_Wave1D_CP04',
+            'bundle_name':os.environ['BUNDLE_NAME'],
+            'candidate_repository':os.environ['CANDIDATE_REPOSITORY'],
+            'candidate_pr':int(os.environ['CANDIDATE_PR']),
+            'candidate_base':os.environ['CANDIDATE_BASE'],
+            'candidate_sha':os.environ['CANDIDATE_SHA'],
+            'runtime_run':int(os.environ['RUNTIME_RUN']),
+            'runtime_job':int(os.environ['RUNTIME_JOB']),
+            'public_verifier_pr':int(os.environ['PUBLIC_VERIFIER_PR']),
+            'public_verifier_head':os.environ['PUBLIC_VERIFIER_HEAD'],
+            'public_run':int(os.environ['PUBLIC_RUN']),
+            'public_job':int(os.environ['PUBLIC_JOB']),
+            'public_artifact_id':int(os.environ['PUBLIC_ARTIFACT_ID']),
+            'public_json_sha256':os.environ['PUBLIC_JSON_SHA256'],
+            'public_zip_sha256':os.environ['PUBLIC_ZIP_SHA256'],
+            'durable_commit':os.environ['DURABLE_COMMIT'],
+            'durable_path':os.environ['DURABLE_PATH'],
+            'prior_review_filename':os.environ['PRIOR_REVIEW_NAME'],
+            'prior_review_sha256':os.environ['PRIOR_REVIEW_SHA256'],
+            'prior_review_size':int(os.environ['PRIOR_REVIEW_SIZE']),
+            'builder_run':int(os.environ['GITHUB_RUN_ID']),
+            'review_mode':'FRESH_INDEPENDENT_CLEAN_ROOM_READ_ONLY_IMMUTABLE_SOURCES_ONLY',
+          }
+          (root/'BUNDLE_METADATA.json').write_text(json.dumps(data,indent=2)+'\n',encoding='utf-8')
+          PY
+
+          cat > "$root/README.txt" <<EOF
+          Immutable FamilyPilot review bundle for candidate ${CANDIDATE_SHA}.
+          Attach the separate prior review file listed in review/PRIOR_REVIEW_REQUIRED.txt.
+          Start from review/${PROMPT_NAME}.
+          Verify integrity with: sha256sum -c SHA256SUMS
+          EOF
+
+          (
+            cd "$root"
+            find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          )
+          (
+            cd "$PWD/out"
+            zip -q -r "$BUNDLE_NAME.zip" "$BUNDLE_NAME"
+            sha256sum "$BUNDLE_NAME.zip" > "$BUNDLE_NAME.zip.sha256"
+          )
+
+      - name: Upload immutable review package
+        uses: actions/upload-artifact@v4
+        with:
+          name: FamilyPilot_PF08A_Wave1D_CP04_b30b574_Fresh_Independent_Review_Package_2026-07-29
+          path: |
+            out/FamilyPilot_PF08A_Wave1D_CP04_b30b574_Fresh_Independent_Review_Bundle_2026-07-29.zip
+            out/FamilyPilot_PF08A_Wave1D_CP04_b30b574_Fresh_Independent_Review_Bundle_2026-07-29.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
