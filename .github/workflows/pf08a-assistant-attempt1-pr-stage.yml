@@ -1,0 +1,130 @@
+name: PF-08A Assistant Attempt 1 PR Stage
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pf08a-assistant-attempt1-stage.yml'
+      - '.github/workflows/pf08a-assistant-attempt1-pr-stage.yml'
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  apply-test-stage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      EXPECTED_HEAD: a4ecf55c4bbaabf3b258ee86e1c6a7ba55b65e0c
+      TARGET_BRANCH: agent/pf08a-wave1d-cp04-corrections
+      RESULT_BRANCH: coord/pf08a-wave1d-assistant-attempt1-result
+    steps:
+      - name: Checkout staging definition
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: builder
+          persist-credentials: true
+
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify immutable pre-write state
+        working-directory: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          pr="$(gh api repos/${{ github.repository }}/pulls/141)"
+          test "$(jq -r .state <<<"$pr")" = open
+          test "$(jq -r .draft <<<"$pr")" = true
+          test "$(jq -r .merged <<<"$pr")" = false
+          test "$(jq -r .head.ref <<<"$pr")" = "$TARGET_BRANCH"
+          test "$(jq -r .head.sha <<<"$pr")" = "$EXPECTED_HEAD"
+          test "$(jq -r .base.ref <<<"$pr")" = main
+
+      - name: Apply bounded correction patch
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          awk '/<<'"'"'PATCH_B64'"'"'/{capture=1;next} /^PATCH_B64$/{capture=0} capture' ../builder/.github/workflows/pf08a-assistant-attempt1-stage.yml > /tmp/attempt1.patch.xz.b64
+          tr -d '\n\r' < /tmp/attempt1.patch.xz.b64 | base64 -d | xz -d > /tmp/attempt1.patch
+          git apply --check /tmp/attempt1.patch
+          git apply /tmp/attempt1.patch
+          git diff --check
+
+      - name: Verify syntax mirrors and domain contracts
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          node --check familypilot-scope.js
+          node --check src/familypilot-scope.js
+          node --check familypilot-module-registry.js
+          node --check src/familypilot-module-registry.js
+          node --check familypilot-module-registry-retry-correction.js
+          node --check src/familypilot-module-registry-retry-correction.js
+          node --check familypilot-planned-income-amount-model.js
+          node --check tools/pf08a-wave1d-module-registry-domain-smoke.mjs
+          node --check tools/pf08a-wave1d-financial-fingerprint-domain-smoke.mjs
+          node --check tools/pf08a-wave1d-listener-sentinel-domain-smoke.mjs
+          node --check tools/pf08a-wave1d-integrated-browser-smoke.mjs
+          node --check tools/pf08a-wave1d-visible-degraded-browser-smoke.mjs
+          node --check tools/pf08a-wave1d-scope-fallback-browser-smoke.mjs
+          node --check tools/pf08a-wave1d-recovery-reload-browser-smoke.mjs
+          cmp familypilot-scope.js src/familypilot-scope.js
+          cmp familypilot-module-registry.js src/familypilot-module-registry.js
+          cmp familypilot-module-registry-retry-correction.js src/familypilot-module-registry-retry-correction.js
+          node tools/pf08a-wave1d-module-registry-domain-smoke.mjs
+          node tools/pf08a-wave1d-financial-fingerprint-domain-smoke.mjs
+          node tools/pf08a-wave1d-listener-sentinel-domain-smoke.mjs
+
+      - name: Verify Wave 1D browser contracts
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          node tools/pf08a-wave1d-integrated-browser-smoke.mjs
+          node tools/pf08a-wave1d-visible-degraded-browser-smoke.mjs
+          node tools/pf08a-wave1d-scope-fallback-browser-smoke.mjs
+          node tools/pf08a-wave1d-recovery-reload-browser-smoke.mjs
+
+      - name: Verify Wave 1C regressions
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          node tools/pf08a-wave1c-persistence-browser-smoke.mjs
+          node tools/pf08a-wave1c-compatibility-migration-smoke.mjs
+          node tools/pf08a-wave1c-integrated-browser-smoke.mjs
+
+      - name: Create one staged correction commit
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          git config user.name "FamilyPilot Coordination"
+          git config user.email "coordination@familypilot.invalid"
+          git add .github/workflows/pf08a-wave1d-visible-degraded.yml \
+            familypilot-module-registry-retry-correction.js familypilot-module-registry.js familypilot-scope.js \
+            src/familypilot-module-registry-retry-correction.js src/familypilot-module-registry.js src/familypilot-scope.js \
+            tools/pf08a-wave1d-financial-fingerprint-domain-smoke.mjs \
+            tools/pf08a-wave1d-listener-sentinel-domain-smoke.mjs \
+            tools/pf08a-wave1d-module-registry-domain-smoke.mjs \
+            tools/pf08a-wave1d-recovery-reload-browser-smoke.mjs \
+            tools/pf08a-wave1d-visible-degraded-browser-smoke.mjs
+          test "$(git diff --cached --name-only | wc -l)" -eq 12
+          git commit -m "Correct remaining PF-08A Wave 1D review findings"
+          git push origin "HEAD:refs/heads/$RESULT_BRANCH"
+          git rev-parse HEAD | tee /tmp/result-sha.txt
+
+      - name: Upload attempt evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pf08a-assistant-attempt1-evidence
+          path: |
+            /tmp/result-sha.txt
+            /tmp/attempt1.patch
+          retention-days: 30

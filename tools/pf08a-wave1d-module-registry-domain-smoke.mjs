@@ -2,6 +2,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 
 const source=readFileSync('familypilot-module-registry.js','utf8');
+const correctionSource=readFileSync('familypilot-module-registry-retry-correction.js','utf8');
 const marker='PF08A_WAVE1D_MODULE_REGISTRY_DOMAIN_PASS';
 const assert=(value,message)=>{if(!value)throw new Error(message)};
 
@@ -59,6 +60,72 @@ function createContext(search='?test=1'){
   return context;
 }
 
+function createBarrierContext(){
+  const documentListeners=new Map();
+  const windowListeners=new Map();
+  const bodyClasses=new Set();
+  let moduleState='degraded';
+
+  function control({id,readOnly=false,disabled=false}){
+    const attributes=new Map();
+    return {
+      id,tagName:'BUTTON',type:'button',disabled,dataset:{},
+      getAttribute(name){return attributes.has(name)?attributes.get(name):null},
+      setAttribute(name,value){attributes.set(name,String(value))},
+      removeAttribute(name){attributes.delete(name)},
+      closest(selector){
+        if(selector==='#actionDock')return null;
+        if(readOnly&&selector.includes('.nav'))return this;
+        if(selector.startsWith('button,input,select,textarea'))return this;
+        return null;
+      },
+    };
+  }
+
+  const mutationControl=control({id:'mutationOutsideDock'});
+  const readOnlyNavigation=control({id:'readOnlyNavigation',readOnly:true});
+  const preDisabledControl=control({id:'preDisabledControl',disabled:true});
+  const controls=[mutationControl,readOnlyNavigation,preDisabledControl];
+  const snapshot=()=>({catalogue:[{
+    moduleId:'base_finance',state:moduleState,containmentLevel:'application_shell_degraded',
+    retryClass:'reload_required',blockedByModuleId:null,lastRetryAt:null,attempt:1,
+  }]});
+  const registry={snapshot,moduleForPath(){return null},markDegraded(){throw new Error('Unexpected terminal restoration')}};
+  const document={
+    documentElement:{},
+    body:{classList:{toggle(name,active){active?bodyClasses.add(name):bodyClasses.delete(name)}}},
+    addEventListener(type,fn){const list=documentListeners.get(type)||[];list.push(fn);documentListeners.set(type,list)},
+    querySelectorAll(selector){
+      if(selector==='button,input,select,textarea')return controls;
+      if(selector==='[data-fp-shell-mutation-blocked="true"]')return controls.filter(item=>item.dataset.fpShellMutationBlocked==='true');
+      return [];
+    },
+    querySelector(selector){
+      if(selector==='#readOnlyNavigation')return readOnlyNavigation;
+      if(selector==='#mutationOutsideDock')return mutationControl;
+      return null;
+    },
+  };
+  class MutationObserver{constructor(fn){this.fn=fn}observe(){}}
+  const context={
+    console,URLSearchParams,Map,WeakMap,Number,String,Boolean,Array,Object,JSON,
+    location:{search:'?test=1'},document,MutationObserver,FamilyPilotModuleRegistry:registry,
+    addEventListener(type,fn){const list=windowListeners.get(type)||[];list.push(fn);windowListeners.set(type,list)},
+    dispatchEvent(event){for(const fn of windowListeners.get(event.type)||[])fn(event);return true},
+    __setModuleState(value){moduleState=value},
+    __documentListeners:documentListeners,
+    __bodyClasses:bodyClasses,
+    __mutationControl:mutationControl,
+    __readOnlyNavigation:readOnlyNavigation,
+    __preDisabledControl:preDisabledControl,
+    __snapshot:snapshot,
+  };
+  context.window=context;
+  context.globalThis=context;
+  vm.runInNewContext(correctionSource,context,{filename:'familypilot-module-registry-retry-correction.js'});
+  return context;
+}
+
 const testContext=createContext('?test=1');
 const registry=testContext.FamilyPilotModuleRegistry;
 assert(registry,'Registry API missing');
@@ -107,6 +174,64 @@ const emptyContext=createContext('?test=&moduleFailure=what_if&moduleFailureStag
 assert(!emptyContext.FamilyPilotModuleRegistry.test,'empty test value enabled test API');
 assert(emptyContext.FamilyPilotModuleRegistry.get('what_if').state!=='degraded','empty test value activated failure injection');
 
+const detachedProbeId='register_detached_probe';
+const beforeDetachedRegistration=registry.snapshot();
+const firstRegisterReturn=registry.register({
+  moduleId:detachedProbeId, userName:'Register detached probe', criticality:'supporting',
+  containmentLevel:'module_degraded', retryClass:'reload_required', dependencies:['base_finance'], routes:[], unaffectedRoutes:[],
+  ownershipContract:{
+    navigationSelectors:[],
+    screenSelectors:[],
+    packageMarkers:['global:__REGISTER_DETACHED_PROBE_READY__'],
+    listenerSentinel:null,
+  },
+});
+const authoritativeAfterFirstRegistration=registry.get(detachedProbeId);
+assert(firstRegisterReturn!==authoritativeAfterFirstRegistration,'First register return was not detached');
+assert(firstRegisterReturn.dependencies!==authoritativeAfterFirstRegistration.dependencies,'First register dependencies were not detached');
+assert(firstRegisterReturn.ownershipContract!==authoritativeAfterFirstRegistration.ownershipContract,'First register ownership contract was not detached');
+assert(firstRegisterReturn.ownershipContract.packageMarkers!==authoritativeAfterFirstRegistration.ownershipContract.packageMarkers,'First register package markers were not detached');
+assert(firstRegisterReturn.loadedScripts!==authoritativeAfterFirstRegistration.loadedScripts,'First register loaded scripts were not detached');
+firstRegisterReturn.state='degraded';
+firstRegisterReturn.userName='Externally mutated first return';
+firstRegisterReturn.dependencies.push('what_if');
+firstRegisterReturn.ownershipContract.packageMarkers.push('global:__EXTERNAL_FIRST_MUTATION__');
+firstRegisterReturn.loadedScripts.push('/external-first-mutation.js');
+const afterFirstMutation=registry.get(detachedProbeId);
+assert(afterFirstMutation.state==='registered','First return mutation changed authoritative state');
+assert(afterFirstMutation.userName==='Register detached probe','First return mutation changed authoritative user name');
+assert(afterFirstMutation.dependencies.length===1&&afterFirstMutation.dependencies[0]==='base_finance','First return mutation changed authoritative dependencies');
+assert(afterFirstMutation.ownershipContract.packageMarkers.length===1&&afterFirstMutation.ownershipContract.packageMarkers[0]==='global:__REGISTER_DETACHED_PROBE_READY__','First return mutation changed authoritative package markers');
+assert(afterFirstMutation.loadedScripts.length===0,'First return mutation changed authoritative loaded scripts');
+const afterFirstRegistration=registry.snapshot();
+assert(afterFirstRegistration.catalogue.length===beforeDetachedRegistration.catalogue.length+1,'First registration did not add exactly one catalogue record');
+
+const eventsBeforeDuplicate=JSON.stringify(afterFirstRegistration.events);
+const duplicateRegisterReturn=registry.register({
+  moduleId:detachedProbeId, userName:'Duplicate definition must be ignored', dependencies:['learning'],
+});
+assert(duplicateRegisterReturn!==firstRegisterReturn,'Duplicate register return shared the first return object');
+assert(duplicateRegisterReturn!==afterFirstMutation,'Duplicate register return was not detached from authoritative read');
+assert(duplicateRegisterReturn.dependencies!==afterFirstMutation.dependencies,'Duplicate register dependencies were not detached');
+assert(duplicateRegisterReturn.ownershipContract!==afterFirstMutation.ownershipContract,'Duplicate register ownership contract was not detached');
+assert(duplicateRegisterReturn.ownershipContract.packageMarkers!==afterFirstMutation.ownershipContract.packageMarkers,'Duplicate register package markers were not detached');
+assert(duplicateRegisterReturn.loadedScripts!==afterFirstMutation.loadedScripts,'Duplicate register loaded scripts were not detached');
+duplicateRegisterReturn.state='unavailable';
+duplicateRegisterReturn.userName='Externally mutated duplicate return';
+duplicateRegisterReturn.dependencies.push('learning');
+duplicateRegisterReturn.ownershipContract.packageMarkers.push('global:__EXTERNAL_DUPLICATE_MUTATION__');
+duplicateRegisterReturn.loadedScripts.push('/external-duplicate-mutation.js');
+const afterDuplicateMutation=registry.get(detachedProbeId);
+const snapshotAfterDuplicate=registry.snapshot();
+assert(afterDuplicateMutation.state==='registered','Duplicate return mutation changed authoritative state');
+assert(afterDuplicateMutation.userName==='Register detached probe','Duplicate return mutation changed authoritative user name');
+assert(afterDuplicateMutation.dependencies.length===1&&afterDuplicateMutation.dependencies[0]==='base_finance','Duplicate return mutation changed authoritative dependencies');
+assert(afterDuplicateMutation.ownershipContract.packageMarkers.length===1&&afterDuplicateMutation.ownershipContract.packageMarkers[0]==='global:__REGISTER_DETACHED_PROBE_READY__','Duplicate return mutation changed authoritative package markers');
+assert(afterDuplicateMutation.loadedScripts.length===0,'Duplicate return mutation changed authoritative loaded scripts');
+assert(snapshotAfterDuplicate.catalogue.length===afterFirstRegistration.catalogue.length,'Duplicate registration added a catalogue record');
+assert(snapshotAfterDuplicate.catalogue.filter(item=>item.moduleId===detachedProbeId).length===1,'Duplicate registration created a second module record');
+assert(JSON.stringify(snapshotAfterDuplicate.events)===eventsBeforeDuplicate,'Duplicate registration added an event');
+
 const probeContract={
   navigationSelectors:['[data-probe-entry]'],
   screenSelectors:['#probeScreen'],
@@ -131,6 +256,33 @@ registry.beginLoad('contract_probe');
 const accepted=registry.markReady('contract_probe');
 assert(accepted.state==='ready','Valid ownership contract did not reach ready');
 
+const barrierContext=createBarrierContext();
+const barrier=barrierContext.__FP_TEST__?.moduleRegistryCorrection;
+assert(barrier,'Shell mutation barrier test API missing');
+assert(barrier.shellDegraded()===true,'Shell degradation was not detected');
+assert(barrierContext.__bodyClasses.has('fp-shell-mutation-barrier'),'Shell mutation body marker missing');
+assert(barrierContext.__mutationControl.closest('#actionDock')===null,'Mutation probe is not outside action dock');
+assert(barrierContext.__mutationControl.disabled===true,'Outside-dock mutation control was not disabled');
+assert(barrierContext.__mutationControl.dataset.fpShellMutationBlocked==='true','Outside-dock mutation marker missing');
+assert(barrierContext.__readOnlyNavigation.disabled===false,'Read-only navigation was disabled');
+assert(barrier.readOnlyControl('#readOnlyNavigation')===true,'Read-only navigation was not classified');
+assert(barrier.blockedControls().some(item=>item.id==='mutationOutsideDock'),'Blocked-control report omitted outside-dock mutation');
+const blockedBefore=barrier.blockedCount();
+const mutationEvent={target:barrierContext.__mutationControl,prevented:false,stopped:false,preventDefault(){this.prevented=true},stopImmediatePropagation(){this.stopped=true}};
+barrierContext.__documentListeners.get('click')[0](mutationEvent);
+assert(mutationEvent.prevented&&mutationEvent.stopped,'Mutation event was not intercepted');
+assert(barrier.blockedCount()===blockedBefore+1,'Mutation block counter did not increment');
+const navigationEvent={target:barrierContext.__readOnlyNavigation,prevented:false,stopped:false,preventDefault(){this.prevented=true},stopImmediatePropagation(){this.stopped=true}};
+barrierContext.__documentListeners.get('click')[0](navigationEvent);
+assert(!navigationEvent.prevented&&!navigationEvent.stopped,'Read-only navigation was intercepted');
+barrierContext.__setModuleState('ready');
+barrierContext.dispatchEvent({type:'familypilot:module-state',detail:barrierContext.__snapshot()});
+assert(barrier.shellDegraded()===false,'Shell mutation barrier did not recover');
+assert(barrierContext.__mutationControl.disabled===false,'Mutation control was not restored after recovery');
+assert(!('fpShellMutationBlocked' in barrierContext.__mutationControl.dataset),'Mutation marker remained after recovery');
+assert(barrierContext.__preDisabledControl.disabled===true,'Pre-disabled state was not preserved');
+assert(barrierContext.__readOnlyNavigation.disabled===false,'Read-only navigation changed after recovery');
+
 console.log(JSON.stringify({
   status:'PASS',
   marker,
@@ -142,5 +294,13 @@ console.log(JSON.stringify({
   injection_isolated:true,
   exact_test_mode:true,
   ownership_contract_enforced:true,
+  register_returns_detached_clone:true,
+  duplicate_register_returns_detached_clone:true,
+  external_mutation_cannot_change_registry:true,
+  shell_mutation_barrier:true,
+  outside_action_dock_disabled:true,
+  mutation_intercepted:true,
+  read_only_navigation_preserved:true,
+  recovery_restored_controls:true,
 },null,2));
 console.log(marker);

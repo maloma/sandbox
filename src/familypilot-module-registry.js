@@ -227,11 +227,11 @@
   function register(definition){
     const moduleId = String(definition?.moduleId || '');
     if(!moduleId) throw new Error('moduleId required');
-    if(records.has(moduleId)) return records.get(moduleId);
+    if(records.has(moduleId)) return clone(records.get(moduleId));
     const record = normalizedRecord(definition);
     records.set(moduleId, record);
     emit(record, null, 'registered');
-    return record;
+    return clone(record);
   }
 
   moduleDefinitions.forEach(register);
