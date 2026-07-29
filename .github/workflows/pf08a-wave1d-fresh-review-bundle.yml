@@ -1,0 +1,147 @@
+name: PF-08A Wave 1D Fresh Review Bundle
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pf08a-wave1d-fresh-review-bundle.yml'
+      - 'review/PF08A_Wave1D_CP04_Corrected_Exact_Head_Fresh_Independent_Review_Prompt_RU_2026-07-29.md'
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+jobs:
+  build-immutable-review-bundle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CANDIDATE_REPOSITORY: maloma/sandbox
+      CANDIDATE_PR: '141'
+      CANDIDATE_BASE: 1af3694a75230488270dbc6aa8e30ca642f7fb41
+      CANDIDATE_SHA: a4ecf55c4bbaabf3b258ee86e1c6a7ba55b65e0c
+      DURABLE_COMMIT: db311481a3839a49c3391e34b90427a89b2a00d4
+      DURABLE_PATH: evidence/pf08a-wave1d-correction-durable-a4ecf55c4bba.json
+      PUBLIC_ARTIFACT_ID: '8709583866'
+      PUBLIC_JSON_SHA256: 4c0069077b5a10b7db51878d71db566199fd8cd100ff6636ac025fb5174292fb
+      PRIOR_REVIEW_SHA256: 751d5644a7a3395a95660a0ebdfcd7f41e9f33ad565908a84cea4a9f2a249bc2
+      PRIOR_REVIEW_SIZE: '32343'
+      BUNDLE_NAME: PF08A_Wave1D_CP04_Corrected_Exact_Head_Fresh_Independent_Review_Bundle_2026-07-29
+    steps:
+      - name: Checkout bundle definition
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: builder
+          persist-credentials: false
+
+      - name: Assemble immutable sources
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          root="$PWD/out/$BUNDLE_NAME"
+          mkdir -p "$root"/{candidate,evidence/public-artifact,evidence/durable,metadata,review}
+
+          git init -q source
+          git -C source remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${CANDIDATE_REPOSITORY}.git"
+          git -C source fetch -q --depth=1 origin "$CANDIDATE_BASE"
+          git -C source fetch -q --depth=1 origin "$CANDIDATE_SHA"
+          git -C source fetch -q --depth=1 origin "$DURABLE_COMMIT"
+          test "$(git -C source rev-parse "$CANDIDATE_SHA")" = "$CANDIDATE_SHA"
+          test "$(git -C source rev-parse "$DURABLE_COMMIT")" = "$DURABLE_COMMIT"
+
+          git -C source archive "$CANDIDATE_SHA" | tar -x -C "$root/candidate"
+          printf '%s\n' "$CANDIDATE_SHA" > "$root/candidate/CANDIDATE_HEAD.txt"
+          git -C source diff --binary "$CANDIDATE_BASE" "$CANDIDATE_SHA" > "$root/candidate.patch"
+          git -C source diff --name-status "$CANDIDATE_BASE" "$CANDIDATE_SHA" > "$root/candidate-name-status.txt"
+          git -C source log --reverse --format='%H %s' "$CANDIDATE_BASE..$CANDIDATE_SHA" > "$root/candidate-log.txt"
+          git -C source show "$DURABLE_COMMIT:$DURABLE_PATH" > "$root/evidence/durable/$(basename "$DURABLE_PATH")"
+
+          gh api "repos/${CANDIDATE_REPOSITORY}/pulls/141" > "$root/metadata/pr141.json"
+          gh api "repos/${CANDIDATE_REPOSITORY}/pulls/142" > "$root/metadata/pr142.json"
+          gh api "repos/${CANDIDATE_REPOSITORY}/pulls/143" > "$root/metadata/pr143.json"
+          gh api "repos/${CANDIDATE_REPOSITORY}/actions/runs/30410818364" > "$root/metadata/runtime-run-30410818364.json"
+          gh api "repos/${CANDIDATE_REPOSITORY}/actions/jobs/90446242760" > "$root/metadata/runtime-job-90446242760.json"
+          gh api "repos/${CANDIDATE_REPOSITORY}/actions/runs/30413575358" > "$root/metadata/public-run-30413575358.json"
+          gh api "repos/${CANDIDATE_REPOSITORY}/actions/jobs/90455010165" > "$root/metadata/public-job-90455010165.json"
+          cp "$GITHUB_EVENT_PATH" "$root/metadata/bundle-builder-event.json"
+
+          gh api "repos/${CANDIDATE_REPOSITORY}/actions/artifacts/${PUBLIC_ARTIFACT_ID}/zip" > "$root/evidence/public-artifact/source-artifact-${PUBLIC_ARTIFACT_ID}.zip"
+          unzip -q "$root/evidence/public-artifact/source-artifact-${PUBLIC_ARTIFACT_ID}.zip" -d "$root/evidence/public-artifact/extracted"
+          public_json="$(find "$root/evidence/public-artifact/extracted" -type f -name '*.json' -print -quit)"
+          test -n "$public_json"
+          echo "${PUBLIC_JSON_SHA256}  ${public_json}" | sha256sum -c -
+
+          cp builder/review/PF08A_Wave1D_CP04_Corrected_Exact_Head_Fresh_Independent_Review_Prompt_RU_2026-07-29.md "$root/review/"
+          cat > "$root/review/PRIOR_REVIEW_REQUIRED.txt" <<EOF
+          Attach this separate immutable source beside the bundle:
+          PF08A_Wave1D_CP04_Fresh_Independent_Runtime_Acceptance_Result.md
+          SHA-256: ${PRIOR_REVIEW_SHA256}
+          Size: ${PRIOR_REVIEW_SIZE} bytes
+          Historical verdict: FAIL / RUNTIME_ACCEPTANCE PROHIBITED / P0_04 OPEN
+          The new reviewer must use it only for exact findings and binding criteria, not inherit its verdict.
+          EOF
+
+          node --version > "$root/metadata/bundle-builder-node.txt"
+          python3 --version > "$root/metadata/bundle-builder-python.txt"
+          uname -a > "$root/metadata/bundle-builder-uname.txt"
+
+          python3 - "$root" <<'PY'
+          import json, os, pathlib, sys
+          root=pathlib.Path(sys.argv[1])
+          data={
+            'schema_version':1,
+            'bundle_name':os.environ['BUNDLE_NAME'],
+            'candidate_repository':os.environ['CANDIDATE_REPOSITORY'],
+            'candidate_pr':int(os.environ['CANDIDATE_PR']),
+            'candidate_base':os.environ['CANDIDATE_BASE'],
+            'candidate_sha':os.environ['CANDIDATE_SHA'],
+            'runtime_run':30410818364,
+            'runtime_job':90446242760,
+            'public_verifier_pr':142,
+            'public_verifier_head':'515b902ddcb6b23f1606306bcf4d916a40fb9ae8',
+            'public_run':30413575358,
+            'public_job':90455010165,
+            'public_artifact_id':int(os.environ['PUBLIC_ARTIFACT_ID']),
+            'public_json_sha256':os.environ['PUBLIC_JSON_SHA256'],
+            'durable_commit':os.environ['DURABLE_COMMIT'],
+            'durable_path':os.environ['DURABLE_PATH'],
+            'prior_review_filename':'PF08A_Wave1D_CP04_Fresh_Independent_Runtime_Acceptance_Result.md',
+            'prior_review_sha256':os.environ['PRIOR_REVIEW_SHA256'],
+            'prior_review_size':int(os.environ['PRIOR_REVIEW_SIZE']),
+            'builder_pr':int(os.environ.get('GITHUB_REF_NAME','0').split('/')[0]) if os.environ.get('GITHUB_REF_NAME','').split('/')[0].isdigit() else None,
+            'builder_head':os.environ.get('GITHUB_SHA'),
+            'builder_run':int(os.environ['GITHUB_RUN_ID']),
+            'review_mode':'FRESH_INDEPENDENT_CLEAN_ROOM_READ_ONLY_IMMUTABLE_SOURCES_ONLY',
+          }
+          (root/'BUNDLE_METADATA.json').write_text(json.dumps(data,indent=2)+'\n',encoding='utf-8')
+          PY
+
+          cat > "$root/README.txt" <<'EOF'
+          Immutable correction-review bundle.
+          A separate prior review file with the exact pinned SHA-256 and size is also required.
+          Start with review/PF08A_Wave1D_CP04_Corrected_Exact_Head_Fresh_Independent_Review_Prompt_RU_2026-07-29.md.
+          Use only those two immutable sources. Do not use GitHub, web, memory or other chats.
+          Verify bundle integrity first with: sha256sum -c SHA256SUMS
+          EOF
+
+          (
+            cd "$root"
+            find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          )
+          (
+            cd "$PWD/out"
+            zip -q -r "$BUNDLE_NAME.zip" "$BUNDLE_NAME"
+            sha256sum "$BUNDLE_NAME.zip" > "$BUNDLE_NAME.zip.sha256"
+          )
+
+      - name: Upload immutable review bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: pf08a-wave1d-cp04-fresh-review-bundle-a4ecf55c4bba
+          path: |
+            out/PF08A_Wave1D_CP04_Corrected_Exact_Head_Fresh_Independent_Review_Bundle_2026-07-29.zip
+            out/PF08A_Wave1D_CP04_Corrected_Exact_Head_Fresh_Independent_Review_Bundle_2026-07-29.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
