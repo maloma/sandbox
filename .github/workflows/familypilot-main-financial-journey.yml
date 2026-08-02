@@ -1,0 +1,86 @@
+name: FamilyPilot Main Financial Journey
+
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'familypilot-scope.js'
+      - 'familypilot-persistence-runtime.js'
+      - 'familypilot-wallet-management.js'
+      - 'familypilot-wallet-management-ui.js'
+      - 'familypilot-wallet-transfers.js'
+      - 'familypilot-wallet-transfers-ui.js'
+      - 'familypilot-obligations.js'
+      - 'familypilot-obligations-ui-v2.js'
+      - 'familypilot-partial-payments.js'
+      - 'familypilot-partial-payments-render-sync.js'
+      - 'familypilot-savings-goals.js'
+      - 'familypilot-savings-goals-ui.js'
+      - 'familypilot-pf08a-savings-truth.js'
+      - 'familypilot-pf08a-savings-truth-correction.js'
+      - 'familypilot-pf08a-savings-truth-ui.js'
+      - 'familypilot-m4-03-savings-accounts.js'
+      - 'familypilot-m4-03-savings-accounts-ui.js'
+      - 'familypilot-m4-03-budget-designer.js'
+      - 'familypilot-m4-03-budget-designer-ui.js'
+      - 'familypilot-m4-04-money-planning.js'
+      - 'familypilot-m4-04-money-planning-ui.js'
+      - 'familypilot-m4-05-onboarding-income-distribution.js'
+      - 'familypilot-m4-05-onboarding-income-distribution-ui.js'
+      - 'familypilot-module-registry.js'
+      - 'familypilot-module-registry-ui.js'
+      - 'tools/pf08a-m3-07c-browser-smoke.mjs'
+      - 'tools/familypilot-main-financial-journey-browser-smoke.mjs'
+      - '.github/workflows/familypilot-main-financial-journey.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  main-financial-journey:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+      - name: Verify exact checked-out head
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
+      - name: Check browser smoke syntax
+        run: |
+          node --check tools/pf08a-m3-07c-browser-smoke.mjs
+          node --check tools/familypilot-main-financial-journey-browser-smoke.mjs
+      - name: Run M3-07C month-boundary baseline
+        run: node tools/pf08a-m3-07c-browser-smoke.mjs
+      - name: Run FamilyPilot Main Financial Journey
+        env:
+          FAMILYPILOT_TEST_SEED: familypilot-main-financial-journey-v1-ci
+          FAMILYPILOT_TEST_LOG_PATH: ${{ runner.temp }}/familypilot-main-financial-journey.json
+        run: node tools/familypilot-main-financial-journey-browser-smoke.mjs
+      - name: Print structured journey log
+        if: always()
+        env:
+          LOG_PATH: ${{ runner.temp }}/familypilot-main-financial-journey.json
+        run: |
+          echo "FamilyPilot structured test log: ${LOG_PATH}"
+          if test -f "${LOG_PATH}"; then
+            cat "${LOG_PATH}"
+          else
+            echo "Structured test log was not created."
+          fi
+      - name: Upload structured journey log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: familypilot-main-financial-journey-log
+          path: ${{ runner.temp }}/familypilot-main-financial-journey.json
+          if-no-files-found: warn
+          retention-days: 7
