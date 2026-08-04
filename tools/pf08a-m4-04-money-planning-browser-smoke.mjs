@@ -142,7 +142,7 @@ const harness = `<!doctype html>
     const moneyText = text(doc.getElementById('moneyLocationsScreen'));
     assert(moneyText.includes('Хотите регулярно откладывать часть полученного дохода?'), 'Accepted onboarding question is missing');
     assert(moneyText.includes('Назначение всегда одно: общие накопления капитала'), 'Rule incorrectly asks for another purpose');
-    assert(moneyText.includes('Корректировка остатка'), 'Neutral adjustment UI is missing');
+    assert(doc.querySelector('#moneyLocationsScreen [data-m404-adjust]'), 'Neutral adjustment UI is missing');
     moneyApi.openGifts();
     const giftText = text(doc.getElementById('giftPlanningScreen'));
     assert(giftText.includes('Фонд подарков') && giftText.includes('Временная надбавка'), 'Gift fund hybrid UI is missing');
