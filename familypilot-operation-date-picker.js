@@ -46,7 +46,7 @@
     let modal=document.getElementById('operationDatePickerModal');
     if(!modal){
       modal=document.createElement('div');modal.id='operationDatePickerModal';modal.className='modal';
-      modal.innerHTML=`<div class="sheet"><div class="sheet-head"><h2 id="operationDatePickerTitle">Дата операции</h2><button class="close" type="button" data-operation-date-close>Закрыть</button></div><div class="fp-date-month-head"><button type="button" data-operation-month="-1" aria-label="Предыдущий месяц">‹</button><div id="operationDateMonthTitle" class="fp-date-month-title"></div><button type="button" data-operation-month="1" aria-label="Следующий месяц">›</button></div><div class="fp-date-legend"><span class="today"><i></i>Сегодня</span><span class="selected"><i></i>Выбрано</span></div><div class="fp-date-weekdays"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span></div><div id="operationDateGrid" class="fp-date-grid"></div><div class="field"><label for="operationDateTime">Время</label><input id="operationDateTime" type="time" step="60"></div><div class="fp-date-actions"><button class="btn secondary" type="button" data-operation-date-today>Сегодня</button><button class="btn secondary" type="button" data-operation-date-close>Отмена</button><button class="btn primary" type="button" data-operation-date-apply>Применить</button></div></div>`;
+      modal.innerHTML=`<div class="sheet"><div class="sheet-head"><h2 id="operationDatePickerTitle">Дата операции</h2><button class="close" type="button" data-operation-date-close>Закрыть</button></div><div class="fp-date-month-head"><button type="button" data-operation-month="-1" aria-label="Предыдущий месяц">‹</button><div id="operationDateMonthTitle" class="fp-date-month-title"></div><button type="button" data-operation-month="1" aria-label="Следующий месяц">›</button></div><div class="field"><label for="operationDateYear">Перейти к году</label><input id="operationDateYear" type="number" inputmode="numeric" min="1900" max="9999"></div><div class="fp-date-legend"><span class="today"><i></i>Сегодня</span><span class="selected"><i></i>Выбрано</span></div><div class="fp-date-weekdays"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span></div><div id="operationDateGrid" class="fp-date-grid"></div><div class="field"><label for="operationDateTime">Время</label><input id="operationDateTime" type="time" step="60"></div><div class="fp-date-actions"><button class="btn secondary" type="button" data-operation-date-today>Сегодня</button><button class="btn secondary" type="button" data-operation-date-close>Отмена</button><button class="btn primary" type="button" data-operation-date-apply>Применить</button></div></div>`;
       document.body.appendChild(modal);
     }
 
@@ -54,7 +54,7 @@
     function syncDisplay(id=activeSourceId){const item=sources.get(id);if(item)item.display.textContent=displayValue(parse(item.source.value||valueOf(new Date())))}
     function syncAll(){for(const id of sources.keys())syncDisplay(id)}
     function render(){
-      $('operationDateMonthTitle').textContent=new Intl.DateTimeFormat('ru-RU',{month:'long',year:'numeric'}).format(month);
+      $('operationDateMonthTitle').textContent=new Intl.DateTimeFormat('ru-RU',{month:'long',year:'numeric'}).format(month);$('operationDateYear').value=String(month.getFullYear());
       const firstWeekday=(month.getDay()+6)%7,start=new Date(month.getFullYear(),month.getMonth(),1-firstWeekday),today=new Date();
       $('operationDateGrid').innerHTML=Array.from({length:42},(_,index)=>{const day=new Date(start.getFullYear(),start.getMonth(),start.getDate()+index),classes=['fp-date-day'];if(day.getMonth()!==month.getMonth())classes.push('other-month');if(sameDay(day,today))classes.push('is-today');if(sameDay(day,selected))classes.push('is-selected');return`<button type="button" class="${classes.join(' ')}" data-operation-date-day="${day.getFullYear()}-${pad(day.getMonth()+1)}-${pad(day.getDate())}">${day.getDate()}</button>`}).join('');
       $('operationDateTime').value=`${pad(selected.getHours())}:${pad(selected.getMinutes())}`;
@@ -79,6 +79,7 @@
       if(applyButton){event.preventDefault();apply();return}
       if(closer){event.preventDefault();close('operationDatePickerModal')}
     },true);
+    $('operationDateYear').addEventListener('change',()=>{const year=Number($('operationDateYear').value);if(Number.isInteger(year)&&year>=1900&&year<=9999){month=new Date(year,month.getMonth(),1);selected.setFullYear(year);render()}else $('operationDateYear').value=String(month.getFullYear())});
     for(const modalId of ['entryModal','partialPaymentModal']){const host=document.getElementById(modalId);if(host)new MutationObserver(()=>{if(host.classList.contains('open'))syncAll()}).observe(host,{attributes:true,attributeFilter:['class']})}
     syncAll();
 
