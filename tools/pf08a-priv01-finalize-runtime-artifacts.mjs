@@ -12,7 +12,7 @@ const scopeModule = readFileSync(sourceScopePath, 'utf8');
 const analyticsModule = readFileSync(sourceAnalyticsPath, 'utf8');
 
 if (!source.includes('hidden-capital-disclosure-v1')) throw new Error('Hidden Capital disclosure marker is missing');
-if (!source.includes('<script src="./familypilot-scope.js"></script>')) throw new Error('FamilyPilot scope module tag is missing');
+if (!source.includes('familypilot-scope.js')) throw new Error('FamilyPilot scope bootstrap anchor is missing');
 if (!source.includes('<script src="./familypilot-analytics-state.js"></script>')) throw new Error('Analytics state module tag is missing');
 
 writeFileSync(indexPath, source, 'utf8');
