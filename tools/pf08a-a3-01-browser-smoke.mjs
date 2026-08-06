@@ -240,7 +240,19 @@ try {
   });
 
   if (!output.stdout.includes('data-status="PASS"')) {
-    throw new Error(`Browser smoke did not pass. DOM tail: ${output.stdout.slice(-7000)}`);
+    const resultMatch = output.stdout.match(/<pre\b[^>]*\bid=(['"])result\1[^>]*>([\s\S]*?)<\/pre>/i);
+    if (resultMatch) {
+      const result = resultMatch[2].replace(/&(?:amp|lt|gt|quot|apos);|&#(?:x[\da-f]+|\d+);/gi, entity => {
+        if (entity[1] === '#') {
+          const value = entity.slice(2, -1);
+          const hexadecimal = value[0].toLowerCase() === 'x';
+          return String.fromCodePoint(Number.parseInt(hexadecimal ? value.slice(1) : value, hexadecimal ? 16 : 10));
+        }
+        return { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&apos;': "'" }[entity.toLowerCase()];
+      });
+      throw new Error(`Browser smoke did not pass. Harness result: ${result.slice(0, 7000)}`);
+    }
+    throw new Error(`Browser smoke did not pass. Harness result unavailable. DOM tail: ${output.stdout.slice(-7000)}`);
   }
   if (!output.stdout.includes(marker)) throw new Error(`Browser smoke marker ${marker} missing`);
 
