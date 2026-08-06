@@ -41,7 +41,19 @@ const harness = `<!doctype html>
     const deadline = Date.now() + 12000;
     while (Date.now() < deadline) {
       const api = frame.contentWindow && frame.contentWindow.__FP_TEST__;
-      if (api) return api;
+      if (
+        api
+        && typeof api.replaceOperationsForTest === 'function'
+        && typeof api.setActiveWallet === 'function'
+        && typeof api.setAnalyticsPeriod === 'function'
+        && typeof api.resetAnalyticsFilters === 'function'
+        && typeof api.getAnalyticsViewState === 'function'
+        && typeof api.createOperation === 'function'
+        && typeof api.setAnalyticsMode === 'function'
+        && typeof api.setAnalyticsSearch === 'function'
+        && typeof api.getActiveWallet === 'function'
+        && typeof api.analyticsFilteredOperations === 'function'
+      ) return api;
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     throw new Error('FamilyPilot test API did not become ready');
