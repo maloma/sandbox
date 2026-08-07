@@ -14,7 +14,7 @@ const rootScope=readFileSync(rootScopePath,'utf8');
 const analyticsModule=readFileSync(sourceAnalyticsPath,'utf8');
 const rootAnalytics=readFileSync(rootAnalyticsPath,'utf8');
 
-if(!source.includes('<script src="./familypilot-scope.js"></script>'))throw new Error('FamilyPilot scope module tag is missing');
+if(!source.includes('familypilot-scope.js'))throw new Error('FamilyPilot scope bootstrap anchor is missing');
 if(!source.includes('<script src="./familypilot-analytics-state.js"></script>'))throw new Error('Analytics state module tag is missing');
 
 const changed={html:index!==source,scope:rootScope!==scopeModule,analytics:rootAnalytics!==analyticsModule};

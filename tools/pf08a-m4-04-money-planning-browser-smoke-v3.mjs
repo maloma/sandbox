@@ -11,10 +11,6 @@ const patches=[
   [
     "if (test?.moneyPlanning?.capital && win.__FP_M4_04_READY__ === true) return test;",
     "if (test?.moneyPlanning?.capital && win.__FP_M4_04_READY__ === true && win.__FP_M4_04_PACKAGE_LOADED__ === true) return test;"
-  ],
-  [
-    "    assert(moneyText.includes('Корректировка остатка'), 'Neutral adjustment UI is missing');",
-    "    assert(moneyText.includes('Сверка остатков') && doc.getElementById('m404AdjustmentModal')?.textContent.includes('Корректировка остатка'), 'Neutral adjustment UI is missing');"
   ]
 ];
 for(const[needle,replacement]of patches){

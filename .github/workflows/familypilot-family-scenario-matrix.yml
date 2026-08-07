@@ -1,0 +1,67 @@
+name: FamilyPilot Automated Family Scenarios
+
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'familypilot-*.js'
+      - 'src/familypilot.html'
+      - 'src/familypilot-*.js'
+      - 'tools/pf08a-m3-07c-browser-smoke.mjs'
+      - 'tools/familypilot-main-financial-journey-browser-smoke.mjs'
+      - 'tools/familypilot-family-scenario-matrix-browser-smoke.mjs'
+      - '.github/workflows/familypilot-main-financial-journey.yml'
+      - '.github/workflows/familypilot-family-scenario-matrix.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  automated-family-scenarios:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Quiet exact PR-head checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+      - name: Verify exact checked-out PR head
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
+      - name: Syntax-check scenario matrix
+        run: node --check tools/familypilot-family-scenario-matrix-browser-smoke.mjs
+      - name: Run accepted main financial journey first
+        env:
+          FAMILYPILOT_TEST_SEED: familypilot-main-financial-journey-v1-pre-matrix-ci
+          FAMILYPILOT_TEST_LOG_PATH: ${{ runner.temp }}/familypilot-main-financial-journey-pre-matrix.json
+        run: node tools/familypilot-main-financial-journey-browser-smoke.mjs
+      - name: Run deterministic family scenario matrix
+        env:
+          FAMILYPILOT_SCENARIO_SEED: familypilot-family-scenario-matrix-v1-ci
+          FAMILYPILOT_SCENARIO_REPORT_PATH: ${{ runner.temp }}/familypilot-family-scenario-matrix.json
+        run: node tools/familypilot-family-scenario-matrix-browser-smoke.mjs
+      - name: Print structured family scenario report
+        if: always()
+        env:
+          REPORT_PATH: ${{ runner.temp }}/familypilot-family-scenario-matrix.json
+        run: |
+          echo "FamilyPilot structured family scenario report: ${REPORT_PATH}"
+          if test -f "${REPORT_PATH}"; then
+            cat "${REPORT_PATH}"
+          else
+            echo "Structured family scenario report was not created."
+          fi
+      - name: Upload structured family scenario report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: familypilot-family-scenario-matrix-report
+          path: ${{ runner.temp }}/familypilot-family-scenario-matrix.json
+          if-no-files-found: warn
+          retention-days: 7
