@@ -123,10 +123,13 @@
     return{ok:true,value:{action,amount,occurredAt,scope:debtContext.value.scope,scopeWalletId:debtContext.value.scopeWalletId,walletId:debtContext.value.walletId,currency:String(input.currency||'EUR'),comment:String(input.comment||'').trim()}};
   }
   function createSourceEvent(state,input,actorId='member-anna',at=Date.now()){
-    normalizeState(state,at);const validated=validateSourceInput(input);if(!validated.ok)return validated;
+    normalizeState(state,at);
+    const activeWallet=(state.wallets||[]).find(wallet=>wallet.id===state.activeWalletId)||null,personal=activeWallet?.type==='personal';
+    const scopeWalletId=String(input?.scopeWalletId||(personal?activeWallet.id:'wallet-household-main')).trim();
+    const validated=validateSourceInput(input,{scope:personal?'personal':'household',scopeWalletId});if(!validated.ok)return validated;
     const cpResult=findOrCreateCounterparty(state,input,actorId,at);if(cpResult.error)return{ok:false,error:cpResult.error};
-    const value=validated.value,chain=ensureActiveChain(state,cpResult.counterparty.id,value.walletId,value.currency,actorId,at);
-    const event=normalizeEvent({type:'source',chainId:chain.id,counterpartyId:cpResult.counterparty.id,action:value.action,amount:value.amount,currency:value.currency,walletId:value.walletId,occurredAt:value.occurredAt,comment:value.comment,createdAt:at,createdByMemberId:actorId},at);
+    const value=validated.value,chain=ensureActiveChain(state,cpResult.counterparty.id,value.scopeWalletId,value.currency,actorId,at),eventWalletId=value.walletId||value.scopeWalletId;
+    const event=normalizeEvent({type:'source',chainId:chain.id,counterpartyId:cpResult.counterparty.id,action:value.action,amount:value.amount,currency:value.currency,walletId:eventWalletId,occurredAt:value.occurredAt,comment:value.comment,createdAt:at,createdByMemberId:actorId},at);
     state.debtEvents.push(event);const operation=createMoneyOperation(state,event,actorId,at),result=recalculateChain(state,chain.id,at);
     return{ok:true,counterparty:cpResult.counterparty,chain:eventChain(state,event),event,operation,derivedEvents:result.derivedEvents,zero:Math.abs(result.balance)<=EPSILON};
   }
