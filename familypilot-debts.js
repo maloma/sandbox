@@ -23,6 +23,17 @@
     return 0;
   }
   function actionCashKind(action){if(action==='borrow'||action==='receive')return'debt_inflow';if(action==='repay'||action==='lend')return'debt_outflow';return null}
+  function resolveDebtContext(input={},context={}){
+    const action=sourceActions.has(input?.action)?input.action:null;
+    if(!action)return{ok:false,error:'Выберите действие с долгом.'};
+    const scope=context.scope==='personal'?'personal':'household';
+    const requiresMoneyWallet=cashActions.has(action);
+    const scopeWalletId=String(context.scopeWalletId||context.walletId||input.scopeWalletId||(!requiresMoneyWallet?input.walletId:'')||'').trim();
+    if(!scopeWalletId)return{ok:false,error:'Не удалось определить финансовый контекст долга.'};
+    const walletId=requiresMoneyWallet?String(input.walletId||'').trim():null;
+    if(requiresMoneyWallet&&!walletId)return{ok:false,error:'Выберите кошелёк для движения денег.'};
+    return{ok:true,value:{scope,scopeWalletId,walletId,requiresMoneyWallet}};
+  }
   function directionFromBalance(balance){return balance>EPSILON?'receivable':(balance<-EPSILON?'liability':'zero')}
   function revision(target,changes,actorId,at=Date.now(),source='user'){
     const actual=changes.filter(change=>String(change.oldValue??'')!==String(change.newValue??''));
@@ -142,5 +153,5 @@
   function actionLabel(action){return({opening_liability:'Начальный долг: я должен',opening_receivable:'Начальный долг: мне должны',borrow:'Мне дали',repay:'Я вернул',lend:'Я дал',receive:'Мне вернули'})[action]||'Движение долга'}
   function eventDirection(event){const kind=actionCashKind(event.action);if(kind==='debt_inflow')return'inflow';if(kind==='debt_outflow')return'outflow';if(event.action==='opening_receivable')return'inflow';if(event.action==='opening_liability')return'outflow';return'neutral'}
 
-  return Object.freeze({EPSILON,sourceActions,cashActions,makeId,normalizeName,normalizeState,findOrCreateCounterparty,ensureActiveChain,actionDelta,actionCashKind,actionLabel,eventDirection,directionFromBalance,createSourceEvent,updateSourceEvent,recalculateChain,recalculateAll,closeChain,keepChainOpen,visibleWalletIds,visibleChains,chainHistory,scopeTotals,counterpartyName,linkedOperation,sourceEnabled,validateSourceInput});
+  return Object.freeze({EPSILON,sourceActions,cashActions,makeId,normalizeName,normalizeState,findOrCreateCounterparty,ensureActiveChain,actionDelta,actionCashKind,resolveDebtContext,actionLabel,eventDirection,directionFromBalance,createSourceEvent,updateSourceEvent,recalculateChain,recalculateAll,closeChain,keepChainOpen,visibleWalletIds,visibleChains,chainHistory,scopeTotals,counterpartyName,linkedOperation,sourceEnabled,validateSourceInput});
 });
