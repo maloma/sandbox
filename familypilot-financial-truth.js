@@ -35,13 +35,21 @@
   function financialTruthSnapshot(input={}){
     const context={baseCurrency:String(input.baseCurrency||'').trim().toUpperCase(),scope:input.scope==='personal'?'personal':'household',scopeId:input.scope==='personal'?String(input.scopeId||'').trim():null};
     if(!context.baseCurrency)return{ok:false,error:'base_currency_required'};if(context.scope==='personal'&&!context.scopeId)return{ok:false,error:'personal_scope_id_required'};
-    const wallets=walletCapitalContributions(input.walletBalances,context);if(!wallets.ok)return wallets;
-    const debts=debtCapitalContributions(input.debtPositions,context);if(!debts.ok)return debts;
-    const investments=investmentCapitalContributions(input.investments,context);if(!investments.ok)return investments;
+    const wallets=walletCapitalContributions(input.walletBalances,context);if(!wallets.ok)return wallets;const debts=debtCapitalContributions(input.debtPositions,context);if(!debts.ok)return debts;const investments=investmentCapitalContributions(input.investments,context);if(!investments.ok)return investments;
     const contributions=[...wallets.contributions,...debts.contributions,...investments.contributions],summary=sumCapitalContributions(contributions,context);if(!summary.ok)return summary;
     return{ok:true,baseCurrency:context.baseCurrency,scope:context.scope,scopeId:context.scopeId,netFamilyCapital:context.scope==='household'?summary.netCapital:null,personalNetCapital:context.scope==='personal'?summary.netCapital:null,operationalFunds:summary.liquidAssets,assets:summary.assets,liabilities:summary.liabilities,allValued:summary.allValued,unresolved:summary.unresolved,contributions:summary.included};
   }
 
-  const api=Object.freeze({convertToBaseValue,makeCapitalContribution,sumCapitalContributions,walletCapitalContributions,debtCapitalContributions,investmentCapitalContributions,financialTruthSnapshot});
+  function financialTruthSelfCheck(snapshot={}){
+    if(snapshot?.ok!==true)return{ok:false,error:'snapshot_not_ok'};
+    const baseCurrency=String(snapshot.baseCurrency||'').trim().toUpperCase(),scope=snapshot.scope==='personal'?'personal':'household',scopeId=scope==='personal'?String(snapshot.scopeId||'').trim():null,contributions=Array.isArray(snapshot.contributions)?snapshot.contributions:[],ids=new Set();
+    if(!baseCurrency)return{ok:false,error:'base_currency_required'};if(scope==='personal'&&!scopeId)return{ok:false,error:'personal_scope_id_required'};
+    let resolvedNet=0,unresolvedCount=0;
+    for(const item of contributions){const id=String(item?.id||'').trim();if(!id)return{ok:false,error:'contribution_id_required'};if(ids.has(id))return{ok:false,error:'duplicate_contribution_id',contributionId:id};ids.add(id);if(item.scope!==scope)return{ok:false,error:'cross_scope_contribution',contributionId:id};if(scope==='personal'&&item.scopeId!==scopeId)return{ok:false,error:'wrong_personal_scope',contributionId:id};if(String(item.baseCurrency||'').toUpperCase()!==baseCurrency)return{ok:false,error:'base_currency_mismatch',contributionId:id};if(item.resolved!==true){unresolvedCount++;continue}const value=Number(item.baseAmount);if(!Number.isFinite(value))return{ok:false,error:'resolved_value_missing',contributionId:id};if(item.nativeCurrency!==baseCurrency&&(!Number.isFinite(Number(item.rateToBase))||!item.valuationSource||!Number.isFinite(Number(item.valuedAt))))return{ok:false,error:'valuation_metadata_missing',contributionId:id};resolvedNet+=value;}
+    resolvedNet=Math.round(resolvedNet*100)/100;const declaredNet=scope==='household'?Number(snapshot.netFamilyCapital):Number(snapshot.personalNetCapital);if(!Number.isFinite(declaredNet)||Math.round(declaredNet*100)/100!==resolvedNet)return{ok:false,error:'net_capital_mismatch',expected:resolvedNet,actual:declaredNet};if(Boolean(snapshot.allValued)!==(unresolvedCount===0))return{ok:false,error:'valuation_completeness_mismatch'};if((Array.isArray(snapshot.unresolved)?snapshot.unresolved.length:0)!==unresolvedCount)return{ok:false,error:'unresolved_count_mismatch'};
+    return{ok:true,scope,baseCurrency,contributionCount:contributions.length,unresolvedCount,netCapital:resolvedNet};
+  }
+
+  const api=Object.freeze({convertToBaseValue,makeCapitalContribution,sumCapitalContributions,walletCapitalContributions,debtCapitalContributions,investmentCapitalContributions,financialTruthSnapshot,financialTruthSelfCheck});
   if(typeof module==='object'&&module.exports)module.exports=api;if(root)root.FamilyPilotFinancialTruth=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
