@@ -111,7 +111,38 @@
     return{ok:true,scope,scopeId,assets,liabilities,liquidAssets,netCapital:Math.round((assets-liabilities)*100)/100,included,unresolved,allValued:unresolved.length===0};
   }
 
-  const api=Object.freeze({convertToBaseValue,makeCapitalContribution,sumCapitalContributions});
+  function walletCapitalContributions(walletBalances=[],context={}){
+    const baseCurrency=String(context.baseCurrency||'').trim().toUpperCase();
+    if(!baseCurrency)return{ok:false,error:'base_currency_required'};
+    const rows=Array.isArray(walletBalances)?walletBalances:[],contributions=[];
+    for(const row of rows){
+      if(!row||typeof row!=='object'||row.included===false)continue;
+      const walletId=String(row.id||'').trim();
+      const balance=Number(row.balance);
+      if(!walletId)return{ok:false,error:'wallet_id_required'};
+      if(!Number.isFinite(balance))return{ok:false,error:'invalid_wallet_balance',walletId};
+      const result=makeCapitalContribution({
+        id:`wallet:${walletId}`,
+        sourceType:'wallet',
+        sourceId:walletId,
+        className:'money',
+        label:String(row.name||'').trim(),
+        scope:row.scope==='personal'?'personal':'household',
+        scopeId:row.scope==='personal'?String(row.scopeId||walletId).trim():null,
+        effect:balance<0?'liability':'asset',
+        liquid:true,
+        amount:Math.abs(balance),
+        currency:row.currency||row.nativeCurrency,
+        baseCurrency,
+        valuation:row.valuation
+      });
+      if(!result.ok)return{...result,walletId};
+      contributions.push(result.contribution);
+    }
+    return{ok:true,contributions};
+  }
+
+  const api=Object.freeze({convertToBaseValue,makeCapitalContribution,sumCapitalContributions,walletCapitalContributions});
   if(typeof module==='object'&&module.exports)module.exports=api;
   if(root)root.FamilyPilotFinancialTruth=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
