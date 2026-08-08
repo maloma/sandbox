@@ -19,7 +19,7 @@
     const {state,scopeApi,$,esc,isoLocal,open,close,money,save,showScreen,toast,now}=runtime;
     let planGoalId='',valuationAccountId='',forecastHorizon=30;
     const clone=value=>JSON.parse(JSON.stringify(value));
-    const baseCapital=()=>Number(scopeApi.capitalSnapshot(state)?.capital)||0;
+    const baseCapital=()=>{const canonical=scopeApi.capitalSnapshot(state);if(canonical?.financialTruthReady!==true||canonical?.financialTruthError)return 0;const capital=Number(canonical.capital)||0,rawDelta=Number(api.capitalSnapshot(state,0)?.valuationDelta),valuationDelta=Number.isFinite(rawDelta)?rawDelta:0;return Math.round((capital-valuationDelta)*100)/100};
     const amount=id=>Number(String($(id)?.value||'').trim().replace(',','.'));
     const parseDate=id=>new Date($(id).value).getTime();
     const formatDate=value=>value?new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',year:'numeric'}).format(new Date(value)):'—';
