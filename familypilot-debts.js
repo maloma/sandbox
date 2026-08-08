@@ -137,9 +137,10 @@
   function updateSourceEvent(state,eventId,input,actorId='member-anna',at=Date.now()){
     const event=state.debtEvents.find(item=>item.id===eventId&&item.type==='source');if(!event)return{ok:false,error:'Исходное движение долга не найдено.'};
     const oldChain=eventChain(state,event);if(!oldChain)return{ok:false,error:'Цепочка долга не найдена.'};if(oldChain.status==='closed')return{ok:false,error:'Закрытая цепочка доступна только для чтения.'};
-    const validated=validateSourceInput(input);if(!validated.ok)return validated;const cpResult=findOrCreateCounterparty(state,input,actorId,at);if(cpResult.error)return{ok:false,error:cpResult.error};
-    const value=validated.value,targetChain=ensureActiveChain(state,cpResult.counterparty.id,value.walletId,value.currency,actorId,at);
-    const proposed={chainId:targetChain.id,counterpartyId:cpResult.counterparty.id,action:value.action,amount:value.amount,currency:value.currency,walletId:value.walletId,occurredAt:value.occurredAt,comment:value.comment};
+    const scopeWalletId=String(oldChain.scopeWalletId||oldChain.walletId||'').trim(),scopeWallet=(state.wallets||[]).find(wallet=>wallet.id===scopeWalletId)||null,personal=scopeWallet?.type==='personal';
+    const validated=validateSourceInput(input,{scope:personal?'personal':'household',scopeWalletId});if(!validated.ok)return validated;const cpResult=findOrCreateCounterparty(state,input,actorId,at);if(cpResult.error)return{ok:false,error:cpResult.error};
+    const value=validated.value,targetChain=ensureActiveChain(state,cpResult.counterparty.id,value.scopeWalletId,value.currency,actorId,at),eventWalletId=value.walletId||value.scopeWalletId;
+    const proposed={chainId:targetChain.id,counterpartyId:cpResult.counterparty.id,action:value.action,amount:value.amount,currency:value.currency,walletId:eventWalletId,occurredAt:value.occurredAt,comment:value.comment};
     revision(event,Object.entries(proposed).map(([field,newValue])=>({field,oldValue:event[field],newValue})),actorId,at,'debt_source_edit');Object.assign(event,proposed,{lastEditedByMemberId:actorId,lastEditedAt:at});syncMoneyOperation(state,event,actorId,at);
     recalculateChain(state,oldChain.id,at);if(targetChain.id!==oldChain.id)recalculateChain(state,targetChain.id,at);
     const currentTarget=state.debtChains.find(item=>item.id===targetChain.id);return{ok:true,event,chain:currentTarget,counterparty:cpResult.counterparty,operation:linkedOperation(state,event),zero:Math.abs(currentTarget.currentBalance)<=EPSILON};
