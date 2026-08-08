@@ -71,9 +71,11 @@
     const counterparty=normalizeCounterparty({name,kind,note:input?.counterpartyNote,createdAt:at,createdByMemberId:actorId},at);state.debtCounterparties.push(counterparty);return{counterparty,created:true};
   }
   function activeChain(state,counterpartyId,walletId,currency){return state.debtChains.find(item=>item.status==='active'&&item.counterpartyId===counterpartyId&&item.walletId===walletId&&item.currency===currency)||null}
-  function ensureActiveChain(state,counterpartyId,walletId,currency,actorId='member-anna',at=Date.now()){
-    const existing=activeChain(state,counterpartyId,walletId,currency);if(existing)return existing;
-    const chain=normalizeChain({counterpartyId,walletId,currency,status:'active',openedAt:at,createdAt:at,createdByMemberId:actorId},at);state.debtChains.push(chain);return chain;
+  function ensureActiveChain(state,counterpartyId,scopeWalletId,currency,actorId='member-anna',at=Date.now()){
+    const scopeId=String(scopeWalletId||'').trim();
+    const existing=state.debtChains.find(item=>item.status==='active'&&item.counterpartyId===counterpartyId&&String(item.scopeWalletId||item.walletId||'')===scopeId&&item.currency===currency)||null;
+    if(existing)return existing;
+    const chain=normalizeChain({counterpartyId,scopeWalletId:scopeId,walletId:scopeId,currency,status:'active',openedAt:at,createdAt:at,createdByMemberId:actorId},at);state.debtChains.push(chain);return chain;
   }
   function sourceEvents(state,chainId){return state.debtEvents.filter(item=>item.chainId===chainId&&item.type==='source'&&item.status==='active').sort((a,b)=>a.occurredAt-b.occurredAt||a.createdAt-b.createdAt||a.id.localeCompare(b.id))}
   function linkedOperation(state,event){return event.linkedOperationId?state.operations.find(item=>item.id===event.linkedOperationId)||null:null}
