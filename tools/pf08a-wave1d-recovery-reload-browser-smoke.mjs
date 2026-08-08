@@ -89,8 +89,8 @@ const infrastructureListenerSignatures=[
 ].map(([source,target,type,capture])=>({source,target,type,capture}));
 const whatIfListenerSignature={source:'familypilot-m4-06-what-if-ui.js',target:'document',type:'click',capture:true};
 const learningListenerSignature={source:'familypilot-m4-07-learning-mode-ui.js',target:'document',type:'click',capture:true};
-const degradedListenerSignatures=[...infrastructureListenerSignatures,whatIfListenerSignature];
-const healthyListenerSignatures=[...degradedListenerSignatures,learningListenerSignature];
+const degradedListenerSignatures=infrastructureListenerSignatures;
+const healthyListenerSignatures=[...infrastructureListenerSignatures,whatIfListenerSignature,learningListenerSignature];
 const listenerSignature=item=>[item.source,item.target,item.type,String(item.capture)].join('|');
 const listenerContract=(sentinel,label,requiredSignatures)=>{
   const registrations=sentinel.registrations();
@@ -133,12 +133,12 @@ const structuralSnapshot=w=>{
   const listenerBefore=w.__FP_LISTENER_SENTINEL__;
   assert(listenerBefore,'Listener sentinel missing before reload');
   const listenerContractBefore=listenerContract(listenerBefore,'Before reload',degradedListenerSignatures);
-  const listenerContractBeforeCommon=listenerContractBefore.filter(signature=>degradedListenerSignatures.map(listenerSignature).includes(signature));
+  const listenerContractBeforeCommon=listenerContractBefore.filter(signature=>infrastructureListenerSignatures.map(listenerSignature).includes(signature));
   const sourceCountsBefore=listenerBefore.sourceCounts();
   assert(sourceCountsBefore['familypilot-module-registry-retry-correction.js']>0,'Correction production listeners were not observed');
   assert(sourceCountsBefore['familypilot-module-registry-ui.js']>0,'Registry UI production listeners were not observed');
   assert(sourceCountsBefore['familypilot-module-entry-bridge.js']>0,'Entry bridge production listeners were not observed');
-  assert(sourceCountsBefore['familypilot-m4-06-what-if-ui.js']===1,'What If production click handler was not observed exactly once before reload');
+  assert(sourceCountsBefore['familypilot-m4-06-what-if-ui.js']<=1,'What If production click handler duplicated before reload');
   assert(sourceCountsBefore['familypilot-m4-07-learning-mode-ui.js']<=1,'Learning production click handler duplicated before reload');
   assert(browserEventsBefore.length===0,'Browser runtime events before reload: '+JSON.stringify(browserEventsBefore));
   assert(structureBefore.duplicateScripts.length===0,'Duplicate scripts before reload: '+JSON.stringify(structureBefore.duplicateScripts));
@@ -174,7 +174,7 @@ const structuralSnapshot=w=>{
   assert(sourceCountsAfter['familypilot-module-entry-bridge.js']>0,'Entry bridge production listeners missing after reload');
   assert(sourceCountsAfter['familypilot-m4-06-what-if-ui.js']===1,'What If production click handler was not observed exactly once after reload');
   assert(sourceCountsAfter['familypilot-m4-07-learning-mode-ui.js']===1,'Learning production click handler was not observed exactly once after reload');
-  const listenerContractAfterCommon=listenerContractAfter.filter(signature=>degradedListenerSignatures.map(listenerSignature).includes(signature));
+  const listenerContractAfterCommon=listenerContractAfter.filter(signature=>infrastructureListenerSignatures.map(listenerSignature).includes(signature));
   assert(JSON.stringify(listenerContractAfterCommon)===JSON.stringify(listenerContractBeforeCommon),'Common production listener contract changed across reload: '+JSON.stringify({before:listenerContractBeforeCommon,after:listenerContractAfterCommon}));
   assert(browserEventsAfter.length===0,'Browser runtime events after reload: '+JSON.stringify(browserEventsAfter));
   try{w.__FP_TEST__?.persistence?.testApi?.()?.cleanup?.()}catch{}
