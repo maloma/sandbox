@@ -62,8 +62,33 @@ export function runDebtCapitalCases(){
   return{ok:true,caseCount:10};
 }
 
+export function runValuationCases(){
+  const at=Date.parse('2026-08-08T10:00:00Z');
+  const base=truth.convertToBaseValue({amount:125.55,currency:'EUR',baseCurrency:'EUR'});
+  assert(base.ok===true&&base.baseAmount===125.55&&base.converted===false,'Базовая валюта должна считаться 1:1');
+
+  const usd=truth.convertToBaseValue({amount:1000,currency:'USD',baseCurrency:'EUR',valuation:{rateToBase:0.86,source:'indicative-market',valuedAt:at}});
+  assert(usd.ok===true&&usd.baseAmount===860,'Иностранная валюта пересчитана неверно');
+  assert(usd.valuationSource==='indicative-market'&&usd.valuedAt===at,'Источник или дата курса потеряны');
+
+  const missing=truth.makeCapitalContribution({id:'wallet:usd',sourceType:'wallet',className:'money',scope:'household',effect:'asset',liquid:true,amount:1000,currency:'USD',baseCurrency:'EUR'});
+  assert(missing.ok===true&&missing.contribution.resolved===false,'Сумма без курса ошибочно признана оценённой');
+  const mixed=truth.sumCapitalContributions([
+    truth.makeCapitalContribution({id:'wallet:eur',sourceType:'wallet',className:'money',scope:'household',effect:'asset',liquid:true,amount:100,currency:'EUR',baseCurrency:'EUR'}).contribution,
+    missing.contribution
+  ],{scope:'household'});
+  assert(mixed.ok===true&&mixed.netCapital===100,'Неоценённая иностранная валюта была молча сложена с базовой');
+  assert(mixed.allValued===false&&mixed.unresolved.length===1,'Неоценённый компонент не вынесен в предупреждение');
+
+  const badDate=truth.convertToBaseValue({amount:1,currency:'USD',baseCurrency:'EUR',valuation:{rateToBase:0.86,source:'indicative-market'}});
+  assert(badDate.ok===false&&badDate.error==='valuation_date_required','Пересчёт без даты оценки не заблокирован');
+
+  return{ok:true,caseCount:8};
+}
+
 if(import.meta.url===`file://${process.argv[1]}`){
   const financial=runFinancialTruthCases();
   const debt=runDebtCapitalCases();
-  console.log(JSON.stringify({status:'PASS',stage:'FP81-20',financial,debt}));
+  const valuation=runValuationCases();
+  console.log(JSON.stringify({status:'PASS',stage:'FP81-21',financial,debt,valuation}));
 }
