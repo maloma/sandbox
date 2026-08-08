@@ -113,13 +113,14 @@
     return{ok:true,chain,derivedEvents:created,balance:chain.currentBalance};
   }
   function recalculateAll(state,at=Date.now()){for(const chain of state.debtChains)recalculateChain(state,chain.id,at);return state}
-  function validateSourceInput(input){
+  function validateSourceInput(input,context={}){
     const action=sourceActions.has(input?.action)?input.action:null,amount=rounded(asNumber(input?.amount,NaN)),occurredAt=asNumber(input?.occurredAt,NaN);
     if(!action)return{ok:false,error:'Выберите действие с долгом.'};
     if(!Number.isFinite(amount)||amount<=0||amount>999999.99)return{ok:false,error:'Основная сумма должна быть от 0,01 до 999 999,99.'};
     if(!Number.isFinite(occurredAt))return{ok:false,error:'Выберите дату операции.'};
-    if(!input?.walletId)return{ok:false,error:'Выберите кошелёк.'};
-    return{ok:true,value:{action,amount,occurredAt,walletId:String(input.walletId),currency:String(input.currency||'EUR'),comment:String(input.comment||'').trim()}};
+    const debtContext=resolveDebtContext(input,{...context,scopeWalletId:context.scopeWalletId||input?.scopeWalletId||input?.walletId});
+    if(!debtContext.ok)return debtContext;
+    return{ok:true,value:{action,amount,occurredAt,scope:debtContext.value.scope,scopeWalletId:debtContext.value.scopeWalletId,walletId:debtContext.value.walletId,currency:String(input.currency||'EUR'),comment:String(input.comment||'').trim()}};
   }
   function createSourceEvent(state,input,actorId='member-anna',at=Date.now()){
     normalizeState(state,at);const validated=validateSourceInput(input);if(!validated.ok)return validated;
