@@ -124,8 +124,13 @@
   }
   function createSourceEvent(state,input,actorId='member-anna',at=Date.now()){
     normalizeState(state,at);
-    const activeWallet=(state.wallets||[]).find(wallet=>wallet.id===state.activeWalletId)||null,personal=activeWallet?.type==='personal';
-    const scopeWalletId=String(input?.scopeWalletId||(personal?activeWallet.id:'wallet-household-main')).trim();
+    const explicitScopeWallet=(state.wallets||[]).find(wallet=>wallet.id===input?.scopeWalletId)||null;
+    const activeWallet=(state.wallets||[]).find(wallet=>wallet.id===state.activeWalletId)||null;
+    const inputWallet=(state.wallets||[]).find(wallet=>wallet.id===input?.walletId)||null;
+    const contextWallet=explicitScopeWallet||activeWallet||inputWallet||null;
+    const personal=contextWallet?.type==='personal';
+    const householdDefault=(state.wallets||[]).find(wallet=>wallet.type==='household_default'&&!wallet.archivedAt)||null;
+    const scopeWalletId=String(input?.scopeWalletId||(personal?contextWallet?.id:(householdDefault?.id||contextWallet?.id||'wallet-household-main'))).trim();
     const validated=validateSourceInput(input,{scope:personal?'personal':'household',scopeWalletId});if(!validated.ok)return validated;
     const cpResult=findOrCreateCounterparty(state,input,actorId,at);if(cpResult.error)return{ok:false,error:cpResult.error};
     const value=validated.value,chain=ensureActiveChain(state,cpResult.counterparty.id,value.scopeWalletId,value.currency,actorId,at),eventWalletId=value.walletId||value.scopeWalletId;
