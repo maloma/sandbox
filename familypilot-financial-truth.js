@@ -45,7 +45,50 @@
     };
   }
 
-  const api=Object.freeze({convertToBaseValue});
+  function makeCapitalContribution(input={}){
+    const id=String(input.id||'').trim();
+    const sourceType=String(input.sourceType||'').trim();
+    const sourceId=String(input.sourceId||id).trim();
+    const scope=input.scope==='personal'?'personal':'household';
+    const scopeId=scope==='personal'?String(input.scopeId||'').trim():null;
+    const effect=input.effect==='liability'?'liability':'asset';
+    const nativeAmount=Math.abs(Number(input.amount));
+    if(!id)return{ok:false,error:'contribution_id_required'};
+    if(!sourceType)return{ok:false,error:'source_type_required'};
+    if(scope==='personal'&&!scopeId)return{ok:false,error:'personal_scope_id_required'};
+    if(!Number.isFinite(nativeAmount))return{ok:false,error:'invalid_amount'};
+
+    const converted=convertToBaseValue({
+      amount:nativeAmount,
+      currency:input.currency,
+      baseCurrency:input.baseCurrency,
+      valuation:input.valuation
+    });
+    const sign=effect==='liability'?-1:1;
+    const contribution={
+      id,
+      className:String(input.className||'other').trim()||'other',
+      label:String(input.label||'').trim(),
+      sourceType,
+      sourceId,
+      scope,
+      scopeId,
+      effect,
+      liquid:input.liquid===true,
+      nativeAmount,
+      nativeCurrency:String(input.currency||'').trim().toUpperCase(),
+      baseCurrency:String(input.baseCurrency||'').trim().toUpperCase(),
+      resolved:converted.ok===true,
+      baseAmount:converted.ok?Math.round(sign*Math.abs(converted.baseAmount)*100)/100:null,
+      rateToBase:converted.ok?converted.rateToBase:null,
+      valuationSource:converted.ok?converted.valuationSource:null,
+      valuedAt:converted.ok?converted.valuedAt:null,
+      valuationError:converted.ok?null:converted.error
+    };
+    return{ok:true,contribution};
+  }
+
+  const api=Object.freeze({convertToBaseValue,makeCapitalContribution});
   if(typeof module==='object'&&module.exports)module.exports=api;
   if(root)root.FamilyPilotFinancialTruth=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
