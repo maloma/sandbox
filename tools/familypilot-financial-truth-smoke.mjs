@@ -24,7 +24,11 @@ export function runFinancialTruthCases(){
   assert(snapshot.netFamilyCapital===2800,'Семейный капитал рассчитан неверно');
   assert(snapshot.allValued===true,'Базовая валюта ошибочно помечена как неоценённая');
   assert(snapshot.contributions.length===4,'Состав капитала неполный');
-  return{ok:true,caseCount:7};
+  const selfCheck=truth.financialTruthSelfCheck(snapshot);
+  assert(selfCheck.ok===true&&selfCheck.netCapital===2800,'Самопроверка не подтвердила канонический снимок');
+  const tampered=truth.financialTruthSelfCheck({...snapshot,netFamilyCapital:2801});
+  assert(tampered.ok===false&&tampered.error==='net_capital_mismatch','Самопроверка не обнаружила расхождение итогового капитала');
+  return{ok:true,caseCount:9};
 }
 
 export function runDebtCapitalCases(){
@@ -90,5 +94,5 @@ if(import.meta.url===`file://${process.argv[1]}`){
   const financial=runFinancialTruthCases();
   const debt=runDebtCapitalCases();
   const valuation=runValuationCases();
-  console.log(JSON.stringify({status:'PASS',stage:'FP81-21',financial,debt,valuation}));
+  console.log(JSON.stringify({status:'PASS',stage:'FP81-23',financial,debt,valuation}));
 }
