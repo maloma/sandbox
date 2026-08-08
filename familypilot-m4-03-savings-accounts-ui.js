@@ -5,9 +5,9 @@
 
   const deadline=Date.now()+30000;
   const wait=()=>{
-    const runtime=window.__FP_RUNTIME__,api=window.FamilyPilotSavingsAccounts,legacy=window.FamilyPilotSavingsGoals,screen=document.getElementById('savingsGoalsScreen');
-    if(!runtime||!api||!legacy||!window.__FP_M4_01_UI__||!screen){
-      if(Date.now()>=deadline){window.__FP_M4_03_UI_ERROR__='M4-03 dependencies did not become ready';return}
+    const runtime=window.__FP_RUNTIME__,api=window.FamilyPilotSavingsAccounts,legacy=window.FamilyPilotSavingsGoals,financialTruth=window.FamilyPilotFinancialTruth,screen=document.getElementById('savingsGoalsScreen');
+    if(!runtime||!api||!legacy||!window.__FP_M4_01_UI__||!screen||window.__FP_FINANCIAL_TRUTH_RUNTIME_READY__!==true||typeof financialTruth?.financialTruthSnapshot!=='function'){
+      if(Date.now()>=deadline){window.__FP_M4_03_UI_ERROR__='M4-03 dependencies or Financial Truth did not become ready';return}
       setTimeout(wait,25);return;
     }
     install(runtime,api,legacy);
