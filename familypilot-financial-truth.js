@@ -142,7 +142,40 @@
     return{ok:true,contributions};
   }
 
-  const api=Object.freeze({convertToBaseValue,makeCapitalContribution,sumCapitalContributions,walletCapitalContributions});
+  function debtCapitalContributions(debtPositions=[],context={}){
+    const baseCurrency=String(context.baseCurrency||'').trim().toUpperCase();
+    if(!baseCurrency)return{ok:false,error:'base_currency_required'};
+    const rows=Array.isArray(debtPositions)?debtPositions:[],contributions=[];
+    for(const row of rows){
+      if(!row||typeof row!=='object'||row.status==='closed')continue;
+      const debtId=String(row.id||'').trim();
+      const balance=Number(row.balance??row.currentBalance);
+      if(!debtId)return{ok:false,error:'debt_id_required'};
+      if(!Number.isFinite(balance))return{ok:false,error:'invalid_debt_balance',debtId};
+      if(Math.abs(balance)<0.000001)continue;
+      const receivable=balance>0;
+      const result=makeCapitalContribution({
+        id:`debt:${debtId}`,
+        sourceType:'debt',
+        sourceId:debtId,
+        className:receivable?'receivable':'liability',
+        label:String(row.label||row.counterpartyName||'').trim(),
+        scope:row.scope==='personal'?'personal':'household',
+        scopeId:row.scope==='personal'?String(row.scopeId||'').trim():null,
+        effect:receivable?'asset':'liability',
+        liquid:false,
+        amount:Math.abs(balance),
+        currency:row.currency,
+        baseCurrency,
+        valuation:row.valuation
+      });
+      if(!result.ok)return{...result,debtId};
+      contributions.push(result.contribution);
+    }
+    return{ok:true,contributions};
+  }
+
+  const api=Object.freeze({convertToBaseValue,makeCapitalContribution,sumCapitalContributions,walletCapitalContributions,debtCapitalContributions});
   if(typeof module==='object'&&module.exports)module.exports=api;
   if(root)root.FamilyPilotFinancialTruth=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
