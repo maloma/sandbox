@@ -88,7 +88,30 @@
     return{ok:true,contribution};
   }
 
-  const api=Object.freeze({convertToBaseValue,makeCapitalContribution});
+  function sumCapitalContributions(contributions=[],context={}){
+    const scope=context.scope==='personal'?'personal':'household';
+    const scopeId=scope==='personal'?String(context.scopeId||'').trim():null;
+    if(scope==='personal'&&!scopeId)return{ok:false,error:'personal_scope_id_required'};
+    const input=Array.isArray(contributions)?contributions:[];
+    const seen=new Set(),included=[],unresolved=[];
+    let assets=0,liabilities=0,liquidAssets=0;
+    for(const contribution of input){
+      if(!contribution||typeof contribution!=='object')continue;
+      if(contribution.scope!==scope)continue;
+      if(scope==='personal'&&contribution.scopeId!==scopeId)continue;
+      const id=String(contribution.id||'').trim();
+      if(!id)return{ok:false,error:'contribution_id_required'};
+      if(seen.has(id))return{ok:false,error:'duplicate_contribution_id',contributionId:id};
+      seen.add(id);included.push(contribution);
+      if(contribution.resolved!==true||!Number.isFinite(Number(contribution.baseAmount))){unresolved.push(contribution);continue}
+      const value=Math.round(Number(contribution.baseAmount)*100)/100;
+      if(value>=0){assets+=value;if(contribution.liquid===true)liquidAssets+=value}else liabilities+=Math.abs(value);
+    }
+    assets=Math.round(assets*100)/100;liabilities=Math.round(liabilities*100)/100;liquidAssets=Math.round(liquidAssets*100)/100;
+    return{ok:true,scope,scopeId,assets,liabilities,liquidAssets,netCapital:Math.round((assets-liabilities)*100)/100,included,unresolved,allValued:unresolved.length===0};
+  }
+
+  const api=Object.freeze({convertToBaseValue,makeCapitalContribution,sumCapitalContributions});
   if(typeof module==='object'&&module.exports)module.exports=api;
   if(root)root.FamilyPilotFinancialTruth=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
