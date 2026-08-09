@@ -28,7 +28,48 @@ export function runFinancialTruthCases(){
   assert(selfCheck.ok===true&&selfCheck.netCapital===2800,'Самопроверка не подтвердила канонический снимок');
   const tampered=truth.financialTruthSelfCheck({...snapshot,netFamilyCapital:2801});
   assert(tampered.ok===false&&tampered.error==='net_capital_mismatch','Самопроверка не обнаружила расхождение итогового капитала');
-  return{ok:true,caseCount:9};
+
+  const empty=truth.financialTruthSnapshot({baseCurrency:'EUR',scope:'household',walletBalances:[],debtPositions:[],investments:[]});
+  assert(empty.ok===true&&empty.allValued===true&&empty.unresolved.length===0,'Отсутствующие необязательные классы активов ошибочно делают состояние неполным');
+  assert(empty.operationalFunds===0&&empty.assets===0&&empty.liabilities===0&&empty.netFamilyCapital===0,'Отсутствующие необязательные классы активов должны считаться нулём');
+
+  const expenseBefore=truth.financialTruthSnapshot({
+    baseCurrency:'EUR',scope:'household',
+    walletBalances:[{id:'family-main',balance:1000,currency:'EUR',scope:'household'}],
+    debtPositions:[{id:'expense-liability',currentBalance:-700,currency:'EUR',scope:'household'}],
+    investments:[]
+  });
+  const expenseAfter=truth.financialTruthSnapshot({
+    baseCurrency:'EUR',scope:'household',
+    walletBalances:[{id:'family-main',balance:930,currency:'EUR',scope:'household'}],
+    debtPositions:[{id:'expense-liability',currentBalance:-700,currency:'EUR',scope:'household'}],
+    investments:[]
+  });
+  assert(expenseBefore.ok===true&&expenseAfter.ok===true,'Сценарий процентов и комиссий не построен');
+  assert(expenseAfter.liabilities===700,'Проценты и комиссии не должны уменьшать основную сумму обязательства');
+  assert(expenseBefore.netFamilyCapital-expenseAfter.netFamilyCapital===70,'Проценты и комиссии должны уменьшать капитал через деньги как обычный расход');
+
+  const principalState={
+    schemaVersion:22,
+    activeWalletId:'wallet-household-main',
+    wallets:[{id:'wallet-household-main',type:'household_default',name:'Семейный',nativeCurrency:'EUR'}],
+    operations:[],debtCounterparties:[],debtChains:[],debtEvents:[]
+  };
+  const principalOpening=debts.createSourceEvent(principalState,{action:'opening_liability',amount:500,currency:'EUR',occurredAt:1000,counterpartyName:'Банк'});
+  assert(principalOpening.ok===true,'Не удалось создать базовую долговую цепочку для проверки основной суммы');
+  const principalBorrow=debts.createSourceEvent(principalState,{action:'borrow',amount:300,currency:'EUR',walletId:'wallet-household-main',occurredAt:2000,counterpartyId:principalOpening.counterparty.id});
+  const principalRepay=debts.createSourceEvent(principalState,{action:'repay',amount:100,currency:'EUR',walletId:'wallet-household-main',occurredAt:3000,counterpartyId:principalOpening.counterparty.id});
+  assert(principalBorrow.ok===true&&principalBorrow.operation?.kind==='debt_inflow'&&principalBorrow.operation?.kind!=='income','Основная сумма нового займа ошибочно попала в обычный доход');
+  assert(principalRepay.ok===true&&principalRepay.operation?.kind==='debt_outflow'&&principalRepay.operation?.kind!=='expense','Погашение основной суммы ошибочно попало в обычный расход');
+
+  const property=truth.makeCapitalContribution({id:'asset:home',sourceType:'asset',sourceId:'home',className:'property',label:'Жильё',scope:'household',effect:'asset',liquid:false,amount:250000,currency:'EUR',baseCurrency:'EUR'});
+  const mortgage=truth.makeCapitalContribution({id:'debt:mortgage',sourceType:'debt',sourceId:'mortgage',className:'liability',label:'Ипотека',scope:'household',effect:'liability',liquid:false,amount:180000,currency:'EUR',baseCurrency:'EUR'});
+  assert(property.ok===true&&mortgage.ok===true,'Актив или ипотека не преобразованы в канонические вклады капитала');
+  const equity=truth.sumCapitalContributions([property.contribution,mortgage.contribution],{scope:'household'});
+  assert(equity.ok===true,'Сценарий актив + ипотека не рассчитан');
+  assert(equity.assets===250000&&equity.liabilities===180000&&equity.netCapital===70000,'Чистая доля собственности рассчитана неверно');
+
+  return{ok:true,caseCount:20};
 }
 
 export function runDebtCapitalCases(){
