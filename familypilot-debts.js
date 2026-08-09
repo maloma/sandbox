@@ -171,9 +171,24 @@
   function visibleChains(state,walletIds,options={}){const allowed=walletIds instanceof Set?walletIds:new Set(walletIds||[]),includeClosed=options.includeClosed!==false;recalculateAll(state,options.at||Date.now());return state.debtChains.filter(chain=>allowed.has(chain.scopeWalletId||chain.walletId)&&(includeClosed||chain.status==='active')).sort((a,b)=>(a.status===b.status?Math.abs(b.currentBalance)-Math.abs(a.currentBalance):(a.status==='active'?-1:1))||b.openedAt-a.openedAt)}
   function chainHistory(state,chainId){const rank={source:0,offset:1,reciprocal:2,closed:3};return state.debtEvents.filter(item=>item.chainId===chainId).sort((a,b)=>a.occurredAt-b.occurredAt||(rank[a.type==='source'?'source':a.derivedKind]||0)-(rank[b.type==='source'?'source':b.derivedKind]||0)||a.createdAt-b.createdAt)}
   function scopeTotals(state,walletIds){let receivable=0,liability=0;for(const chain of visibleChains(state,walletIds,{includeClosed:false})){if(chain.currentBalance>EPSILON)receivable+=chain.currentBalance;if(chain.currentBalance<-EPSILON)liability+=Math.abs(chain.currentBalance)}return{receivable:rounded(receivable),liability:rounded(liability),net:rounded(receivable-liability)}}
+  function scopePlanning(state,walletIds,options={}){
+    const at=asNumber(options.at,Date.now()),requested=String(options.horizon||'14d'),horizon=['14d','1m','3m','1y'].includes(requested)?requested:'14d';
+    const start=new Date(at);start.setHours(0,0,0,0);const end=new Date(start);
+    if(horizon==='14d')end.setDate(end.getDate()+14);
+    else if(horizon==='1m'||horizon==='3m'){
+      const months=horizon==='1m'?1:3,day=end.getDate();end.setDate(1);end.setMonth(end.getMonth()+months);const last=new Date(end.getFullYear(),end.getMonth()+1,0).getDate();end.setDate(Math.min(day,last));
+    }else{
+      const month=end.getMonth(),day=end.getDate();end.setDate(1);end.setFullYear(end.getFullYear()+1);end.setMonth(month);const last=new Date(end.getFullYear(),end.getMonth()+1,0).getDate();end.setDate(Math.min(day,last));
+    }
+    const allowed=walletIds instanceof Set?walletIds:new Set(walletIds||[]),totals=scopeTotals(state,allowed),active=(state.debtChains||[]).filter(chain=>chain.status==='active'&&allowed.has(chain.scopeWalletId||chain.walletId)&&Math.abs(chain.currentBalance)>EPSILON);
+    const groups={overdue:[],dueInPeriod:[],noDueDate:[]};
+    for(const chain of active){const due=chain.expectedDueAt==null?null:asNumber(chain.expectedDueAt,null);if(due==null)groups.noDueDate.push(chain);else if(due<start.getTime())groups.overdue.push(chain);else if(due<end.getTime())groups.dueInPeriod.push(chain)}
+    const summarize=chains=>{let receivable=0,liability=0;for(const chain of chains){if(chain.currentBalance>EPSILON)receivable+=chain.currentBalance;if(chain.currentBalance<-EPSILON)liability+=Math.abs(chain.currentBalance)}return{chains,receivable:rounded(receivable),liability:rounded(liability),net:rounded(receivable-liability)}};
+    return{horizon,windowStart:start.getTime(),windowEnd:end.getTime(),receivable:totals.receivable,liability:totals.liability,net:totals.net,overdue:summarize(groups.overdue),dueInPeriod:summarize(groups.dueInPeriod),noDueDate:summarize(groups.noDueDate)};
+  }
   function counterpartyName(state,id){return state.debtCounterparties.find(item=>item.id===id)?.name||'Контрагент'}
   function actionLabel(action){return({opening_liability:'Начальный долг: я должен',opening_receivable:'Начальный долг: мне должны',borrow:'Мне дали',repay:'Я вернул',lend:'Я дал',receive:'Мне вернули'})[action]||'Движение долга'}
   function eventDirection(event){const kind=actionCashKind(event.action);if(kind==='debt_inflow')return'inflow';if(kind==='debt_outflow')return'outflow';if(event.action==='opening_receivable')return'inflow';if(event.action==='opening_liability')return'outflow';return'neutral'}
 
-  return Object.freeze({EPSILON,sourceActions,cashActions,makeId,normalizeName,normalizeState,findOrCreateCounterparty,ensureActiveChain,setChainExpectedDueAt,actionDelta,actionCashKind,resolveDebtContext,actionLabel,eventDirection,directionFromBalance,createSourceEvent,updateSourceEvent,recalculateChain,recalculateAll,closeChain,keepChainOpen,visibleWalletIds,visibleChains,chainHistory,scopeTotals,counterpartyName,linkedOperation,sourceEnabled,validateSourceInput});
+  return Object.freeze({EPSILON,sourceActions,cashActions,makeId,normalizeName,normalizeState,findOrCreateCounterparty,ensureActiveChain,setChainExpectedDueAt,actionDelta,actionCashKind,resolveDebtContext,actionLabel,eventDirection,directionFromBalance,createSourceEvent,updateSourceEvent,recalculateChain,recalculateAll,closeChain,keepChainOpen,visibleWalletIds,visibleChains,chainHistory,scopeTotals,scopePlanning,counterpartyName,linkedOperation,sourceEnabled,validateSourceInput});
 });
