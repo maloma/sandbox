@@ -47,7 +47,8 @@
   }
   function normalizeChain(raw,at=Date.now()){
     const scopeWalletId=String(raw?.scopeWalletId||raw?.walletId||'wallet-household-main');
-    return{id:raw?.id||makeId('debt-chain',at),counterpartyId:String(raw?.counterpartyId||''),scopeWalletId,walletId:String(raw?.walletId||scopeWalletId),currency:String(raw?.currency||'EUR'),status:raw?.status==='closed'?'closed':'active',openedAt:asNumber(raw?.openedAt,raw?.createdAt||at),closedAt:raw?.closedAt==null?null:asNumber(raw.closedAt,null),closureEventId:raw?.closureEventId||null,currentBalance:rounded(raw?.currentBalance),currentDirection:directionFromBalance(raw?.currentBalance),createdAt:asNumber(raw?.createdAt,at),createdByMemberId:raw?.createdByMemberId||'member-anna',lastEditedAt:asNumber(raw?.lastEditedAt,raw?.createdAt||at),lastEditedByMemberId:raw?.lastEditedByMemberId||raw?.createdByMemberId||'member-anna',revisions:history(raw?.revisions)};
+    const expectedDueAt=raw?.expectedDueAt==null?null:asNumber(raw.expectedDueAt,null);
+    return{id:raw?.id||makeId('debt-chain',at),counterpartyId:String(raw?.counterpartyId||''),scopeWalletId,walletId:String(raw?.walletId||scopeWalletId),currency:String(raw?.currency||'EUR'),status:raw?.status==='closed'?'closed':'active',openedAt:asNumber(raw?.openedAt,raw?.createdAt||at),closedAt:raw?.closedAt==null?null:asNumber(raw.closedAt,null),closureEventId:raw?.closureEventId||null,expectedDueAt,currentBalance:rounded(raw?.currentBalance),currentDirection:directionFromBalance(raw?.currentBalance),createdAt:asNumber(raw?.createdAt,at),createdByMemberId:raw?.createdByMemberId||'member-anna',lastEditedAt:asNumber(raw?.lastEditedAt,raw?.createdAt||at),lastEditedByMemberId:raw?.lastEditedByMemberId||raw?.createdByMemberId||'member-anna',revisions:history(raw?.revisions)};
   }
   function normalizeEvent(raw,at=Date.now()){
     const type=raw?.type==='derived'?'derived':'source';
