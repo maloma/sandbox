@@ -17,6 +17,12 @@
     .meta-note,.settings-subtitle,.manager-help,.plan-intro p,.obligation-help,.debt-direction-note,
     .debt-readonly,.savings-note,.wallet-manager-note{font-size:13px;line-height:1.45}
     .nav{font-size:11px}
+    #plansScreen .plan-module{grid-template-columns:42px minmax(0,1fr);column-gap:11px;row-gap:5px;align-items:start}
+    #plansScreen .plan-module-copy{min-width:0}
+    #plansScreen .plan-module-copy strong,#plansScreen .plan-module-copy small{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.35}
+    #plansScreen .plan-module-copy small{font-size:13px}
+    #plansScreen .plan-module-state{grid-column:2;justify-self:start;max-width:none;white-space:normal;text-align:left;overflow-wrap:anywhere;line-height:1.35;font-size:12px}
+    @media(max-width:380px){#plansScreen .plan-module{grid-template-columns:38px minmax(0,1fr)}}
   `;
   document.head.appendChild(readabilityStyle);
 
