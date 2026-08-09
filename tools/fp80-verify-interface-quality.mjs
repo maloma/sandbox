@@ -3,9 +3,11 @@ import {readFileSync} from 'node:fs';
 const source=readFileSync('src/familypilot.html','utf8');
 const root=readFileSync('index.html','utf8');
 const bridge=readFileSync('familypilot-module-entry-bridge.js','utf8');
+const sourceBridge=readFileSync('src/familypilot-module-entry-bridge.js','utf8');
 const assert=(condition,message)=>{if(!condition)throw new Error(message)};
 
 assert(source===root,'Canonical source and published root must remain byte-identical');
+assert(bridge===sourceBridge,'Module-entry bridge root/source mirrors must remain byte-identical');
 assert(source.includes('<script src="./familypilot-module-entry-bridge.js"'),'Global module-entry UI bridge is not loaded');
 assert(source.indexOf('</style>')<source.indexOf('<script src="./familypilot-module-entry-bridge.js"'),'Readability bridge must execute after canonical inline CSS is parsed');
 
@@ -32,6 +34,7 @@ console.log(JSON.stringify({
   status:'PASS',
   marker:'FP80_INTERFACE_QUALITY_PASS',
   sourceRootEqual:true,
+  bridgeMirrorsEqual:true,
   readabilityStyleFinal:true,
   meaningfulSecondaryFloor:true,
   plansWrappingEffective:true,
