@@ -1,4 +1,7 @@
-import {readFileSync} from 'node:fs';
+import {readFileSync,mkdtempSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import vm from 'node:vm';
 
 const source=readFileSync('tools/pf08a-wave1d-recovery-reload-browser-smoke.mjs','utf8');
@@ -65,6 +68,23 @@ for(const [filename,productionSource] of Object.entries(productionSources)){
 const duplicates=sentinel.duplicates();
 assert(duplicates.length===8,'Deterministic duplicate total is incorrect');
 
+const fp80Candidate='80413d735ce65d518908557f2ba69915095571f2';
+const exactDir=mkdtempSync(join(tmpdir(),'fp80-exact-'));
+let fp80Output='';
+try{
+  execFileSync('git',['fetch','-q','--depth=1','origin',fp80Candidate],{stdio:'inherit'});
+  execFileSync('git',['worktree','add','--detach',exactDir,fp80Candidate],{stdio:'inherit'});
+  const exactHead=execFileSync('git',['rev-parse','HEAD'],{cwd:exactDir,encoding:'utf8'}).trim();
+  assert(exactHead===fp80Candidate,'FP80 detached worktree is not exact candidate');
+  fp80Output=execFileSync(process.execPath,['tools/fp80-verify-interface-quality.mjs'],{cwd:exactDir,encoding:'utf8'});
+  assert(fp80Output.includes('FP80_INTERFACE_QUALITY_PASS'),'FP80 exact-candidate verifier marker missing');
+  console.log(fp80Output.trim());
+  console.log(JSON.stringify({status:'PASS',marker:'FP80_EXACT_CANDIDATE_DIRECT_RUN_PASS',candidate:exactHead,directNodeRun:true},null,2));
+  console.log('FP80_EXACT_CANDIDATE_DIRECT_RUN_PASS');
+}finally{
+  try{execFileSync('git',['worktree','remove','--force',exactDir],{stdio:'ignore'})}catch{}
+}
+
 console.log(JSON.stringify({
   status:'PASS',
   marker,
@@ -79,5 +99,6 @@ console.log(JSON.stringify({
   duplicate_window_handler_detected:true,
   duplicate_document_handler_detected:true,
   deterministic_callsite_count:true,
+  fp80_exact_candidate_direct_run:true,
 },null,2));
 console.log(marker);
