@@ -180,10 +180,10 @@
     }else{
       const month=end.getMonth(),day=end.getDate();end.setDate(1);end.setFullYear(end.getFullYear()+1);end.setMonth(month);const last=new Date(end.getFullYear(),end.getMonth()+1,0).getDate();end.setDate(Math.min(day,last));
     }
-    const allowed=walletIds instanceof Set?walletIds:new Set(walletIds||[]),totals=scopeTotals(state,allowed),active=(state.debtChains||[]).filter(chain=>chain.status==='active'&&allowed.has(chain.scopeWalletId||chain.walletId)&&Math.abs(chain.currentBalance)>EPSILON);
-    const groups={overdue:[],dueInPeriod:[],noDueDate:[]};
-    for(const chain of active){const due=chain.expectedDueAt==null?null:asNumber(chain.expectedDueAt,null);if(due==null)groups.noDueDate.push(chain);else if(due<start.getTime())groups.overdue.push(chain);else if(due<end.getTime())groups.dueInPeriod.push(chain)}
+    const allowed=walletIds instanceof Set?walletIds:new Set(walletIds||[]),active=(state?.debtChains||[]).filter(chain=>chain.status==='active'&&allowed.has(chain.scopeWalletId||chain.walletId)&&Math.abs(chain.currentBalance)>EPSILON);
     const summarize=chains=>{let receivable=0,liability=0;for(const chain of chains){if(chain.currentBalance>EPSILON)receivable+=chain.currentBalance;if(chain.currentBalance<-EPSILON)liability+=Math.abs(chain.currentBalance)}return{chains,receivable:rounded(receivable),liability:rounded(liability),net:rounded(receivable-liability)}};
+    const totals=summarize(active),groups={overdue:[],dueInPeriod:[],noDueDate:[]};
+    for(const chain of active){const due=chain.expectedDueAt==null?null:asNumber(chain.expectedDueAt,null);if(due==null)groups.noDueDate.push(chain);else if(due<start.getTime())groups.overdue.push(chain);else if(due<end.getTime())groups.dueInPeriod.push(chain)}
     return{horizon,windowStart:start.getTime(),windowEnd:end.getTime(),receivable:totals.receivable,liability:totals.liability,net:totals.net,overdue:summarize(groups.overdue),dueInPeriod:summarize(groups.dueInPeriod),noDueDate:summarize(groups.noDueDate)};
   }
   function counterpartyName(state,id){return state.debtCounterparties.find(item=>item.id===id)?.name||'Контрагент'}
