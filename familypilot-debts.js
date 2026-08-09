@@ -47,14 +47,14 @@
   }
   function normalizeChain(raw,at=Date.now()){
     const scopeWalletId=String(raw?.scopeWalletId||raw?.walletId||'wallet-household-main');
-    const expectedDueAt=raw?.expectedDueAt==null?null:asNumber(raw.expectedDueAt,null);
+    const rawDueAt=raw?.expectedDueAt,expectedDueAt=rawDueAt==null||String(rawDueAt).trim()===''?null:asNumber(rawDueAt,null);
     return{id:raw?.id||makeId('debt-chain',at),counterpartyId:String(raw?.counterpartyId||''),scopeWalletId,walletId:String(raw?.walletId||scopeWalletId),currency:String(raw?.currency||'EUR'),status:raw?.status==='closed'?'closed':'active',openedAt:asNumber(raw?.openedAt,raw?.createdAt||at),closedAt:raw?.closedAt==null?null:asNumber(raw.closedAt,null),closureEventId:raw?.closureEventId||null,expectedDueAt,currentBalance:rounded(raw?.currentBalance),currentDirection:directionFromBalance(raw?.currentBalance),createdAt:asNumber(raw?.createdAt,at),createdByMemberId:raw?.createdByMemberId||'member-anna',lastEditedAt:asNumber(raw?.lastEditedAt,raw?.createdAt||at),lastEditedByMemberId:raw?.lastEditedByMemberId||raw?.createdByMemberId||'member-anna',revisions:history(raw?.revisions)};
   }
   function setChainExpectedDueAt(state,chainId,expectedDueAt,actorId='member-anna',at=Date.now()){
     const chain=(state?.debtChains||[]).find(item=>item.id===chainId);if(!chain)return{ok:false,error:'Цепочка долга не найдена.'};
     if(chain.status==='closed')return{ok:false,error:'Закрытая цепочка доступна только для чтения.'};
-    let nextDueAt=null;
-    if(expectedDueAt!=null){nextDueAt=asNumber(expectedDueAt,NaN);if(!Number.isFinite(nextDueAt))return{ok:false,error:'Ожидаемая дата возврата некорректна.'}}
+    const clearing=expectedDueAt==null||(typeof expectedDueAt==='string'&&expectedDueAt.trim()==='');let nextDueAt=null;
+    if(!clearing){nextDueAt=asNumber(expectedDueAt,NaN);if(!Number.isFinite(nextDueAt))return{ok:false,error:'Ожидаемая дата возврата некорректна.'}}
     const change=revision(chain,[{field:'expectedDueAt',oldValue:chain.expectedDueAt,newValue:nextDueAt}],actorId,at,'debt_due_date_edit');
     chain.expectedDueAt=nextDueAt;return{ok:true,chain,revision:change};
   }
