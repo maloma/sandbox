@@ -50,6 +50,14 @@
     const expectedDueAt=raw?.expectedDueAt==null?null:asNumber(raw.expectedDueAt,null);
     return{id:raw?.id||makeId('debt-chain',at),counterpartyId:String(raw?.counterpartyId||''),scopeWalletId,walletId:String(raw?.walletId||scopeWalletId),currency:String(raw?.currency||'EUR'),status:raw?.status==='closed'?'closed':'active',openedAt:asNumber(raw?.openedAt,raw?.createdAt||at),closedAt:raw?.closedAt==null?null:asNumber(raw.closedAt,null),closureEventId:raw?.closureEventId||null,expectedDueAt,currentBalance:rounded(raw?.currentBalance),currentDirection:directionFromBalance(raw?.currentBalance),createdAt:asNumber(raw?.createdAt,at),createdByMemberId:raw?.createdByMemberId||'member-anna',lastEditedAt:asNumber(raw?.lastEditedAt,raw?.createdAt||at),lastEditedByMemberId:raw?.lastEditedByMemberId||raw?.createdByMemberId||'member-anna',revisions:history(raw?.revisions)};
   }
+  function setChainExpectedDueAt(state,chainId,expectedDueAt,actorId='member-anna',at=Date.now()){
+    const chain=(state?.debtChains||[]).find(item=>item.id===chainId);if(!chain)return{ok:false,error:'Цепочка долга не найдена.'};
+    if(chain.status==='closed')return{ok:false,error:'Закрытая цепочка доступна только для чтения.'};
+    let nextDueAt=null;
+    if(expectedDueAt!=null){nextDueAt=asNumber(expectedDueAt,NaN);if(!Number.isFinite(nextDueAt))return{ok:false,error:'Ожидаемая дата возврата некорректна.'}}
+    const change=revision(chain,[{field:'expectedDueAt',oldValue:chain.expectedDueAt,newValue:nextDueAt}],actorId,at,'debt_due_date_edit');
+    chain.expectedDueAt=nextDueAt;return{ok:true,chain,revision:change};
+  }
   function normalizeEvent(raw,at=Date.now()){
     const type=raw?.type==='derived'?'derived':'source';
     return{id:raw?.id||makeId(type==='source'?'debt-source':'debt-derived',at),type,derivedKind:type==='derived'?String(raw?.derivedKind||'offset'):null,chainId:String(raw?.chainId||''),counterpartyId:String(raw?.counterpartyId||''),action:type==='source'&&sourceActions.has(raw?.action)?raw.action:null,amount:Math.max(0,rounded(raw?.amount)),currency:String(raw?.currency||'EUR'),walletId:String(raw?.walletId||'wallet-household-main'),occurredAt:asNumber(raw?.occurredAt,at),comment:String(raw?.comment||''),linkedOperationId:raw?.linkedOperationId||null,sourceEventId:raw?.sourceEventId||null,beforeBalance:rounded(raw?.beforeBalance),afterBalance:rounded(raw?.afterBalance),appliedOffset:rounded(raw?.appliedOffset),excess:rounded(raw?.excess),direction:String(raw?.direction||'neutral'),status:raw?.status==='trash'?'trash':'active',createdAt:asNumber(raw?.createdAt,at),createdByMemberId:raw?.createdByMemberId||'member-anna',lastEditedAt:asNumber(raw?.lastEditedAt,raw?.createdAt||at),lastEditedByMemberId:raw?.lastEditedByMemberId||raw?.createdByMemberId||'member-anna',revisions:history(raw?.revisions)};
@@ -167,5 +175,5 @@
   function actionLabel(action){return({opening_liability:'Начальный долг: я должен',opening_receivable:'Начальный долг: мне должны',borrow:'Мне дали',repay:'Я вернул',lend:'Я дал',receive:'Мне вернули'})[action]||'Движение долга'}
   function eventDirection(event){const kind=actionCashKind(event.action);if(kind==='debt_inflow')return'inflow';if(kind==='debt_outflow')return'outflow';if(event.action==='opening_receivable')return'inflow';if(event.action==='opening_liability')return'outflow';return'neutral'}
 
-  return Object.freeze({EPSILON,sourceActions,cashActions,makeId,normalizeName,normalizeState,findOrCreateCounterparty,ensureActiveChain,actionDelta,actionCashKind,resolveDebtContext,actionLabel,eventDirection,directionFromBalance,createSourceEvent,updateSourceEvent,recalculateChain,recalculateAll,closeChain,keepChainOpen,visibleWalletIds,visibleChains,chainHistory,scopeTotals,counterpartyName,linkedOperation,sourceEnabled,validateSourceInput});
+  return Object.freeze({EPSILON,sourceActions,cashActions,makeId,normalizeName,normalizeState,findOrCreateCounterparty,ensureActiveChain,setChainExpectedDueAt,actionDelta,actionCashKind,resolveDebtContext,actionLabel,eventDirection,directionFromBalance,createSourceEvent,updateSourceEvent,recalculateChain,recalculateAll,closeChain,keepChainOpen,visibleWalletIds,visibleChains,chainHistory,scopeTotals,counterpartyName,linkedOperation,sourceEnabled,validateSourceInput});
 });
