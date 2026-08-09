@@ -25,6 +25,7 @@
     @media(max-width:380px){#plansScreen .plan-module{grid-template-columns:38px minmax(0,1fr)}}
   `;
   document.head.appendChild(readabilityStyle);
+  function pinReadabilityStyleLast(){if(readabilityStyle.parentNode===document.head&&document.head.lastElementChild===readabilityStyle)return;readabilityStyle.remove();document.head.appendChild(readabilityStyle)}
 
   const deadline=Date.now()+120000;
   const selectors={
@@ -96,6 +97,7 @@
     return section;
   }
   function sync(){
+    pinReadabilityStyleLast();
     normalizePersistenceOwnership();
     const registry=window.FamilyPilotModuleRegistry;
     if(!registry)return;
