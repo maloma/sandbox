@@ -29,8 +29,13 @@ const harness = `<!doctype html>
   async function waitForTestApi() {
     const deadline = Date.now() + 12000;
     while (Date.now() < deadline) {
-      const api = frame.contentWindow && frame.contentWindow.__FP_TEST__;
-      if (api) return api;
+      const window = frame.contentWindow;
+      const api = window && window.__FP_TEST__;
+      if (
+        api &&
+        window.__FP_FINANCIAL_TRUTH_RUNTIME_READY__ === true &&
+        typeof window.FamilyPilotFinancialTruth?.financialTruthSnapshot === 'function'
+      ) return api;
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     throw new Error('FamilyPilot test API did not become ready');
