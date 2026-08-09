@@ -9,7 +9,7 @@
   const finite=(value,fallback=0)=>Number.isFinite(Number(value))?Number(value):fallback;
   const makeId=(prefix='id',at=Date.now())=>`${prefix}-${Number(at).toString(36)}-${Math.random().toString(36).slice(2,9)}`;
   const deps=extra=>({wallets:window.FamilyPilotWalletManagement,transfers:window.FamilyPilotWalletTransfers,savings:window.FamilyPilotSavingsGoals,accounts,scope:runtime.scopeApi,...extra});
-  const stateKeys=['purposeAllocations','purposeAllocationEvents','savingsLegacyReconciliationIssues','savingsPurposeMigrationResults','savingsPurposeMigrationSnapshots','savingsTransfers','transfers','walletMovements','operations','savingsActionOccurrences','purposeLocationAssignments'];
+  const stateKeys=['purposeAllocations','purposeAllocationEvents','savingsLegacyReconciliationIssues','savingsPurposeMigrationResults','savingsPurposeMigrationSnapshots','savingsTransfers','transfers','walletMovements','operations','savingsActionOccurrences','purposeLocationAssignments','balanceAdjustments'];
   function snapshot(state){const data={};for(const key of stateKeys)data[key]=clone(state[key]||[]);data.goalCaches=(state.savingsGoals||[]).map(goal=>({id:goal.id,savedAmount:goal.savedAmount}));return data}
   function restore(state,data){for(const key of stateKeys)state[key]=data[key];for(const cache of data.goalCaches){const goal=(state.savingsGoals||[]).find(item=>item.id===cache.id);if(goal)goal.savedAmount=cache.savedAmount}}
   function normalizeState(state,inputDeps={},at=Date.now()){
@@ -27,6 +27,52 @@
   }
   function applyGiftFundPlan(state,input,confirmed,legacy,actorId='member-anna',inputDeps={},at=Date.now()){
     const result=original.applyGiftFundPlan(state,input,confirmed,legacy,actorId,deps(inputDeps),at);if(result.ok)truth.markAssignment(state,result.goal.id,result.settings.locationId,'user_confirmed',actorId,at);return result;
+  }
+  function releaseSavedDifference(state,goalId,amount,actorId,d,at,economicEventId){
+    let remaining=round(amount);const events=[];
+    const rows=truth.breakdown(state,goalId).sort((a,b)=>b.amount-a.amount||String(a.locationId).localeCompare(String(b.locationId)));
+    for(const row of rows){
+      if(remaining<=.005)break;
+      const part=Math.min(remaining,round(row.amount));
+      const result=truth.release(state,{goalId,locationId:row.locationId,amount:part,reason:'goal_saved_reconciliation_decrease',linkedEconomicEventId:economicEventId},actorId,d,at);
+      if(!result.ok)return result;
+      events.push(result.event);remaining=round(remaining-part);
+    }
+    if(remaining>.005)return{ok:false,error:'Недостаточно денег, назначенных этой цели.'};
+    return{ok:true,events};
+  }
+  function reconcileGoalSavedAmount(state,input,actorId='member-anna',inputDeps={},at=Date.now()){
+    const d=deps(inputDeps);normalizeState(state,d,at);
+    const goalId=String(input?.goalId||''),targetGoal=(state.savingsGoals||[]).find(item=>item.id===goalId&&item.status==='active');
+    if(!targetGoal)return{ok:false,error:'Цель накопления не найдена.'};
+    const desired=round(finite(input?.desiredSavedAmount,NaN));
+    if(!Number.isFinite(desired)||desired<0||desired>truth.MAX_AMOUNT)return{ok:false,error:'Укажите корректную сумму «Уже отложено».'};
+    const current=truth.actualSaved(state,goalId),delta=round(desired-current),mode=String(input?.mode||'');
+    if(Math.abs(delta)<.005)return{ok:true,unchanged:true,goal:targetGoal,previousSavedAmount:current,actualSavedAmount:current,balanceAdjustment:null,purposeAllocationEvents:[]};
+    const data=snapshot(state),economicEventId=makeId('goal-saved-reconciliation',at);
+    try{
+      if(delta<0){
+        const released=releaseSavedDifference(state,goalId,Math.abs(delta),actorId,d,at,economicEventId);
+        if(!released.ok){restore(state,data);return released}
+        truth.syncGoalCaches(state);
+        return{ok:true,goal:targetGoal,mode:'decrease',economicEventId,previousSavedAmount:current,actualSavedAmount:truth.actualSaved(state,goalId),balanceAdjustment:null,purposeAllocationEvents:released.events};
+      }
+      if(!['already_counted','forgotten_balance'].includes(mode))return{ok:false,error:'Укажите, учтены ли эти деньги в текущих остатках.'};
+      const explicitLocationId=String(input?.locationId||''),trusted=truth.trustedLocation(state,goalId)?.wallet?.id||'',locationId=explicitLocationId||trusted;
+      if(!locationId)return{ok:false,error:'Выберите, где реально находятся эти деньги.'};
+      const eligible=truth.eligibleLocations(state).find(item=>item.id===locationId);if(!eligible)return{ok:false,error:'Выберите действующее место хранения наличных или банковских денег.'};
+      let balanceAdjustment=null;
+      if(mode==='forgotten_balance'){
+        const currentBalance=round(d.scope?.walletCapitalSnapshot?.(state,locationId)?.capital??truth.locationBalance(state,locationId,d));
+        const adjusted=original.createBalanceAdjustment(state,{walletId:locationId,newBalance:round(currentBalance+delta),occurredAt:at,note:`Сверка цели «${targetGoal.name}»: ранее неучтённые деньги`},actorId,d,at);
+        if(!adjusted.ok){restore(state,data);return adjusted}
+        balanceAdjustment=adjusted.adjustment||null;
+      }
+      const allocated=truth.allocateExisting(state,{goalId,locationId,amount:delta,reason:mode==='forgotten_balance'?'goal_saved_reconciliation_forgotten_balance':'goal_saved_reconciliation_existing',source:'goal_saved_reconciliation',linkedEconomicEventId:economicEventId,occurredAt:at},actorId,d,at);
+      if(!allocated.ok){restore(state,data);return allocated}
+      truth.markAssignment(state,goalId,locationId,'user_confirmed',actorId,at);truth.syncGoalCaches(state);
+      return{ok:true,goal:targetGoal,mode,economicEventId,previousSavedAmount:current,actualSavedAmount:truth.actualSaved(state,goalId),balanceAdjustment,purposeAllocationEvents:[allocated.event]};
+    }catch(error){restore(state,data);return{ok:false,error:String(error?.message||error)}}
   }
   function completeAction(state,actionId,input,actorId='member-anna',inputDeps={},at=Date.now()){
     const d=deps(inputDeps);normalizeState(state,d,at);
@@ -48,6 +94,6 @@
       action.actualAmount=round(action.actualAmount+amount);action.sourceLocationId=sourceLocationId;action.destinationLocationId=destinationLocationId;action.savingsTransferIds=Array.isArray(action.savingsTransferIds)?action.savingsTransferIds:[];action.walletTransferIds=Array.isArray(action.walletTransferIds)?action.walletTransferIds:[];action.savingsTransferIds.push(purposeResult.transfer.id);if(physicalResult?.transfer?.id)action.walletTransferIds.push(physicalResult.transfer.id);action.status=action.actualAmount+.005>=action.plannedAmount?'completed':'partial';action.updatedAt=at;action.updatedByMemberId=actorId;truth.syncGoalCaches(state);return{ok:true,action,purposeTransfer:purposeResult.transfer,walletTransfer:physicalResult?.transfer||null,economicEventId,purposeAllocationEvents:purposeResult.purposeAllocationEvents||[]};
     }catch(error){restore(state,data);return{ok:false,error:String(error?.message||error)}}
   }
-  const api=Object.freeze({...original,normalizeState,setPurposeLocation,configureIncomeSavingsRule,applyGiftFundPlan,completeAction,truth});
+  const api=Object.freeze({...original,normalizeState,setPurposeLocation,configureIncomeSavingsRule,applyGiftFundPlan,reconcileGoalSavedAmount,completeAction,truth});
   window.FamilyPilotMoneyPlanning=api;
 })();
