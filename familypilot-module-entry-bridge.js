@@ -3,6 +3,30 @@
   if(window.__FP_MODULE_ENTRY_BRIDGE_BOOTSTRAP__)return;
   window.__FP_MODULE_ENTRY_BRIDGE_BOOTSTRAP__=true;
 
+  const readabilityStyle=document.createElement('style');
+  readabilityStyle.id='familypilot-readability-style';
+  readabilityStyle.textContent=`
+    .wallet-copy small,.filter-button small,.wallet-notice small,.entry-wallet-warning small,#moreScreen .settings-subtitle,
+    .op-time,.op-meta,.op-note,.filter-toggle small,.analytics-summary-actions span,.analytics-operation .kind-label,
+    .analytics-operation .op-date,.category-kind,.category-status,.analytics-data-basis,.obligation-summary span,
+    .obligation-row small,.obligation-status,.obligation-sequence,.debt-principal .debt-kind,.debt-filter button,
+    .debt-chain-card small,.debt-chain-status,.debt-history-row small,.debt-derived-note,.savings-head small,
+    .savings-actions .btn,.savings-remaining,.savings-readonly,.wallet-manager-head small,.wallet-badge,
+    .wallet-manager-actions .btn,.wallet-toggle small,.wallet-class-option small,.fp-module-list-row small,
+    .fp-module-code,.fp-module-actions .btn,.fp-module-state{font-size:12px}
+    .meta-note,.settings-subtitle,.manager-help,.plan-intro p,.obligation-help,.debt-direction-note,
+    .debt-readonly,.savings-note,.wallet-manager-note{font-size:13px;line-height:1.45}
+    .nav{font-size:11px}
+    #plansScreen .plan-module{grid-template-columns:42px minmax(0,1fr);column-gap:11px;row-gap:5px;align-items:start}
+    #plansScreen .plan-module-copy{min-width:0}
+    #plansScreen .plan-module-copy strong,#plansScreen .plan-module-copy small{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.35}
+    #plansScreen .plan-module-copy small{font-size:13px}
+    #plansScreen .plan-module-state{grid-column:2;justify-self:start;max-width:none;white-space:normal;text-align:left;overflow-wrap:anywhere;line-height:1.35;font-size:12px}
+    @media(max-width:380px){#plansScreen .plan-module{grid-template-columns:38px minmax(0,1fr)}}
+  `;
+  document.head.appendChild(readabilityStyle);
+  function pinReadabilityStyleLast(){if(readabilityStyle.parentNode===document.head&&document.head.lastElementChild===readabilityStyle)return;readabilityStyle.remove();document.head.appendChild(readabilityStyle)}
+
   const deadline=Date.now()+120000;
   const selectors={
     obligations:['[data-plan-module="obligations"]'],
@@ -73,6 +97,7 @@
     return section;
   }
   function sync(){
+    pinReadabilityStyleLast();
     normalizePersistenceOwnership();
     const registry=window.FamilyPilotModuleRegistry;
     if(!registry)return;
