@@ -57,15 +57,6 @@
     const classes=api().lifecyclePolicy().classes||[];
     return classes.map(entry=>String(entry.name)).filter(name=>['active_confirmed','temporary','migration_recovery','quarantine'].includes(name));
   }
-  function emptyResetCandidate(){
-    const p=api(),contract=p.financialStateContract();
-    const state={schemaVersion:p.CURRENT_STATE_SCHEMA_VERSION,household:{id:null,baseCurrency:'EUR',openingCapital:0},config:{trashRetentionEnabled:false,trashRetentionDays:null,quickCategoryIds:{expense:[],income:[]}},currentMemberId:null,activeWalletId:null};
-    for(const key of contract.collectionKeys)state[key]=[];
-    for(const key of contract.scalarKeys)state[key]=null;
-    for(const key of contract.objectKeys)if(!Object.prototype.hasOwnProperty.call(state,key))state[key]={};
-    const validation=p.structuralValidate(state);
-    return validation.ok?{ok:true,state:deepFreeze(state)}:error('reset_candidate_builder_unavailable');
-  }
   function makePlan(state,action,target,retention,candidate,summary,extra={}){
     const p=api(),entry=POLICY.actions[action],preconditionFingerprint=stateFingerprint(state);
     const plan=deepFreeze({
@@ -109,8 +100,7 @@
       return makePlan(state,action,{entityType:'operation',count:eligibleIds.length,ids:eligibleIds},retention,null,{type:'operation',count:eligibleIds.length,ids:eligibleIds,message:'Expiry is a bounded proposal; no record is purged by planning.'});
     }
     if(action==='reset_application'){
-      const candidate=emptyResetCandidate();if(!candidate.ok)return candidate;
-      return makePlan(state,action,{scope:'canonical_application_state'},retention,candidate.state,{scope:'canonical_application_state',message:'Application reset candidate contains canonical defaults only.'});
+      return makePlan(state,action,{scope:'canonical_application_state'},retention,null,{scope:'canonical_application_state',candidateStatus:'unavailable',reason:'reset_candidate_builder_unavailable',message:'Application reset remains plan-only until a canonical reset initializer is available.'});
     }
     return makePlan(state,action,{scope:'controlled_adapter_surface'},retention,null,{scope:'controlled_adapter_surface',storageClasses:safeStorageClasses(),unknownStorage:'not_deleted',externalStorage:'not_deleted',message:'Erase is bounded to adapter-controlled storage; unknown and external storage are excluded.'},{storageClasses:safeStorageClasses()});
   }
@@ -136,6 +126,7 @@
     const internal=planInternals.get(plan);
     if(plan.action==='irreversible_privacy_erase')return error('erase_adapter_authority_required',{lifecycle:lifecycle(plan,'blocked',{boundedEraseSurface:'adapter_authority_not_exposed'})});
     if(plan.action==='expire_trash')return error('unsupported_expiry_apply',{lifecycle:lifecycle(plan,'blocked',{reason:'hard_delete_not_authorized_by_existing_operation_contract'})});
+    if(plan.action==='reset_application')return error('reset_candidate_builder_unavailable',{lifecycle:lifecycle(plan,'blocked',{reason:'reset_candidate_builder_unavailable'})});
     if(!internal?.candidate)return error('destructive_candidate_unavailable');
     try{
       const committed=p.commitState(internal.candidate);
