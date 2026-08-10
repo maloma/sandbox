@@ -48,6 +48,8 @@
     quarantine:'familypilot-state-quarantine-v1',
     status:'familypilot-state-recovery-status-v1'
   });
+  const QUARANTINE_MAX_RECORDS=20;
+  const MIGRATION_SNAPSHOT_MAX_RECORDS=3;
   const keys=Object.freeze({
     compatibility:testToken?`${storageNamespace}state-v3`:productionKeys.compatibility,
     head:testToken?`${storageNamespace}state-head-v1`:productionKeys.head,
@@ -58,6 +60,12 @@
     quarantine:testToken?`${storageNamespace}state-quarantine-v1`:productionKeys.quarantine,
     status:testToken?`${storageNamespace}state-recovery-status-v1`:productionKeys.status
   });
+  const LIFECYCLE_CLASSES=Object.freeze([
+    Object.freeze({name:'active_confirmed',keys:Object.freeze(['compatibility','slotA','slotB','head','status']),genericCleanupEligible:false}),
+    Object.freeze({name:'temporary',keys:Object.freeze(['candidate']),genericCleanupEligible:true}),
+    Object.freeze({name:'migration_recovery',keys:Object.freeze(['snapshots']),genericCleanupEligible:true}),
+    Object.freeze({name:'quarantine',keys:Object.freeze(['quarantine']),genericCleanupEligible:true})
+  ]);
   const BASE_STATE_KEYS=new Set(['familypilot.operations.foundation.v2','familypilot-state-v3']);
   const LEGACY_STATE_KEYS=new Set(['familypilot.main.v7','family-finance-state']);
   const protectedPhysicalKeys=new Set(Object.values(keys));
@@ -80,6 +88,7 @@
   let failNext='';
   let lastFinalizeResult={ok:false,error:'not_finalized'};
   let networkRequests=0;
+  let retentionSequence=0;
 
   function markOwnedRead(){if(firstOwnedReadAt===null)firstOwnedReadAt=Date.now()}
   function isPlainObject(value){if(value===null||typeof value!=='object')return false;if(Object.prototype.toString.call(value)!=='[object Object]')return false;const p=Object.getPrototypeOf(value);return p===null||typeof p==='object'}
@@ -107,6 +116,7 @@
   function fnv1a32(text){let hash=0x811c9dc5;for(let i=0;i<text.length;i++){hash^=text.charCodeAt(i);hash=Math.imul(hash,0x01000193)}return(hash>>>0).toString(16).padStart(8,'0')}
   function clone(value){return JSON.parse(canonicalSerialize(value))}
   function financialStateContract(){return clone(FINANCIAL_STATE_CONTRACT)}
+  function lifecyclePolicy(){return clone({version:1,classes:LIFECYCLE_CLASSES.map(entry=>({name:entry.name,keys:entry.keys.map(name=>keys[name]),genericCleanupEligible:entry.genericCleanupEligible})),retention:{quarantine:{maxRecords:QUARANTINE_MAX_RECORDS,maxBytes:null,byteBudgetOwner:'adapter_not_configured'},migrationSnapshots:{maxRecords:MIGRATION_SNAPSHOT_MAX_RECORDS,maxBytes:null,byteBudgetOwner:'adapter_not_configured'}}})}
   function parseObject(raw){if(typeof raw!=='string'||!raw.trim())return{ok:false,empty:true,error:'empty'};try{const value=JSON.parse(raw);return isPlainObject(value)?{ok:true,value}:{ok:false,error:'root_not_object'}}catch{return{ok:false,error:'malformed_json'}}}
   const criticalArrayKeys=['wallets','operations','walletMovements','transfers','purposeAllocations','savingsTransfers','obligationRules','obligationOccurrences'];
   function structuralValidate(state){
@@ -177,9 +187,24 @@
     currentStatusValue={status,source:extra.source||selectedSource,revision:Number(extra.revision??currentStatusValue.revision)||0,stateSchemaVersion:Number(extra.stateSchemaVersion??currentStatusValue.stateSchemaVersion)||0,messageCode:extra.messageCode||status,occurredAt:Date.now(),acknowledgedAt:null,quarantineIds:[...(extra.quarantineIds||currentStatusValue.quarantineIds||[])],snapshotIds:[...(extra.snapshotIds||currentStatusValue.snapshotIds||[])]};
     persistStatus();return currentStatusValue;
   }
-  function retain(list,max){if(list.length<=max)return list;const protectedItems=list.filter(item=>item.protected===true),unprotected=list.filter(item=>item.protected!==true).sort((a,b)=>(a.capturedAt||0)-(b.capturedAt||0));while(protectedItems.length+unprotected.length>max&&unprotected.length)unprotected.shift();return[...protectedItems,...unprotected].sort((a,b)=>(a.capturedAt||0)-(b.capturedAt||0))}
-  function quarantineRaw(source,raw,reasonCode,protectedRecord=true){let list=loadArray(keys.quarantine);const id=`quarantine-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;list.push({id,source,collection:null,recordId:null,reasonCode,capturedAt:Date.now(),rawLength:String(raw||'').length,rawChecksum:fnv1a32(String(raw||'')),rawPayload:String(raw||''),protected:protectedRecord});list=retain(list,20);storeArray(keys.quarantine,list);return id}
-  function captureSnapshot(raw,source,fromVersion,toVersion){if(typeof raw!=='string'||!raw.trim())return null;let list=loadArray(keys.snapshots);const checksum=fnv1a32(raw),existing=list.find(item=>item.sourceChecksum===checksum&&item.targetSchemaVersion===toVersion);if(existing)return existing.id;const id=`snapshot-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;list.push({id,sourcePayload:raw,sourceChecksum:checksum,sourceSchemaVersion:Number(fromVersion)||0,targetSchemaVersion:toVersion,migrationSetFingerprint:'pf08a-wave1c-v1',capturedAt:Date.now(),source,protected:false});list=retain(list,3);storeArray(keys.snapshots,list);return id}
+  function retain(list,maxRecords,options={}){
+    if(!Array.isArray(list)||!Number.isInteger(maxRecords)||maxRecords<0)return{ok:false,error:'invalid_record_limit',list:[]};
+    const maxBytes=options.maxBytes;
+    if(maxBytes!==undefined&&maxBytes!==null&&(!Number.isFinite(maxBytes)||maxBytes<0))return{ok:false,error:'invalid_byte_limit',list:[]};
+    const byteSize=options.byteSize;
+    if(maxBytes!==undefined&&maxBytes!==null&&byteSize!==undefined&&typeof byteSize!=='function')return{ok:false,error:'invalid_byte_size',list:[]};
+    const ordered=list.map((item,index)=>({item,index,capturedAt:Number(item?.capturedAt)||0,retentionOrder:Number(item?.retentionOrder)||0,id:String(item?.id??index)})).sort((a,b)=>a.capturedAt-b.capturedAt||a.retentionOrder-b.retentionOrder||a.id.localeCompare(b.id)||a.index-b.index);
+    let retained=ordered.slice();
+    const sizeOf=entry=>{if(maxBytes===undefined||maxBytes===null)return 0;const value=byteSize?byteSize(entry.item):entry.item?.retainedBytes;if(!Number.isFinite(value)||value<0)throw new TypeError('invalid_retained_byte_size');return value};
+    let bytes;
+    try{bytes=retained.reduce((total,entry)=>total+sizeOf(entry),0)}catch{return{ok:false,error:'invalid_retained_byte_size',list:[]}}
+    const over=()=>retained.length>maxRecords||((maxBytes!==undefined&&maxBytes!==null)&&bytes>maxBytes);
+    while(over()&&retained.length){let index=retained.findIndex(entry=>entry.item?.protected!==true);if(index<0)index=0;const [removed]=retained.splice(index,1);bytes-=sizeOf(removed)}
+    return{ok:true,list:retained.sort((a,b)=>a.capturedAt-b.capturedAt||a.retentionOrder-b.retentionOrder||a.id.localeCompare(b.id)||a.index-b.index).map(entry=>entry.item),bytes:maxBytes===undefined||maxBytes===null?null:bytes};
+  }
+  function applyRetention(key,maxRecords,options){const result=retain(loadArray(key),maxRecords,options);if(result.ok)storeArray(key,result.list);return result}
+  function quarantineRaw(source,raw,reasonCode,protectedRecord=true){let list=loadArray(keys.quarantine);const id=`quarantine-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;list.push({id,source,collection:null,recordId:null,reasonCode,capturedAt:Date.now(),retentionOrder:++retentionSequence,rawLength:String(raw||'').length,rawChecksum:fnv1a32(String(raw||'')),rawPayload:String(raw||''),protected:protectedRecord});const retained=retain(list,QUARANTINE_MAX_RECORDS);if(!retained.ok)throw new Error(retained.error);storeArray(keys.quarantine,retained.list);return id}
+  function captureSnapshot(raw,source,fromVersion,toVersion){if(typeof raw!=='string'||!raw.trim())return null;let list=loadArray(keys.snapshots);const checksum=fnv1a32(raw),existing=list.find(item=>item.sourceChecksum===checksum&&item.targetSchemaVersion===toVersion);if(existing)return existing.id;const id=`snapshot-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;list.push({id,sourcePayload:raw,sourceChecksum:checksum,sourceSchemaVersion:Number(fromVersion)||0,targetSchemaVersion:toVersion,migrationSetFingerprint:'pf08a-wave1c-v1',capturedAt:Date.now(),retentionOrder:++retentionSequence,source,protected:false});const retained=retain(list,MIGRATION_SNAPSHOT_MAX_RECORDS);if(!retained.ok)throw new Error(retained.error);storeArray(keys.snapshots,retained.list);return id}
   function selectLoadSource(){
     const slots=inspectSlots(),valid=[slots.a,slots.b].filter(item=>item.ok).sort((x,y)=>y.envelope.revision-x.envelope.revision);
     if(valid.length){
@@ -268,6 +293,18 @@
   function diagnosticReport(){const slots=inspectSlots(),snapshots=loadArray(keys.snapshots),quarantine=loadArray(keys.quarantine);return{generatedAt:Date.now(),schemaOwner:'FamilyPilotPersistence',currentStateSchemaVersion:CURRENT_SCHEMA,storageNamespace,bootstrap:{status:bootstrapStatus,installedAt,firstOwnedReadAt,installedBeforeFirstOwnedRead:firstOwnedReadAt===null||installedAt<=firstOwnedReadAt},status:{status:currentStatusValue.status,source:currentStatusValue.source,revision:currentStatusValue.revision,stateSchemaVersion:currentStatusValue.stateSchemaVersion,messageCode:currentStatusValue.messageCode},slots:{head:Boolean(slots.head),a:slots.a.ok,b:slots.b.ok},snapshots:{count:snapshots.length,ids:snapshots.map(item=>item.id)},quarantine:{count:quarantine.length,ids:quarantine.map(item=>item.id),reasons:quarantine.map(item=>item.reasonCode)},migration:{lastFinalizeOk:lastFinalizeResult.ok===true},networkRequests}}
   function downloadDiagnostic(){const blob=new Blob([JSON.stringify(diagnosticReport(),null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`familypilot-diagnostic-${Date.now()}.json`;a.click();queueMicrotask(()=>URL.revokeObjectURL(url))}
   function retryRecovery(){const result=selectLoadSource();return result.ok?result:{source:recoveryLocked?'recovery_shell':'none'}}
+  function artifactMetadata(name,list){return{name,count:list.length,bytes:null,byteBudgetConfigured:false}}
+  function cleanupNonCanonicalArtifacts(){
+    if(recoveryLocked)return{status:'blocked',reason:'recovery_locked',classes:[]};
+    const snapshots=applyRetention(keys.snapshots,MIGRATION_SNAPSHOT_MAX_RECORDS),quarantine=applyRetention(keys.quarantine,QUARANTINE_MAX_RECORDS);
+    const classes=[];
+    if(snapshots.ok)classes.push(artifactMetadata('migration_recovery',snapshots.list));
+    if(quarantine.ok)classes.push(artifactMetadata('quarantine',quarantine.list));
+    const slots=inspectSlots(),finalizedHealthy=bootstrapStatus==='ready'&&lastFinalizeResult.ok===true&&currentStatusValue.status==='healthy'&&Boolean(selectedPayload)&&Boolean(slots.head)&&(slots.a.ok||slots.b.ok);
+    if(finalizedHealthy&&nativeGetItem(keys.candidate)!==null){nativeRemoveItem(keys.candidate);classes.push({name:'temporary',count:1,bytes:null,byteBudgetConfigured:false,removed:true})}
+    else classes.push({name:'temporary',count:nativeGetItem(keys.candidate)===null?0:1,bytes:null,byteBudgetConfigured:false,removed:false,skipped:true});
+    return{status:'completed',classes};
+  }
   function cleanupTest(){if(!testToken)return 0;const remove=[];for(let i=0;i<nativeLength();i++){const key=nativeKey(i);if(key&&key.includes(testToken))remove.push(key)}for(const key of remove)nativeRemoveItem(key);return remove.length}
   function seedMalformedCompatibilityPayload(){for(const key of [keys.head,keys.slotA,keys.slotB,keys.compatibility,keys.candidate])nativeRemoveItem(key);nativeSetItem(keys.compatibility,'{"schemaVersion":22,"wallets":[')}
   function seedFutureSchemaPayload(){for(const key of [keys.head,keys.slotA,keys.slotB,keys.compatibility,keys.candidate])nativeRemoveItem(key);nativeSetItem(keys.compatibility,JSON.stringify({schemaVersion:CURRENT_SCHEMA+1,household:{id:'future'},wallets:[],operations:[],categories:[]}))}
@@ -275,7 +312,7 @@
 
   const selected=selectLoadSource();
   if(selected.ok)pendingCandidate=selected.raw;
-  const api=Object.freeze({CURRENT_SCHEMA,CURRENT_STATE_SCHEMA_VERSION,storageNamespace,canonicalSerialize,fnv1a32,financialStateContract,structuralValidate,finalizeBootstrap,currentStatus:()=>clone(currentStatusValue),inspectSlots,isRecoveryLocked:()=>recoveryLocked,diagnosticReport,downloadDiagnostic,commitState,test:testMode?Object.freeze({cleanup:cleanupTest,failNextWriteAt:point=>{failNext=String(point||'')},corruptActiveSlot,seedMalformedCompatibilityPayload,seedFutureSchemaPayload,retryRecovery,nativeGetItem,nativeSetItem,keys:()=>({...keys})}):undefined});
+  const api=Object.freeze({CURRENT_SCHEMA,CURRENT_STATE_SCHEMA_VERSION,storageNamespace,canonicalSerialize,fnv1a32,financialStateContract,lifecyclePolicy,structuralValidate,finalizeBootstrap,currentStatus:()=>clone(currentStatusValue),inspectSlots,isRecoveryLocked:()=>recoveryLocked,diagnosticReport,downloadDiagnostic,cleanupNonCanonicalArtifacts,commitState,test:testMode?Object.freeze({cleanup:cleanupTest,retain:(list,maxRecords,options)=>retain(list,maxRecords,options),quarantineRaw,captureSnapshot,failNextWriteAt:point=>{failNext=String(point||'')},corruptActiveSlot,seedMalformedCompatibilityPayload,seedFutureSchemaPayload,retryRecovery,nativeGetItem,nativeSetItem,keys:()=>({...keys})}):undefined});
   root.FamilyPilotPersistence=api;
   root.__FP_PERSISTENCE_CORE_READY__=true;
 })(typeof window!=='undefined'?window:globalThis);
