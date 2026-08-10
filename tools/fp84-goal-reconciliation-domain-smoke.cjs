@@ -81,7 +81,7 @@ function loadApi(truthApi=truth){
 
 // Invalid non-amount values must never coerce to zero and release existing allocations.
 {
-  for(const [index,bad] of ['', '   ', false, true, [], {}, null]){
+  for(const [index,bad] of ['', '   ', false, true, [], {}, null].entries()){
     const state=stateOf([wallet('bank',500,'bank')]);const {api}=loadApi();assert(api.reconcileGoalSavedAmount(state,{goalId:'g1',desiredSavedAmount:120,mode:'already_counted',locationId:'bank'},'member-anna',{},200+index*10).ok,'Invalid-input seed failed');
     const before=JSON.stringify({allocations:state.purposeAllocations,events:state.purposeAllocationEvents,adjustments:state.balanceAdjustments,saved:state.savingsGoals[0].savedAmount});
     const result=api.reconcileGoalSavedAmount(state,{goalId:'g1',desiredSavedAmount:bad,mode:'already_counted',locationId:'bank'},'member-anna',{},201+index*10);
