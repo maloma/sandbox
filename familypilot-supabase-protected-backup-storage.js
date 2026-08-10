@@ -54,7 +54,7 @@
       if(typeof token!=='string'||token.length<1||!UUID.test(uid||''))return fail('auth_session_unavailable');
       return {ok:true,token,uid};
     }
-    async function sha(data){try{return b64url(new Uint8Array(await config.cryptoApi.subtle.digest('SHA-256',data)))}catch{return null}}
+    async function sha(data){try{return Array.from(new Uint8Array(await config.cryptoApi.subtle.digest('SHA-256',data)),value=>value.toString(16).padStart(2,'0')).join('')}catch{return null}}
     function objectUrl(path){return `${config.url}/storage/v1/object/${BUCKET}/${encodedPath(path)}`}
     async function provider(path,init,s){
       try{return await options.fetchImpl(objectUrl(path),Object.assign({},init,{headers:Object.assign({'apikey':config.key,'Authorization':`Bearer ${s.token}`},init&&init.headers||{})}))}catch{return null}
@@ -62,10 +62,10 @@
     function dependencies(){const core=root.FamilyPilotProtectedBackupCore,persistence=root.FamilyPilotPersistence;return core&&typeof core.serializeProtectedBackup==='function'&&persistence&&typeof persistence.canonicalSerialize==='function'?{core,persistence}:null}
     function validateManifest(value,context){
       const keys=['kind','formatVersion','protectedContainerKind','protectedContainerVersion','mode','backupId','createdAt','remoteRevision','serializedByteLength','fullSha256','chunkSizeBytes','chunkCount','chunks'];
-      if(!exactKeys(value,keys)||value.kind!=='FamilyPilotProtectedBackupStorageManifest'||value.formatVersion!==1||value.protectedContainerKind!=='FamilyPilotProtectedBackup'||value.protectedContainerVersion!==1||!validMode(value.mode)||typeof value.backupId!=='string'||!/^[A-Za-z0-9_-]{22,}$/.test(value.backupId)||!Number.isSafeInteger(value.createdAt)||value.createdAt<0||!Number.isSafeInteger(value.remoteRevision)||value.remoteRevision<1||!Number.isSafeInteger(value.serializedByteLength)||value.serializedByteLength<1||value.serializedByteLength>MAX_PROTECTED_BACKUP_BYTES||typeof value.fullSha256!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(value.fullSha256)||value.chunkSizeBytes!==CHUNK_BYTES||!Number.isSafeInteger(value.chunkCount)||value.chunkCount<1||value.chunkCount>Math.ceil(MAX_PROTECTED_BACKUP_BYTES/CHUNK_BYTES)||!Array.isArray(value.chunks)||value.chunks.length!==value.chunkCount)return null;
+      if(!exactKeys(value,keys)||value.kind!=='FamilyPilotProtectedBackupStorageManifest'||value.formatVersion!==1||value.protectedContainerKind!=='FamilyPilotProtectedBackup'||value.protectedContainerVersion!==1||!validMode(value.mode)||typeof value.backupId!=='string'||!/^[A-Za-z0-9_-]{22,}$/.test(value.backupId)||!Number.isSafeInteger(value.createdAt)||value.createdAt<0||!Number.isSafeInteger(value.remoteRevision)||value.remoteRevision<1||!Number.isSafeInteger(value.serializedByteLength)||value.serializedByteLength<1||value.serializedByteLength>MAX_PROTECTED_BACKUP_BYTES||typeof value.fullSha256!=='string'||!/^[0-9a-f]{64}$/.test(value.fullSha256)||value.chunkSizeBytes!==CHUNK_BYTES||!Number.isSafeInteger(value.chunkCount)||value.chunkCount<1||value.chunkCount>Math.ceil(MAX_PROTECTED_BACKUP_BYTES/CHUNK_BYTES)||!Array.isArray(value.chunks)||value.chunks.length!==value.chunkCount)return null;
       if(context&&(value.mode!==context.mode||value.backupId!==context.backupId||value.createdAt!==context.createdAt||value.remoteRevision!==context.remoteRevision))return null;
       let total=0;
-      for(let i=0;i<value.chunks.length;i++){const chunk=value.chunks[i];if(!exactKeys(chunk,['index','byteLength','sha256'])||chunk.index!==i||!Number.isSafeInteger(chunk.byteLength)||chunk.byteLength<1||chunk.byteLength>CHUNK_BYTES||typeof chunk.sha256!=='string'||!/^[A-Za-z0-9_-]{43}$/.test(chunk.sha256))return null;total+=chunk.byteLength;}
+      for(let i=0;i<value.chunks.length;i++){const chunk=value.chunks[i];if(!exactKeys(chunk,['index','byteLength','sha256'])||chunk.index!==i||!Number.isSafeInteger(chunk.byteLength)||chunk.byteLength<1||chunk.byteLength>CHUNK_BYTES||typeof chunk.sha256!=='string'||!/^[0-9a-f]{64}$/.test(chunk.sha256))return null;total+=chunk.byteLength;}
       return total===value.serializedByteLength?value:null;
     }
     async function prepareBackupUpload(container,{householdId,remoteRevision,mode}={}){
@@ -116,7 +116,7 @@
       return freeze({ok:true,due:true,requiresPassphrase:true,dueAt});
     }
     async function downloadWithSession(manifestPath,s){
-      const context=parseManifestPath(manifestPath);if(!context)return fail('invalid_remote_backup_manifest_path');if(context.authUid!==s.uid)return fail('remote_backup_identity_mismatch');
+      const context=parseManifestPath(manifestPath);if(!context)return fail('invalid_remote_backup_manifest_path');
       const manifestResponse=await provider(manifestPath,{method:'GET'},s);if(!manifestResponse||!manifestResponse.ok)return fail('remote_backup_integrity_failed');
       let manifestText,manifest;try{manifestText=await manifestResponse.text();manifest=validateManifest(JSON.parse(manifestText),context)}catch{return fail('remote_backup_integrity_failed')};if(!manifest)return fail('remote_backup_integrity_failed');
       const pieces=[];for(const chunk of manifest.chunks){const chunkPath=`${context.householdId}/${context.authUid}/${context.mode}/chunks/${context.backupId}/${chunk.index}.fpchunk`;const response=await provider(chunkPath,{method:'GET'},s);if(!response||!response.ok)return fail('remote_backup_integrity_failed');let data;try{data=new Uint8Array(await response.arrayBuffer())}catch{return fail('remote_backup_integrity_failed')};if(data.length!==chunk.byteLength||await sha(data)!==chunk.sha256)return fail('remote_backup_integrity_failed');pieces.push(data);}
