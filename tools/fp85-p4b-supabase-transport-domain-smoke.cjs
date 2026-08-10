@@ -46,7 +46,7 @@ class FakeSupabase{
   }
 }
 function persistence(p,tracker){return{CURRENT_STATE_SCHEMA_VERSION:p.CURRENT_STATE_SCHEMA_VERSION,canonicalSerialize:p.canonicalSerialize,structuralValidate:p.structuralValidate,isRecoveryLocked:()=>false,commitState:value=>{tracker.writes++;return p.commitState(value)}}}
-function makeTransport(context,fake,token=async()=> 'user-jwt'){return context.FamilyPilotSupabaseTransport.createTransport({projectUrl:'https://example.supabase.co/',publishableKey:'publishable-test-key',getAccessToken:token,fetchImpl:fake.fetch.bind(fake)})}
+function makeTransport(context,fake,token=async()=> 'user-jwt'){return context.FamilyPilotSupabaseTransport.createTransport({projectUrl:'https://example.supabase.co',publishableKey:'sb_publishable_testKey123',getAccessToken:token,fetchImpl:fake.fetch.bind(fake)})}
 
 async function main(){
   // Backend contract assertions: public reads are RLS-scoped and authoritative writes only use the guarded RPC.
@@ -73,12 +73,13 @@ async function main(){
 
   const fake=new FakeSupabase(),context=load(fake.fetch.bind(fake)),module=context.FamilyPilotSupabaseTransport;
   assert(module&&Object.isFrozen(module)&&typeof module.createTransport==='function');
-  assert.throws(()=>module.createTransport({projectUrl:'http://example.supabase.co',publishableKey:'key',getAccessToken:async()=>''}),/invalid_transport_configuration/);
-  assert.throws(()=>module.createTransport({projectUrl:'https://example.supabase.co',publishableKey:'secret-key',getAccessToken:async()=>''}),/invalid_transport_configuration/);
+  const invalidKeys=['','publishable-test-key','sb_secret_testSecret123','service_role_testKey','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.signature','eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.signature','sb_publishable_'];
+  for(const publishableKey of invalidKeys){const callsBefore=fake.calls.length;assert.throws(()=>module.createTransport({projectUrl:'https://example.supabase.co',publishableKey,getAccessToken:async()=> 'user-jwt',fetchImpl:fake.fetch.bind(fake)}),/invalid_transport_configuration/);assert.strictEqual(fake.calls.length,callsBefore,'invalid API keys make zero provider requests')}
+  for(const projectUrl of ['http://example.supabase.co','https://evil.example.com','https://example.supabase.co/path','https://example.supabase.co/?query=1','https://example.supabase.co/#hash','https://user:password@example.supabase.co']){const callsBefore=fake.calls.length;assert.throws(()=>module.createTransport({projectUrl,publishableKey:'sb_publishable_testKey123',getAccessToken:async()=> 'user-jwt',fetchImpl:fake.fetch.bind(fake)}),/invalid_transport_configuration/);assert.strictEqual(fake.calls.length,callsBefore,'invalid project URLs make zero provider requests')}
   const noSession=makeTransport(context,fake,async()=> '');assert.strictEqual((await noSession.read('household-1')).error,'auth_session_unavailable');assert.strictEqual(fake.calls.length,0);
   const transport=makeTransport(context,fake);
   const absent=await transport.read('household-1');assert.deepStrictEqual(clone(absent),{ok:true,row:null});
-  assert.strictEqual(fake.calls.length,1);const getCall=fake.calls[0];assert.strictEqual(getCall.init.method,'GET');assert(new URL(getCall.url).pathname==='/rest/v1/familypilot_remote_state');assert(new URL(getCall.url).searchParams.get('household_id')==='eq.household-1');assert.strictEqual(getCall.init.headers.apikey,'publishable-test-key');assert.strictEqual(getCall.init.headers.Authorization,'Bearer user-jwt');
+  assert.strictEqual(fake.calls.length,1);const getCall=fake.calls[0];assert.strictEqual(getCall.init.method,'GET');assert(new URL(getCall.url).pathname==='/rest/v1/familypilot_remote_state');assert(new URL(getCall.url).searchParams.get('household_id')==='eq.household-1');assert.strictEqual(getCall.init.headers.apikey,'sb_publishable_testKey123');assert.strictEqual(getCall.init.headers.Authorization,'Bearer user-jwt');assert.notStrictEqual(getCall.init.headers.apikey,getCall.init.headers.Authorization.slice('Bearer '.length));
   const input={householdId:'household-1',expectedRevision:0,revision:1,stateSchemaVersion:22,payload:'{"schemaVersion":22}',payloadSha256:'a'.repeat(64),updatedAt:1700000000000,updatedBy:'member-1'};
   const created=await transport.compareAndSwap(input);assert(created.ok&&created.row.householdId==='household-1'&&created.row.stateSchemaVersion===22);assert.strictEqual(fake.calls.length,2);const post=fake.calls[1];assert.strictEqual(post.init.method,'POST');assert.strictEqual(new URL(post.url).pathname,'/rest/v1/rpc/familypilot_compare_and_swap_state');assert.deepStrictEqual(JSON.parse(post.init.body),{p_household_id:input.householdId,p_expected_revision:0,p_revision:1,p_state_schema_version:22,p_payload:input.payload,p_payload_sha256:input.payloadSha256,p_updated_at:input.updatedAt,p_updated_by:input.updatedBy});
   const mapped=await transport.read('household-1');assert(mapped.ok&&mapped.row.payload===input.payload&&mapped.row.payloadSha256===input.payloadSha256);

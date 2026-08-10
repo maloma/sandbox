@@ -8,7 +8,7 @@
   const usableText=value=>typeof value==='string'&&value.trim().length>0;
   const validSafeInteger=value=>Number.isSafeInteger(value)&&value>=0;
   const validRowInteger=value=>Number.isInteger(value)&&value>=1;
-  const forbiddenCredential=value=>/service(?:[_-]?role)?|secret/i.test(value);
+  const isPublishableKey=value=>typeof value==='string'&&/^sb_publishable_[A-Za-z0-9_-]+$/.test(value.trim());
   const responseOk=response=>Boolean(response)&&((typeof response.ok==='boolean'&&response.ok)||(typeof response.status==='number'&&response.status>=200&&response.status<300));
   const freezeRow=row=>Object.freeze({
     householdId:row.household_id,
@@ -29,11 +29,12 @@
   }
   function createConfiguration(options){
     const projectUrl=options?.projectUrl,publishableKey=options?.publishableKey;
-    if(!usableText(projectUrl)||!usableText(publishableKey)||forbiddenCredential(publishableKey)
+    if(!usableText(projectUrl)||!isPublishableKey(publishableKey)
       ||typeof options?.getAccessToken!=='function')throw new TypeError('invalid_transport_configuration');
     let url;
     try{url=new URL(projectUrl)}catch{throw new TypeError('invalid_transport_configuration')}
-    if(url.protocol!=='https:'||url.username||url.password)throw new TypeError('invalid_transport_configuration');
+    if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.pathname!=='/'
+      ||!url.hostname.endsWith('.supabase.co')||url.hostname==='supabase.co')throw new TypeError('invalid_transport_configuration');
     const fetchImpl=options.fetchImpl===undefined?root.fetch:options.fetchImpl;
     if(typeof fetchImpl!=='function')throw new TypeError('invalid_transport_configuration');
     return Object.freeze({baseUrl:url.href.replace(/\/$/,''),publishableKey:publishableKey.trim(),getAccessToken:options.getAccessToken,fetchImpl});
