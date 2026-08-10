@@ -67,12 +67,34 @@
         const currentBalance=round(d.scope?.walletCapitalSnapshot?.(state,locationId)?.capital??truth.locationBalance(state,locationId,d));
         const adjusted=original.createBalanceAdjustment(state,{walletId:locationId,newBalance:round(currentBalance+delta),occurredAt:at,note:`Сверка цели «${targetGoal.name}»: ранее неучтённые деньги`},actorId,d,at);
         if(!adjusted.ok){restore(state,data);return adjusted}
-        balanceAdjustment=adjusted.adjustment||null;
+        balanceAdjustment=adjusted.adjustment||null;if(balanceAdjustment)balanceAdjustment.id=economicEventId;
       }
       const allocated=truth.allocateExisting(state,{goalId,locationId,amount:delta,reason:mode==='forgotten_balance'?'goal_saved_reconciliation_forgotten_balance':'goal_saved_reconciliation_existing',source:'goal_saved_reconciliation',linkedEconomicEventId:economicEventId,occurredAt:at},actorId,d,at);
       if(!allocated.ok){restore(state,data);return allocated}
       truth.markAssignment(state,goalId,locationId,'user_confirmed',actorId,at);truth.syncGoalCaches(state);
       return{ok:true,goal:targetGoal,mode,economicEventId,previousSavedAmount:current,actualSavedAmount:truth.actualSaved(state,goalId),balanceAdjustment,purposeAllocationEvents:[allocated.event]};
+    }catch(error){restore(state,data);return{ok:false,error:String(error?.message||error)}}
+  }
+  function reverseGoalSavedReconciliation(state,economicEventId,actorId='member-anna',inputDeps={},at=Date.now()){
+    const d=deps(inputDeps);normalizeState(state,d,at);const id=String(economicEventId||'');if(!id)return{ok:false,error:'Укажите изменение сверки для восстановления.'};
+    const originalEvents=(state.purposeAllocationEvents||[]).filter(item=>item.linkedEconomicEventId===id);
+    if(!originalEvents.length)return{ok:false,error:'Изменение сверки не найдено.'};
+    if(originalEvents.some(item=>item.status==='reversed'))return{ok:false,error:'Эта сверка уже восстановлена.'};
+    const adjustment=(state.balanceAdjustments||[]).find(item=>item.id===id&&item.status!=='inactive')||null,data=snapshot(state),reversalEconomicEventId=makeId('goal-saved-reconciliation-reversal',at),reversalEvents=[];
+    try{
+      for(const event of [...originalEvents].sort((a,b)=>b.createdAt-a.createdAt)){
+        const reversed=truth.reverseEvent(state,event.id,actorId,d,at);if(!reversed.ok){restore(state,data);return reversed}
+        reversed.event.linkedEconomicEventId=reversalEconomicEventId;reversalEvents.push(reversed.event);
+      }
+      let balanceAdjustment=null;
+      if(adjustment){
+        const currentBalance=round(d.scope?.walletCapitalSnapshot?.(state,adjustment.walletId)?.capital??truth.locationBalance(state,adjustment.walletId,d));
+        const reversed=original.createBalanceAdjustment(state,{walletId:adjustment.walletId,newBalance:round(currentBalance-adjustment.delta),occurredAt:at,note:`Отмена: ${adjustment.note||'сверка ранее неучтённых денег'}`},actorId,d,at);
+        if(!reversed.ok){restore(state,data);return reversed}
+        balanceAdjustment=reversed.adjustment||null;if(balanceAdjustment)balanceAdjustment.id=reversalEconomicEventId;
+      }
+      truth.syncGoalCaches(state);
+      return{ok:true,economicEventId:id,reversalEconomicEventId,balanceAdjustment,purposeAllocationEvents:reversalEvents};
     }catch(error){restore(state,data);return{ok:false,error:String(error?.message||error)}}
   }
   function completeAction(state,actionId,input,actorId='member-anna',inputDeps={},at=Date.now()){
@@ -95,6 +117,6 @@
       action.actualAmount=round(action.actualAmount+amount);action.sourceLocationId=sourceLocationId;action.destinationLocationId=destinationLocationId;action.savingsTransferIds=Array.isArray(action.savingsTransferIds)?action.savingsTransferIds:[];action.walletTransferIds=Array.isArray(action.walletTransferIds)?action.walletTransferIds:[];action.savingsTransferIds.push(purposeResult.transfer.id);if(physicalResult?.transfer?.id)action.walletTransferIds.push(physicalResult.transfer.id);action.status=action.actualAmount+.005>=action.plannedAmount?'completed':'partial';action.updatedAt=at;action.updatedByMemberId=actorId;truth.syncGoalCaches(state);return{ok:true,action,purposeTransfer:purposeResult.transfer,walletTransfer:physicalResult?.transfer||null,economicEventId,purposeAllocationEvents:purposeResult.purposeAllocationEvents||[]};
     }catch(error){restore(state,data);return{ok:false,error:String(error?.message||error)}}
   }
-  const api=Object.freeze({...original,normalizeState,setPurposeLocation,configureIncomeSavingsRule,applyGiftFundPlan,reconcileGoalSavedAmount,completeAction,truth});
+  const api=Object.freeze({...original,normalizeState,setPurposeLocation,configureIncomeSavingsRule,applyGiftFundPlan,reconcileGoalSavedAmount,reverseGoalSavedReconciliation,completeAction,truth});
   window.FamilyPilotMoneyPlanning=api;
 })();
