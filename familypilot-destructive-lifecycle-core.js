@@ -53,6 +53,21 @@
     if(operation.status!==requiredStatus)return error(requiredStatus==='active'?'target_not_active':'target_not_in_trash');
     return{ok:true,operation};
   }
+  function isLinkedObligationOperation(operation){
+    const links=operation?.links;
+    return Boolean(links&&(links.obligationOccurrenceId||links.obligationAllocationOccurrenceId||links.obligationRuleId));
+  }
+  function currentOperationActor(state){
+    return typeof state?.currentMemberId==='string'?state.currentMemberId.trim():'';
+  }
+  function appendOperationStatusRevision(operation,action,actor,now,oldValue,newValue){
+    if(operation.revisions!=null&&!Array.isArray(operation.revisions))return error('operation_revision_history_invalid');
+    const revisions=operation.revisions||[],sequence=revisions.length+1;
+    const id=`operation-status-${api().fnv1a32(`${action}|${operation.id}|${now}|${sequence}`)}`;
+    revisions.push({id,sequence,changedByMemberId:actor,changedAt:now,source:'user',batchId:`operation-status-batch-${api().fnv1a32(`${action}|${operation.id}|${now}|${sequence}`)}`,changes:[{field:'status',oldValue,newValue}]});
+    operation.revisions=revisions;
+    return{ok:true};
+  }
   function safeStorageClasses(){
     const classes=api().lifecyclePolicy().classes||[];
     return classes.map(entry=>String(entry.name)).filter(name=>['active_confirmed','temporary','migration_recovery','quarantine'].includes(name));
@@ -77,14 +92,22 @@
     const target=targetFor(request),retention=retentionPolicy(state);
     if(action==='trash'){
       const supported=supportedOperation(state,target,'active');if(!supported.ok)return supported;
+      if(isLinkedObligationOperation(supported.operation))return error('linked_operation_lifecycle_adapter_required');
+      const actor=currentOperationActor(state);if(!actor)return error('operation_actor_unavailable');
+      if(supported.operation.revisions!=null&&!Array.isArray(supported.operation.revisions))return error('operation_revision_history_invalid');
       const candidate=clone(state),operation=candidate.operations.find(item=>String(item.id)===target.id),days=retention.enabled&&retention.valid?retention.days:null;
-      operation.status='trash';operation.deletedAt=now;operation.deletedByMemberId=state.currentMemberId||null;operation.trashExpiresAt=days===null?null:now+days*DAY;
+      const revision=appendOperationStatusRevision(operation,action,actor,now,'active','trash');if(!revision.ok)return revision;
+      operation.status='trash';operation.deletedAt=now;operation.deletedByMemberId=actor;operation.trashExpiresAt=days===null?null:now+days*DAY;operation.lastEditedByMemberId=actor;operation.lastEditedAt=now;
       return makePlan(state,action,target,retention,deepFreeze(candidate),{type:'operation',id:target.id,message:'Operation will move to Trash without a duplicate record.'});
     }
     if(action==='restore_from_trash'){
       const supported=supportedOperation(state,target,'trash');if(!supported.ok)return supported;
+      if(isLinkedObligationOperation(supported.operation))return error('linked_operation_lifecycle_adapter_required');
+      const actor=currentOperationActor(state);if(!actor)return error('operation_actor_unavailable');
+      if(supported.operation.revisions!=null&&!Array.isArray(supported.operation.revisions))return error('operation_revision_history_invalid');
       const candidate=clone(state),operation=candidate.operations.find(item=>String(item.id)===target.id);
-      operation.status='active';operation.deletedAt=null;operation.deletedByMemberId=null;operation.trashExpiresAt=null;
+      const revision=appendOperationStatusRevision(operation,action,actor,now,'trash','active');if(!revision.ok)return revision;
+      operation.status='active';operation.deletedAt=null;operation.deletedByMemberId=null;operation.trashExpiresAt=null;operation.lastEditedByMemberId=actor;operation.lastEditedAt=now;
       return makePlan(state,action,target,retention,deepFreeze(candidate),{type:'operation',id:target.id,message:'The same operation identity will be restored from Trash.'});
     }
     if(action==='expire_trash'){
