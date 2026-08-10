@@ -226,6 +226,12 @@ body.personal-wallet-scope .scope-context{color:color-mix(in srgb,var(--purple) 
 <script src="./familypilot-module-registry-ui.js" onerror="const f=document.getElementById('fpStaticFallback');if(f)f.hidden=false"></script>
 <script src="./familypilot-module-entry-bridge.js" onerror="const f=document.getElementById('fpStaticFallback');if(f)f.hidden=false"></script>
 <script src="./familypilot-scope.js" onerror="window.__FP_SCOPE_LOAD_FAILED__=true;const f=document.getElementById('fpStaticFallback');if(f)f.hidden=false"></script>
+<script src="./familypilot-backup-restore-core.js"></script>
+<script src="./familypilot-production-persistence-adapter.js"></script>
+<script src="./familypilot-supabase-transport.js"></script>
+<script src="./familypilot-protected-backup-core.js"></script>
+<script src="./familypilot-supabase-protected-backup-storage.js"></script>
+<script src="./familypilot-production-cutover-orchestrator.js"></script>
 <script src="./familypilot-destructive-lifecycle-core.js"></script>
 <script src="./familypilot-destructive-lifecycle-ui.js"></script>
 <script src="./familypilot-analytics-state.js"></script>
@@ -1112,7 +1118,7 @@ renderAll();
 <script src="./familypilot-supabase-auth-session.js"></script>
 <script src="./familypilot-production-runtime.js"></script>
 <script>
-(()=>{const auth=window.FamilyPilotSupabaseAuthSession?.createAuthSession({projectUrl:'https://ojweurengruhsvtmphct.supabase.co',publishableKey:'sb_publishable_PCnI4U4viOnT4c2jG_OP3g_XXEHprVa'}),runtime=window.FamilyPilotProductionRuntime?.createRuntime({auth}),status=document.getElementById('fpCloudStatus'),form=document.getElementById('fpCloudForm');if(!auth||!runtime)return;const refresh=async()=>{const s=await runtime.initialize();status.textContent=s.auth?'Вход выполнен. Облачная проверка доступна после контролируемого подключения семьи.':'FamilyPilot работает локально. Войдите, чтобы проверить доступ к облаку.';document.getElementById('fpCloudSignout').hidden=!s.auth};form.onsubmit=async e=>{e.preventDefault();const r=await runtime.signIn(fpCloudEmail.value,fpCloudPassword.value);status.textContent=r.ok?'Вход выполнен.': 'Не удалось выполнить вход.';await refresh()};fpCloudSignup.onclick=async()=>{const r=await runtime.signUp(fpCloudEmail.value,fpCloudPassword.value);status.textContent=r.status==='email_confirmation_required'?'Проверьте email для подтверждения аккаунта.':r.ok?'Аккаунт создан.':'Не удалось создать аккаунт.';await refresh()};fpCloudSignout.onclick=async()=>{await runtime.signOut();await refresh()};refresh()})();
+(()=>{const auth=window.FamilyPilotSupabaseAuthSession?.createAuthSession({projectUrl:'https://ojweurengruhsvtmphct.supabase.co',publishableKey:'sb_publishable_PCnI4U4viOnT4c2jG_OP3g_XXEHprVa'}),runtime=window.FamilyPilotProductionRuntime?.createRuntime({auth}),status=document.getElementById('fpCloudStatus'),form=document.getElementById('fpCloudForm');if(!auth||!runtime)return;const refresh=async()=>{const s=await runtime.initialize();status.textContent=s.auth?'Вход выполнен. Облачная проверка доступна после контролируемого подключения семьи.':'FamilyPilot работает локально. Войдите, чтобы проверить доступ к облаку.';document.getElementById('fpCloudSignout').hidden=!s.auth};form.onsubmit=async e=>{e.preventDefault();const r=await runtime.signIn(fpCloudEmail.value,fpCloudPassword.value);status.textContent=r.ok?'Вход выполнен.':'Не удалось выполнить вход.';if(r.ok){const p=await runtime.preflight(window.__FP_RUNTIME__?.state);status.textContent=p.state==='household_access_missing'?'Облако ещё не привязано к этой семье':p.state==='cutover_remote_conflict'?'Требуется внимание: облачное состояние отличается.':p.state==='remote_preflight_failed'?'Не удалось проверить облако. Повторите позже.':'Вход выполнен.'}await refresh()};fpCloudSignup.onclick=async()=>{const r=await runtime.signUp(fpCloudEmail.value,fpCloudPassword.value);status.textContent=r.status==='email_confirmation_required'?'Проверьте email для подтверждения аккаунта.':r.ok?'Аккаунт создан.':'Не удалось создать аккаунт.';await refresh()};fpCloudSignout.onclick=async()=>{await runtime.signOut();await refresh()};refresh()})();
 </script>
 </body>
 </html>
