@@ -1,4 +1,5 @@
 'use strict';
+const {execFileSync}=require('node:child_process');
 const truth=require('../familypilot-pf08a-savings-truth.js');
 const assert=(value,message)=>{if(!value)throw new Error(message)};
 const wallet=(id,balance=500)=>({id,type:'household_shared',name:id,openingBalance:balance,includedInHouseholdCapital:true,archivedAt:null,moneyForm:'bank'});
@@ -52,3 +53,5 @@ const deps={};
 }
 
 console.log(JSON.stringify({status:'PASS',marker:'PF08A_WAVE1B_SAVINGS_TRUTH_DOMAIN_PASS',cases_a_h:true,idempotent:true,history_not_duplicated:true,no_partial_migration:true,capital_classification_only:true,split_locations:true,reconciliation:true,archived_preserved:true},null,2));
+require('./fp84-goal-reconciliation-domain-smoke.cjs');
+execFileSync(process.execPath,['tools/fp84-goal-reconciliation-browser-smoke.mjs'],{stdio:'inherit'});

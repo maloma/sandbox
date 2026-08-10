@@ -68,12 +68,14 @@
                       window.DAY=window.FamilyPilotMoneyPlanning?.DAY||86400000;
                       loadScript('familypilot-pf08a-savings-money-bridge.js',()=>
                         loadScript('familypilot-m4-04-money-planning-ui.js',()=>
-                          loadScript('familypilot-pf08a-savings-truth-ui.js',()=>{
-                            window.__FP_M4_03_BUDGET_PACKAGE_LOADED__=true;
-                            window.__FP_M4_04_PACKAGE_LOADED__=true;
-                            window.__FP_SAVINGS_TRUTH_PACKAGE_LOADED__=true;
-                            loadM405();
-                          })
+                          loadScript('familypilot-pf08a-savings-truth-ui.js',()=>
+                            loadScript('familypilot-fp84-goal-reconciliation-ui.js',()=>{
+                              window.__FP_M4_03_BUDGET_PACKAGE_LOADED__=true;
+                              window.__FP_M4_04_PACKAGE_LOADED__=true;
+                              window.__FP_SAVINGS_TRUTH_PACKAGE_LOADED__=true;
+                              loadM405();
+                            })
+                          )
                         )
                       );
                     })
