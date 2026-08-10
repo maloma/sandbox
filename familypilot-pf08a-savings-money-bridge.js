@@ -7,6 +7,7 @@
   const clone=value=>JSON.parse(JSON.stringify(value));
   const round=value=>Math.round((Number(value)||0)*100)/100;
   const finite=(value,fallback=0)=>Number.isFinite(Number(value))?Number(value):fallback;
+  const strictAmount=value=>{if(typeof value==='number')return Number.isFinite(value)?value:NaN;if(typeof value!=='string')return NaN;const text=value.trim().replace(',','.');if(!text||!/^\d+(?:\.\d+)?$/.test(text))return NaN;const number=Number(text);return Number.isFinite(number)?number:NaN};
   const makeId=(prefix='id',at=Date.now())=>`${prefix}-${Number(at).toString(36)}-${Math.random().toString(36).slice(2,9)}`;
   const deps=extra=>({wallets:window.FamilyPilotWalletManagement,transfers:window.FamilyPilotWalletTransfers,savings:window.FamilyPilotSavingsGoals,accounts,scope:runtime.scopeApi,...extra});
   const stateKeys=['purposeAllocations','purposeAllocationEvents','savingsLegacyReconciliationIssues','savingsPurposeMigrationResults','savingsPurposeMigrationSnapshots','savingsTransfers','transfers','walletMovements','operations','savingsActionOccurrences','purposeLocationAssignments','balanceAdjustments'];
@@ -45,9 +46,9 @@
     const d=deps(inputDeps);normalizeState(state,d,at);
     const goalId=String(input?.goalId||''),targetGoal=(state.savingsGoals||[]).find(item=>item.id===goalId&&item.status==='active');
     if(!targetGoal)return{ok:false,error:'Цель накопления не найдена.'};
-    const desired=round(finite(input?.desiredSavedAmount,NaN));
-    if(!Number.isFinite(desired)||desired<0||desired>truth.MAX_AMOUNT)return{ok:false,error:'Укажите корректную сумму «Уже отложено».'};
-    const current=truth.actualSaved(state,goalId),delta=round(desired-current),mode=String(input?.mode||'');
+    const desiredRaw=strictAmount(input?.desiredSavedAmount);
+    if(!Number.isFinite(desiredRaw)||desiredRaw<0||desiredRaw>truth.MAX_AMOUNT)return{ok:false,error:'Укажите корректную сумму «Уже отложено».'};
+    const desired=round(desiredRaw),current=truth.actualSaved(state,goalId),delta=round(desired-current),mode=String(input?.mode||'');
     if(Math.abs(delta)<.005)return{ok:true,unchanged:true,goal:targetGoal,previousSavedAmount:current,actualSavedAmount:current,balanceAdjustment:null,purposeAllocationEvents:[]};
     const data=snapshot(state),economicEventId=makeId('goal-saved-reconciliation',at);
     try{
