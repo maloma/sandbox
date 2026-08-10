@@ -89,8 +89,21 @@ function loadApi(truthApi=truth){
   }
 }
 
-const auditCases=[stateOf([wallet('audit',200,'bank')])];
-for(const state of auditCases){const {api}=loadApi();assert(api.reconcileGoalSavedAmount(state,{goalId:'g1',desiredSavedAmount:80,mode:'already_counted',locationId:'audit'},'member-anna',{},290).ok,'Audit seed failed');const audit=truth.audit(state);assert(audit.singleTruth&&audit.overallocated.length===0,'SavingsTruth audit failed after #84 reconciliation');}
+// Branch B history remains machine-linked after normalization and can be atomically restored.
+{
+  const state=stateOf([wallet('bank',500,'bank')]);const {api}=loadApi();const beforeBalance=walletBalance(state,'bank'),opsBefore=state.operations.length;
+  const created=api.reconcileGoalSavedAmount(state,{goalId:'g1',desiredSavedAmount:125,mode:'forgotten_balance',locationId:'bank'},'member-anna',{},300);
+  assert(created.ok&&created.economicEventId,'Recoverability seed failed');assert(created.balanceAdjustment?.id===created.economicEventId,'Balance adjustment is not durably linked to reconciliation event');assert(created.purposeAllocationEvents?.[0]?.linkedEconomicEventId===created.economicEventId,'Purpose event is not linked to reconciliation event');
+  api.normalizeState(state,{},310);
+  assert(state.balanceAdjustments.some(item=>item.id===created.economicEventId&&item.delta===125),'Balance-adjustment linkage did not survive normalization');assert(state.purposeAllocationEvents.some(item=>item.linkedEconomicEventId===created.economicEventId&&item.status==='active'),'Purpose-event linkage did not survive normalization');
+  const reversed=api.reverseGoalSavedReconciliation(state,created.economicEventId,'member-anna',{},320);
+  assert(reversed.ok&&reversed.reversalEconomicEventId,'Reconciliation recovery failed');assert(walletBalance(state,'bank')===beforeBalance,'Recovery did not restore real wallet balance');assert(truth.actualSaved(state,'g1')===0&&state.savingsGoals[0].savedAmount===0,'Recovery did not restore goal allocation/cache');assert(state.operations.length===opsBefore,'Recovery fabricated Income/Expense');
+  assert(state.balanceAdjustments.some(item=>item.id===created.economicEventId&&item.delta===125),'Original balance adjustment disappeared from history');assert(state.balanceAdjustments.some(item=>item.id===reversed.reversalEconomicEventId&&item.delta===-125),'Compensating balance adjustment missing from history');assert(state.purposeAllocationEvents.some(item=>item.linkedEconomicEventId===reversed.reversalEconomicEventId&&item.reversalOfEventId),'Purpose reversal history link missing');
+  const snapshot=JSON.stringify({allocations:state.purposeAllocations,events:state.purposeAllocationEvents,adjustments:state.balanceAdjustments,saved:state.savingsGoals[0].savedAmount});const duplicate=api.reverseGoalSavedReconciliation(state,created.economicEventId,'member-anna',{},330);assert(!duplicate.ok,'Same reconciliation was reversed twice');assert(JSON.stringify({allocations:state.purposeAllocations,events:state.purposeAllocationEvents,adjustments:state.balanceAdjustments,saved:state.savingsGoals[0].savedAmount})===snapshot,'Duplicate recovery mutated state');
+}
 
-console.log(JSON.stringify({status:'PASS',marker:'FP84_GOAL_RECONCILIATION_DOMAIN_PASS',alreadyCountedCash:true,alreadyCountedBank:true,forgottenCash:true,forgottenBank:true,noIncomeCreated:true,multipleGoalsProtected:true,atomicRollback:true,decreaseRelease:true,invalidCoercionBlocked:true,singleTruthAudit:true},null,2));
+const auditCases=[stateOf([wallet('audit',200,'bank')])];
+for(const state of auditCases){const {api}=loadApi();assert(api.reconcileGoalSavedAmount(state,{goalId:'g1',desiredSavedAmount:80,mode:'already_counted',locationId:'audit'},'member-anna',{},390).ok,'Audit seed failed');const audit=truth.audit(state);assert(audit.singleTruth&&audit.overallocated.length===0,'SavingsTruth audit failed after #84 reconciliation');}
+
+console.log(JSON.stringify({status:'PASS',marker:'FP84_GOAL_RECONCILIATION_DOMAIN_PASS',alreadyCountedCash:true,alreadyCountedBank:true,forgottenCash:true,forgottenBank:true,noIncomeCreated:true,multipleGoalsProtected:true,atomicRollback:true,decreaseRelease:true,invalidCoercionBlocked:true,historyRecoverable:true,singleTruthAudit:true},null,2));
 console.log('FP84_GOAL_RECONCILIATION_DOMAIN_PASS');
