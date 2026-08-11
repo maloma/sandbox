@@ -156,6 +156,25 @@
       return{ok:true,status:'applied',requiresReload:true,revision:committed.revision,activeSlot:committed.activeSlot,lifecycle:lifecycle(plan,'applied',{revision:committed.revision})};
     }catch(err){return error(String(err?.code||err?.message||'destructive_apply_failed'),{lifecycle:lifecycle(plan,'failed')})}
   }
+  function applyToDraft(plan,confirmation,draftState){
+    const p=api();
+    if(p.isRecoveryLocked())return error('recovery_locked');
+    const current=validCurrentState(draftState);if(!current.ok)return current;
+    const valid=validatePlan(plan,draftState);if(!valid.ok)return valid;
+    if(!validConfirmation(plan,confirmation))return error('invalid_action_bound_confirmation');
+    if(plan.action==='irreversible_privacy_erase')return error('erase_adapter_authority_required',{lifecycle:lifecycle(plan,'blocked',{boundedEraseSurface:'adapter_authority_not_exposed'})});
+    if(plan.action==='expire_trash')return error('unsupported_expiry_apply',{lifecycle:lifecycle(plan,'blocked',{reason:'hard_delete_not_authorized_by_existing_operation_contract'})});
+    if(plan.action==='reset_application')return error('reset_candidate_builder_unavailable',{lifecycle:lifecycle(plan,'blocked',{reason:'reset_candidate_builder_unavailable'})});
+    const internal=planInternals.get(plan);
+    if(!internal?.candidate)return error('destructive_candidate_unavailable');
+    let candidate;
+    try{candidate=JSON.parse(p.canonicalSerialize(internal.candidate))}catch{return error('destructive_draft_serialization_failed',{lifecycle:lifecycle(plan,'failed')})}
+    try{
+      for(const key of Reflect.ownKeys(draftState))delete draftState[key];
+      for(const key of Object.keys(candidate))draftState[key]=candidate[key];
+      return{ok:true,status:'applied_to_draft',requiresReload:false,lifecycle:lifecycle(plan,'applied_to_draft')};
+    }catch(err){return error(String(err?.code||err?.message||'destructive_draft_apply_failed'),{lifecycle:lifecycle(plan,'failed')})}
+  }
   function candidateDescriptor(plan){
     if(!plan||!registeredPlans.has(plan))return error('invalid_destructive_plan');
     const candidate=planInternals.get(plan)?.candidate;
@@ -165,5 +184,5 @@
     return{ok:true,available:true,collections};
   }
 
-  root.FamilyPilotDestructiveLifecycleCore=Object.freeze({PLAN_VERSION,ACTIONS,policy,prepare,validatePlan,confirm,apply,candidateDescriptor,retentionPolicy});
+  root.FamilyPilotDestructiveLifecycleCore=Object.freeze({PLAN_VERSION,ACTIONS,policy,prepare,validatePlan,confirm,apply,applyToDraft,candidateDescriptor,retentionPolicy});
 })(typeof window!=='undefined'?window:globalThis);

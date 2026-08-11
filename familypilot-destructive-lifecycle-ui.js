@@ -4,7 +4,7 @@
 
   const DEADLINE_MS=30000;
   const startedAt=Date.now();
-  let active=false,detailOperationId='';
+  let active=false,pending=false,detailOperationId='';
   const linked=operation=>{const links=operation?.links;return Boolean(links&&(links.obligationOccurrenceId||links.obligationAllocationOccurrenceId||links.obligationRuleId))};
   const dependencies=()=>({runtime:window.__FP_RUNTIME__,persistence:window.FamilyPilotPersistence,core:window.FamilyPilotDestructiveLifecycleCore});
   const ready=()=>{const{runtime,persistence,core}=dependencies();return Boolean(active&&runtime&&persistence&&core&&persistence.isRecoveryLocked?.()!==true)};
@@ -12,7 +12,9 @@
   const notify=message=>{const runtime=window.__FP_RUNTIME__;if(typeof runtime?.toast==='function')runtime.toast(message);else window.alert?.(message)};
   const unavailable=()=>notify('Безопасное действие временно недоступно. Обновите страницу и попробуйте снова.');
   const reload=()=>{if(typeof window.location?.reload==='function')window.location.reload()};
+  const bridgeFailure=outcome=>({ok:false,error:String(outcome?.error||'canonical_mutation_failed')});
   function run(action,id,question){
+    if(pending)return{ok:false,error:'lifecycle_action_pending'};
     if(!ready()){unavailable();return{ok:false,error:'ui_dependencies_unavailable'}};
     const{runtime,core}=dependencies(),current=operation(id);
     if(!current||linked(current)){return{ok:false,error:'not_ordinary_operation'}};
@@ -22,6 +24,24 @@
     if(!window.confirm(question))return{ok:false,cancelled:true};
     const confirmed=core.confirm(prepared.plan,{action:prepared.plan.action,acknowledged:true,confirmedAt:runtime.now()});
     if(!confirmed?.ok){unavailable();return confirmed||{ok:false,error:'confirmation_unavailable'}};
+    if(typeof runtime.commitCanonicalMutation==='function'){
+      pending=true;
+      const mutate=draft=>{
+        const applied=core.applyToDraft(prepared.plan,confirmed.confirmation,draft);
+        if(!applied?.ok){const failure=new Error(String(applied?.error||'destructive_draft_apply_failed'));failure.code=applied?.error;throw failure}
+        return applied;
+      };
+      const finish=outcome=>{
+        pending=false;
+        if(!outcome?.ok){const failed=bridgeFailure(outcome);unavailable();return failed}
+        return{...outcome,requiresReload:false};
+      };
+      try{
+        const outcome=runtime.commitCanonicalMutation(mutate);
+        if(outcome&&typeof outcome.then==='function')return outcome.then(finish,reason=>finish({ok:false,error:String(reason?.code||reason?.message||'canonical_mutation_failed')}));
+        return finish(outcome);
+      }catch(err){return finish({ok:false,error:String(err?.code||err?.message||'canonical_mutation_failed')})}
+    }
     const applied=core.apply(prepared.plan,confirmed.confirmation,runtime.state);
     if(!applied?.ok){unavailable();return applied||{ok:false,error:'safe_lifecycle_unavailable'}};
     if(applied.requiresReload===true)reload();
