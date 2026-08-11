@@ -774,11 +774,13 @@ syncFutureActualOperations();syncDetailReceipt();
     return outcome;
   };
 
-  function quickPay(id){
+  async function quickPay(id){
     const occurrence=state.obligationOccurrences.find(item=>item.id===id);if(!occurrence)return;
-    const result=api.payOccurrence(state,id,{amount:occurrence.expectedAmount,occurredAt:now(),walletId:occurrence.walletId,categoryId:occurrence.categoryId},state.currentMemberId,now());
-    if(!result.ok){alert(result.error);return}
-    save();renderAll();showScreen('obligations');toast('Оплата сохранена как связанный расход');
+    const input={amount:occurrence.expectedAmount,occurredAt:now(),walletId:occurrence.walletId,categoryId:occurrence.categoryId};let outcome;
+    const committed=await performCanonicalUiMutation({mutator:draft=>{outcome=api.payOccurrence(draft,id,input,draft.currentMemberId,now())},onSuccess:()=>{if(!outcome?.ok)return;renderAll();showScreen('obligations');toast('Оплата сохранена как связанный расход')}});
+    if(!outcome?.ok){alert(outcome?.error||'Не удалось сохранить оплату.');return outcome}
+    if(!committed.ok){alert('Не удалось сохранить оплату.');return committed}
+    return outcome;
   }
 
   function openExpectedAmount(id){
@@ -786,19 +788,31 @@ syncFutureActualOperations();syncDetailReceipt();
     expectedAmountOccurrenceId=id;$('obligationExpectedAmountInput').value=String(occurrence.expectedAmount).replace('.',',');$('obligationExpectedAmountScope').value='starting_next';$('obligationExpectedAmountError').textContent='';close('obligationDetailModal');open('obligationExpectedAmountModal');
   }
 
-  function saveExpectedAmount(){
-    const result=api.changeExpectedAmount(state,expectedAmountOccurrenceId,Number($('obligationExpectedAmountInput').value.trim().replace(',','.')),$('obligationExpectedAmountScope').value,state.currentMemberId,now());
-    if(!result.ok){$('obligationExpectedAmountError').textContent=result.error;return}
-    save();close('obligationExpectedAmountModal');renderAll();showScreen('obligations');toast('Ожидаемая сумма обновлена с выбранной областью');
+  async function saveExpectedAmount(){
+    const occurrenceId=expectedAmountOccurrenceId,amount=Number($('obligationExpectedAmountInput').value.trim().replace(',','.')),scope=$('obligationExpectedAmountScope').value;let outcome;
+    const committed=await performCanonicalUiMutation({busyElement:$('obligationExpectedAmountSave'),mutator:draft=>{outcome=api.changeExpectedAmount(draft,occurrenceId,amount,scope,draft.currentMemberId,now())},onSuccess:()=>{if(!outcome?.ok)return;close('obligationExpectedAmountModal');renderAll();showScreen('obligations');toast('Ожидаемая сумма обновлена с выбранной областью')}});
+    if(!outcome?.ok){$('obligationExpectedAmountError').textContent=outcome?.error||'Не удалось изменить ожидаемую сумму.';return outcome}
+    if(!committed.ok){$('obligationExpectedAmountError').textContent='Не удалось изменить ожидаемую сумму.';return committed}
+    return outcome;
   }
 
-  function toggleArchive(){
+  async function restoreObligationRule(ruleId){
+    if(!ruleId)return;
+    let outcome;const committed=await performCanonicalUiMutation({mutator:draft=>{outcome=api.restoreRule(draft,ruleId,draft.currentMemberId,now())},onSuccess:()=>{if(!outcome?.ok)return;renderAll();showScreen('obligations');toast('Правило возвращено')}});
+    if(!outcome?.ok){alert(outcome?.error||'Не удалось вернуть правило.');return outcome}
+    if(!committed.ok){alert('Не удалось вернуть правило.');return committed}
+    return outcome;
+  }
+
+  async function toggleArchive(){
     const rule=state.obligationRules.find(item=>item.id===obligationEditingRuleId);if(!rule)return;
     const restoring=rule.status==='archived';
     if(!restoring&&!confirm('Архивировать правило? История и связанные расходы сохранятся.'))return;
-    const result=restoring?api.restoreRule(state,rule.id,state.currentMemberId,now()):api.archiveRule(state,rule.id,state.currentMemberId,now());
-    if(!result.ok){$('obligationRuleError').textContent=result.error;return}
-    save();close('obligationRuleModal');renderAll();showScreen('obligations');toast(restoring?'Правило возвращено':'Правило архивировано');
+    if(restoring)return restoreObligationRule(rule.id);
+    let outcome;const committed=await performCanonicalUiMutation({busyElement:$('obligationArchiveBtn'),mutator:draft=>{outcome=api.archiveRule(draft,rule.id,draft.currentMemberId,now())},onSuccess:()=>{if(!outcome?.ok)return;close('obligationRuleModal');renderAll();showScreen('obligations');toast('Правило архивировано')}});
+    if(!outcome?.ok){$('obligationRuleError').textContent=outcome?.error||'Не удалось архивировать правило.';return outcome}
+    if(!committed.ok){$('obligationRuleError').textContent='Не удалось архивировать правило.';return committed}
+    return outcome;
   }
 
   installMonthNavigation();installRuleFields();installPaymentFields();installExpectedAmountModal();
@@ -812,7 +826,7 @@ syncFutureActualOperations();syncDetailReceipt();
   $('obligationExpectedAmountSave').onclick=saveExpectedAmount;
   $('obligationArchiveBtn').onclick=toggleArchive;
 
-  document.addEventListener('click',event=>{
+  document.addEventListener('click',async event=>{
     const month=event.target.closest('[data-m302-month]');
     const quick=event.target.closest('[data-m302-quick-pay]');
     const detail=event.target.closest('[data-m302-open-detail]');
@@ -822,7 +836,7 @@ syncFutureActualOperations();syncDetailReceipt();
     if(month){const d=new Date(monthAnchor);monthAnchor=new Date(d.getFullYear(),d.getMonth()+Number(month.dataset.m302Month),1).getTime();localStorage.setItem(MONTH_KEY,String(monthAnchor));renderAll();return}
     if(quick){quickPay(quick.dataset.m302QuickPay);return}
     if(detail){openObligationDetail(detail.dataset.m302OpenDetail);return}
-    if(restore){const result=api.restoreRule(state,restore.dataset.m302RestoreRule,state.currentMemberId,now());if(result.ok){save();renderAll();toast('Правило возвращено')}return}
+    if(restore){await restoreObligationRule(restore.dataset.m302RestoreRule);return}
     if(closeButton){close(closeButton.dataset.m302Close);return}
   },true);
 

@@ -43,8 +43,27 @@ function extractEffectiveM302Function(name){
   }
   assert.fail(`${name} inline M3-02 source is unterminated`);
 }
+function extractEffectiveM302Declaration(name){
+  const expression=new RegExp(`\\b(?:async\\s+)?function\\s+${name}\\s*\\(`,'g'),starts=[];
+  for(let match;(match=expression.exec(inlineM302));)starts.push(match.index);
+  assert.equal(starts.length,1,`exactly one inline M3-02 definition for ${name} is required`);
+  const start=starts[0],signatureStart=inlineM302.indexOf('(',start);
+  let parameters=0,bodyStart=-1;
+  for(let cursor=signatureStart;cursor<inlineM302.length;cursor++){
+    if(inlineM302[cursor]==='(')parameters++;
+    if(inlineM302[cursor]===')'&&--parameters===0){bodyStart=inlineM302.indexOf('{',cursor);break}
+  }
+  assert(bodyStart>=0,`${name} inline M3-02 body is present`);
+  let depth=0;
+  for(let cursor=bodyStart;cursor<inlineM302.length;cursor++){
+    if(inlineM302[cursor]==='{')depth++;
+    if(inlineM302[cursor]==='}'&&--depth===0)return inlineM302.slice(start,cursor+1);
+  }
+  assert.fail(`${name} inline M3-02 source is unterminated`);
+}
 const production=Object.fromEntries(['performCanonicalUiMutation','revisionBatch','revision','applyOperationMutation','saveOperation','createCategory','setTrashRetentionEnabled','setCurrentActor','setActiveWallet','saveObligationRule','saveObligationPayment','saveObligationPostpone','skipObligationOccurrence'].map(name=>[name,extractProductionFunction(name)]));
 const effectiveM302=Object.fromEntries(['saveObligationRule','saveObligationPayment','saveObligationPostpone'].map(name=>[name,extractEffectiveM302Function(name)]));
+const effectiveM302Remaining=Object.fromEntries(['quickPay','saveExpectedAmount','restoreObligationRule','toggleArchive'].map(name=>[name,extractEffectiveM302Declaration(name)]));
 function fixture(){return{operations:[],categories:[{id:'cat-exp',kind:'expense',name:'Еда',normalizedName:'еда',createdByMemberId:'m1',createdAt:1,lastEditedByMemberId:'m1',lastEditedAt:1,archivedAt:null,history:[]}],wallets:[{id:'w1',name:'Основной'},{id:'w2',name:'Личный'}],config:{allowFutureActualOperations:false,trashRetentionEnabled:false,quickCategoryIds:{income:[],expense:[]}},currentMemberId:'m1',activeWalletId:'w1'}}
 function harness(initial=fixture()){
   const nodes={},ui={close:0,render:0,toasts:[]};
@@ -138,6 +157,16 @@ async function obligationProof(){
   const postponed=obligationHarness(seededObligation(),effectiveM302),postponeCommit=installObligationCommit(postponed,{held:true}),postponeId=postponed.context.state.obligationOccurrences[0].id,beforeDue=postponed.context.state.obligationOccurrences[0].dueAt;postponed.context.obligationActionOccurrenceId=postponeId;Object.assign(postponed.nodes.obligationPostponeDate,{value:'2023-11-20'});const pendingPostpone=postponed.context.saveObligationPostpone();await Promise.resolve();assert.equal(postponed.context.state.obligationOccurrences[0].dueAt,beforeDue,'effective M3-02 postpone leaves live obligation unchanged while held');assert.equal(postponed.ui.close,0);postponeCommit.release({ok:true});const postponedResult=await pendingPostpone;assert(postponedResult.ok);assert.notEqual(postponed.context.state.obligationOccurrences[0].dueAt,beforeDue);assert.equal(postponed.ui.toasts.at(-1),'Изменена только дата этого платежа');
   const failed=obligationHarness(seededObligation(),effectiveM302),failedCommit=installObligationCommit(failed,{result:{ok:false,error:'held_failure'}}),failedId=failed.context.state.obligationOccurrences[0].id;failed.context.obligationActionOccurrenceId=failedId;Object.assign(failed.nodes.obligationPayAmount,{value:'42.50'});Object.assign(failed.nodes.obligationPayDate,{value:failed.context.dateInputValue(failed.context.now())});Object.assign(failed.nodes.obligationPayWallet,{value:'w1'});Object.assign(failed.nodes.obligationPayCategory,{value:'cat-exp'});const failedResult=await failed.context.saveObligationPayment();assert.equal(failedResult.error,'held_failure');assert.equal(failedCommit.writes,0);assert.equal(failed.context.state.operations.length,0,'failed effective M3-02 payment has no local fallback');assert.match(failed.nodes.obligationPayError.textContent,/Не удалось сохранить оплату/);
 }
+async function remainingObligationProof(){
+  const functions={...effectiveM302,...effectiveM302Remaining},quick=obligationHarness(seededObligation(),functions),quickCommit=installObligationCommit(quick,{held:true}),quickId=quick.context.state.obligationOccurrences[0].id,quickPending=quick.context.quickPay(quickId);await Promise.resolve();assert.equal(quickCommit.commits,1);assert.equal(quick.context.state.operations.length,0,'quick payment keeps live operations unchanged while held');assert.equal(quick.context.state.obligationOccurrences[0].status,'planned');assert.equal(quick.ui.render,0);quickCommit.release({ok:true});const quickResult=await quickPending;assert(quickResult.ok);assert.equal(quick.context.state.operations.length,1);assert.equal(quick.context.state.obligationOccurrences[0].status,'paid');assert.equal(quick.ui.toasts.at(-1),'Оплата сохранена как связанный расход');
+
+  const expected=obligationHarness(seededObligation(),functions),expectedCommit=installObligationCommit(expected,{held:true}),expectedId=expected.context.state.obligationOccurrences[0].id;expected.context.expectedAmountOccurrenceId=expectedId;Object.assign(expected.context.$('obligationExpectedAmountInput'),{value:'55'});Object.assign(expected.context.$('obligationExpectedAmountScope'),{value:'only_this'});const expectedPending=expected.context.saveExpectedAmount();await Promise.resolve();assert.equal(expectedCommit.commits,1);assert.equal(expected.context.state.obligationOccurrences[0].expectedAmount,42.5,'expected amount stays live-unchanged while held');assert.equal(expected.nodes.obligationExpectedAmountSave.disabled,true);expectedCommit.release({ok:true});const expectedResult=await expectedPending;assert(expectedResult.ok);assert.equal(expected.context.state.obligationOccurrences[0].expectedAmount,55);assert.equal(expected.ui.toasts.at(-1),'Ожидаемая сумма обновлена с выбранной областью');
+
+  const archive=obligationHarness(seededObligation(),functions),archiveCommit=installObligationCommit(archive,{held:true}),ruleId=archive.context.state.obligationRules[0].id;archive.context.obligationEditingRuleId=ruleId;const archivePending=archive.context.toggleArchive();await Promise.resolve();assert.equal(archiveCommit.commits,1);assert.equal(archive.context.state.obligationRules[0].status,'active','archive keeps live rule unchanged while held');assert.equal(archive.nodes.obligationArchiveBtn.disabled,true);archiveCommit.release({ok:true});const archiveResult=await archivePending;assert(archiveResult.ok);assert.equal(archive.context.state.obligationRules[0].status,'archived');assert.equal(archive.ui.toasts.at(-1),'Правило архивировано');
+  const restoreCommit=installObligationCommit(archive,{held:true}),restorePending=archive.context.restoreObligationRule(ruleId);await Promise.resolve();assert.equal(restoreCommit.commits,1);assert.equal(archive.context.state.obligationRules[0].status,'archived','restore keeps live rule unchanged while held');restoreCommit.release({ok:true});const restoreResult=await restorePending;assert(restoreResult.ok);assert.equal(archive.context.state.obligationRules[0].status,'active');assert.equal(archive.ui.toasts.at(-1),'Правило возвращено');
+
+  const failed=obligationHarness(seededObligation(),functions),failedCommit=installObligationCommit(failed,{result:{ok:false,error:'held_failure'}}),failedId=failed.context.state.obligationOccurrences[0].id,failedResult=await failed.context.quickPay(failedId);assert.equal(failedResult.error,'held_failure');assert.equal(failedCommit.writes,0);assert.equal(failed.context.state.operations.length,0,'failed quick payment has no local fallback');assert.match(failed.ui.alerts.at(-1),/Не удалось сохранить оплату/);
+}
 async function main(){
   assert(fs.readFileSync(indexPath).equals(fs.readFileSync(mirrorPath)),'root/mirror source bytes are identical');
   assert(index.includes('const P4D3B_INTEGRATION_COMPLETE=false;'),'intermediate integration guard is explicit');
@@ -146,7 +175,8 @@ async function main(){
   assert(index.includes("permanentDelete:async()=>({ok:false,error:'permanent_delete_unavailable_in_r3a'})"),'test permanent delete is disabled');assert(!index.includes('state = draft'),'draft is never assigned to live state');
   for(const name of ['saveObligationRule','saveObligationPayment','saveObligationPostpone','skipObligationOccurrence']){assert.match(production[name],/performCanonicalUiMutation/);assert(!production[name].includes('(state,'),`${name} does not pass live state to the obligation domain API`)}
   for(const name of ['saveObligationRule','saveObligationPayment','saveObligationPostpone']){assert.match(effectiveM302[name],/performCanonicalUiMutation/);assert(!effectiveM302[name].includes('(state,'),`effective M3-02 ${name} does not pass live state to the obligation domain API`)}
-  await saveOperationProof();await categoryProof();await wrapperProofs();await obligationProof();
+  for(const [name,method] of Object.entries({quickPay:'payOccurrence',saveExpectedAmount:'changeExpectedAmount',restoreObligationRule:'restoreRule',toggleArchive:'archiveRule'})){assert.match(effectiveM302Remaining[name],/performCanonicalUiMutation/);assert(!effectiveM302Remaining[name].includes(`api.${method}(state,`),`effective M3-02 ${name} does not pass live state to the obligation domain API`)}
+  await saveOperationProof();await categoryProof();await wrapperProofs();await obligationProof();await remainingObligationProof();
   console.log('FP85_P4D3B_R3B_OBLIGATIONS_UI_MUTATION_PASS');
 }
 main().catch(error=>{console.error(error.stack||error);process.exitCode=1});
