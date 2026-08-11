@@ -1,5 +1,5 @@
 const assert=require('assert'),fs=require('fs'),path=require('path'),vm=require('vm');
-const root=path.resolve(__dirname,'..'),indexPath=path.join(root,'index.html'),mirrorPath=path.join(root,'src','familypilot.html'),m302UiPath=path.join(root,'familypilot-obligations-ui-v2.js'),index=fs.readFileSync(indexPath,'utf8'),m302Ui=fs.readFileSync(m302UiPath,'utf8');
+const root=path.resolve(__dirname,'..'),indexPath=path.join(root,'index.html'),mirrorPath=path.join(root,'src','familypilot.html'),index=fs.readFileSync(indexPath,'utf8'),inlineM302Start='/* pf08a-m3-02-inline-ui:start */',inlineM302End='/* pf08a-m3-02-inline-ui:end */',inlineM302=index.slice(index.indexOf(inlineM302Start)+inlineM302Start.length,index.indexOf(inlineM302End));
 const stage=process.argv.find(argument=>argument.startsWith('--stage='));
 if(stage!=='--stage=r3b'){
   console.error('p4d3b_incomplete_remaining_legacy_families');
@@ -27,21 +27,21 @@ function extractProductionFunction(name){
 }
 function extractEffectiveM302Function(name){
   const expression=new RegExp(`\\b${name}\\s*=\\s*(?:async\\s+)?function\\s*\\(`,'g'),starts=[];
-  for(let match;(match=expression.exec(m302Ui));)starts.push(match.index);
-  assert.equal(starts.length,1,`exactly one effective M3-02 definition for ${name} is required`);
-  const start=starts[0],functionStart=m302Ui.indexOf('function',start),signatureStart=m302Ui.indexOf('(',functionStart);
+  for(let match;(match=expression.exec(inlineM302));)starts.push(match.index);
+  assert.equal(starts.length,1,`exactly one inline M3-02 definition for ${name} is required`);
+  const start=starts[0],functionStart=inlineM302.indexOf('function',start),signatureStart=inlineM302.indexOf('(',functionStart);
   let parameters=0,bodyStart=-1;
-  for(let cursor=signatureStart;cursor<m302Ui.length;cursor++){
-    if(m302Ui[cursor]==='(')parameters++;
-    if(m302Ui[cursor]===')'&&--parameters===0){bodyStart=m302Ui.indexOf('{',cursor);break}
+  for(let cursor=signatureStart;cursor<inlineM302.length;cursor++){
+    if(inlineM302[cursor]==='(')parameters++;
+    if(inlineM302[cursor]===')'&&--parameters===0){bodyStart=inlineM302.indexOf('{',cursor);break}
   }
-  assert(bodyStart>=0,`${name} effective M3-02 body is present`);
+  assert(bodyStart>=0,`${name} inline M3-02 body is present`);
   let depth=0;
-  for(let cursor=bodyStart;cursor<m302Ui.length;cursor++){
-    if(m302Ui[cursor]==='{')depth++;
-    if(m302Ui[cursor]==='}'&&--depth===0)return `async function ${name}${m302Ui.slice(signatureStart,cursor+1)}`;
+  for(let cursor=bodyStart;cursor<inlineM302.length;cursor++){
+    if(inlineM302[cursor]==='{')depth++;
+    if(inlineM302[cursor]==='}'&&--depth===0)return `async function ${name}${inlineM302.slice(signatureStart,cursor+1)}`;
   }
-  assert.fail(`${name} effective M3-02 source is unterminated`);
+  assert.fail(`${name} inline M3-02 source is unterminated`);
 }
 const production=Object.fromEntries(['performCanonicalUiMutation','revisionBatch','revision','applyOperationMutation','saveOperation','createCategory','setTrashRetentionEnabled','setCurrentActor','setActiveWallet','saveObligationRule','saveObligationPayment','saveObligationPostpone','skipObligationOccurrence'].map(name=>[name,extractProductionFunction(name)]));
 const effectiveM302=Object.fromEntries(['saveObligationRule','saveObligationPayment','saveObligationPostpone'].map(name=>[name,extractEffectiveM302Function(name)]));

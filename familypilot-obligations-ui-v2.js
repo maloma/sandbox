@@ -215,13 +215,12 @@
     open('obligationRuleModal');
   };
 
-  saveObligationRule=async function(){
-    const editingRuleId=obligationEditingRuleId,amount=Number($('obligationAmount').value.trim().replace(',','.')),walletId=$('obligationWallet').value,cadence=$('obligationCadence').value;
+  saveObligationRule=function(){
+    const amount=Number($('obligationAmount').value.trim().replace(',','.')),walletId=$('obligationWallet').value,cadence=$('obligationCadence').value;
     const input={name:$('obligationName').value,amount,dueAt:dateFromInput($('obligationDueDate').value),cadence,intervalValue:Number($('obligationIntervalValue').value),intervalUnit:$('obligationIntervalUnit').value,endingMode:$('obligationEndingMode').value,paymentCount:Number($('obligationPaymentCount').value),endingDate:dateFromInput($('obligationEndingDate').value),walletId,categoryId:$('obligationCategory').value,currency:wallet(walletId)?.nativeCurrency||'EUR',note:$('obligationNote').value};
-    let outcome;const committed=await performCanonicalUiMutation({busyElement:$('obligationRuleSave'),mutator:draft=>{outcome=editingRuleId?api.updateRule(draft,editingRuleId,input,draft.currentMemberId,now()):api.createRule(draft,input,draft.currentMemberId,now())},onSuccess:()=>{if(!outcome?.ok)return;close('obligationRuleModal');renderAll();showScreen('obligations');toast(editingRuleId?'Обязательство обновлено':'Обязательство добавлено')}});
-    if(!outcome?.ok){$('obligationRuleError').textContent=outcome?.error||'Не удалось сохранить обязательство.';return outcome}
-    if(!committed.ok){$('obligationRuleError').textContent='Не удалось сохранить обязательство.';return committed}
-    return outcome;
+    const result=obligationEditingRuleId?api.updateRule(state,obligationEditingRuleId,input,state.currentMemberId,now()):api.createRule(state,input,state.currentMemberId,now());
+    if(!result.ok){$('obligationRuleError').textContent=result.error;return}
+    save();close('obligationRuleModal');renderAll();showScreen('obligations');toast(obligationEditingRuleId?'Обязательство обновлено':'Обязательство добавлено');
   };
 
   openObligationDetail=function(id){
@@ -252,12 +251,11 @@
     close('obligationDetailModal');open('obligationPayModal');
   };
 
-  saveObligationPayment=async function(){
-    const occurrenceId=obligationActionOccurrenceId,correctionMode=paymentCorrectionMode,selectedDate=$('obligationPayDate').value,occurredAt=selectedDate===dateInputValue(now())?now():dateFromInput(selectedDate),input={amount:Number($('obligationPayAmount').value.trim().replace(',','.')),occurredAt,walletId:$('obligationPayWallet').value,categoryId:$('obligationPayCategory').value,note:$('obligationPayNote').value};
-    let outcome;const committed=await performCanonicalUiMutation({busyElement:$('obligationPaySave'),mutator:draft=>{outcome=correctionMode?api.correctPayment(draft,occurrenceId,input,draft.currentMemberId,now()):api.payOccurrence(draft,occurrenceId,input,draft.currentMemberId,now())},onSuccess:()=>{if(!outcome?.ok)return;close('obligationPayModal');renderAll();showScreen('obligations');toast(correctionMode?'Оплата исправлена':'Оплата сохранена как связанный расход')}});
-    if(!outcome?.ok){$('obligationPayError').textContent=outcome?.error||'Не удалось сохранить оплату.';return outcome}
-    if(!committed.ok){$('obligationPayError').textContent='Не удалось сохранить оплату.';return committed}
-    return outcome;
+  saveObligationPayment=function(){
+    const selectedDate=$('obligationPayDate').value,occurredAt=selectedDate===dateInputValue(now())?now():dateFromInput(selectedDate),input={amount:Number($('obligationPayAmount').value.trim().replace(',','.')),occurredAt,walletId:$('obligationPayWallet').value,categoryId:$('obligationPayCategory').value,note:$('obligationPayNote').value};
+    const result=paymentCorrectionMode?api.correctPayment(state,obligationActionOccurrenceId,input,state.currentMemberId,now()):api.payOccurrence(state,obligationActionOccurrenceId,input,state.currentMemberId,now());
+    if(!result.ok){$('obligationPayError').textContent=result.error;return}
+    save();close('obligationPayModal');renderAll();showScreen('obligations');toast(paymentCorrectionMode?'Оплата исправлена':'Оплата сохранена как связанный расход');
   };
 
   openObligationPostpone=function(){
@@ -265,12 +263,10 @@
     obligationActionOccurrenceId=occurrence.id;$('obligationPostponeDate').value=dateInputValue(occurrence.dueAt);$('obligationPostponeDate').removeAttribute('min');$('obligationPostponeError').textContent='';close('obligationDetailModal');open('obligationPostponeModal');
   };
 
-  saveObligationPostpone=async function(){
-    const occurrenceId=obligationActionOccurrenceId,newDueAt=dateFromInput($('obligationPostponeDate').value);let outcome;
-    const committed=await performCanonicalUiMutation({busyElement:$('obligationPostponeSave'),mutator:draft=>{outcome=api.moveOccurrence(draft,occurrenceId,newDueAt,draft.currentMemberId,now())},onSuccess:()=>{if(!outcome?.ok)return;close('obligationPostponeModal');renderAll();showScreen('obligations');toast('Изменена только дата этого платежа')}});
-    if(!outcome?.ok){$('obligationPostponeError').textContent=outcome?.error||'Не удалось изменить дату платежа.';return outcome}
-    if(!committed.ok){$('obligationPostponeError').textContent='Не удалось изменить дату платежа.';return committed}
-    return outcome;
+  saveObligationPostpone=function(){
+    const result=api.moveOccurrence(state,obligationActionOccurrenceId,dateFromInput($('obligationPostponeDate').value),state.currentMemberId,now());
+    if(!result.ok){$('obligationPostponeError').textContent=result.error;return}
+    save();close('obligationPostponeModal');renderAll();showScreen('obligations');toast('Изменена только дата этого платежа');
   };
 
   function quickPay(id){
