@@ -228,6 +228,8 @@ body.personal-wallet-scope .scope-context{color:color-mix(in srgb,var(--purple) 
 <script src="./familypilot-scope.js" onerror="window.__FP_SCOPE_LOAD_FAILED__=true;const f=document.getElementById('fpStaticFallback');if(f)f.hidden=false"></script>
 <script src="./familypilot-backup-restore-core.js"></script>
 <script src="./familypilot-production-persistence-adapter.js"></script>
+<script src="./familypilot-authoritative-mutation-gateway.js"></script>
+<script src="./familypilot-authoritative-ui-mutation-controller.js"></script>
 <script src="./familypilot-supabase-transport.js"></script>
 <script src="./familypilot-protected-backup-core.js"></script>
 <script src="./familypilot-supabase-protected-backup-storage.js"></script>
@@ -289,11 +291,24 @@ function restoreOperationCategoryMemory(){const ids=opsTypeFilter==='all'?[...ca
 function rememberOperationCategories(){if(opsTypeFilter==='income'||opsTypeFilter==='expense')categoryMemory[opsTypeFilter]=new Set(normalizeOperationCategories(selectedCategoryIds,opsTypeFilter));else for(const kind of ['income','expense'])categoryMemory[kind]=new Set([...selectedCategoryIds].filter(id=>categoryAllowedForOperations(id,kind)))}
 function saveOperationsWorkspace(){rememberOperationCategories();localStorage.setItem(OPERATIONS_WORKSPACE_KEY,JSON.stringify({version:1,period:normPeriod(periods.operations),type:opsTypeFilter,categories:{income:[...categoryMemory.income],expense:[...categoryMemory.expense]},amountMin,amountMax,expanded:filtersExpanded}))}
 restoreOperationCategoryMemory();
-const save=()=>{localStorage.setItem(APP_KEY,JSON.stringify(state));localStorage.setItem(PERIOD_KEY,JSON.stringify(periods))};
+const persistence=window.FamilyPilotPersistence,uiMutationControllerFactory=window.FamilyPilotAuthoritativeUiMutationController;
+if(!persistence||!uiMutationControllerFactory)throw new Error('Authoritative UI mutation controller dependencies are unavailable');
+let lastVerifiedCanonical=persistence.canonicalSerialize(state);
+const uiMutationController=uiMutationControllerFactory.createController({
+ canonicalSerialize:persistence.canonicalSerialize,
+ structuralValidate:persistence.structuralValidate,
+ getCurrentState:()=>state,
+ replaceCurrentState:nextState=>{state=JSON.parse(persistence.canonicalSerialize(nextState));lastVerifiedCanonical=persistence.canonicalSerialize(state)},
+ commitPreCutoverLocal:nextState=>{localStorage.setItem(APP_KEY,persistence.canonicalSerialize(nextState));return{ok:true}}
+});
+const renderAuthoritativeMutationStatus=()=>{const view=uiMutationController.status(),existing=$('fpAuthoritativeMutationStatus');if(!existing)return;existing.textContent=view.status==='conflict'?'Конфликт версии: обновите авторитетное состояние.':view.status==='reload_required'?'Требуется явное обновление авторитетного состояния.':view.status==='mutation_in_progress'?'Сохранение авторитетного состояния…':'';existing.hidden=!existing.textContent};
+const commitCanonicalMutation=async(mutator,options={})=>{const result=await uiMutationController.mutate(mutator);renderAuthoritativeMutationStatus();if(result.ok&&result.status!=='authoritative_mutation_noop'&&result.status!=='pre_cutover_mutation_noop')renderAll();return result};
+const captureLegacyCanonicalMutation=()=>{let candidate;try{candidate=persistence.canonicalSerialize(state);state=JSON.parse(lastVerifiedCanonical)}catch{return Promise.resolve({ok:false,error:'canonical_state_serialization_failed'})}return commitCanonicalMutation(draft=>{const next=JSON.parse(candidate);for(const key of Object.keys(draft))delete draft[key];Object.assign(draft,next)});};
+const save=()=>captureLegacyCanonicalMutation();
 function purgeExpiredTrash(){return 0}
-purgeExpiredTrash();save();
+purgeExpiredTrash();
 const wallet=id=>state.wallets.find(w=>w.id===id),category=id=>state.categories.find(c=>c.id===id),activeOps=()=>state.operations.filter(o=>o.status==='active'),scopeApi=window.FamilyPilotScope;
-function ensureAccessibleActiveWallet(){const selected=scopeApi.activeWallet(state);if(selected&&selected.id!==state.activeWalletId)state.activeWalletId=selected.id;return selected}
+function ensureAccessibleActiveWallet(){return scopeApi.activeWallet(state)}
 const scopeWallet=()=>scopeApi.activeWallet(state),scopeOps=()=>scopeApi.visibleOperations(state),scopeDescriptor=()=>scopeApi.scopeDescriptor(state),scopeCurrency=()=>scopeDescriptor().currency,analyticsStateApi=window.FamilyPilotAnalyticsState;
 function bounds(p){const x=new Date(p.anchor),y=x.getFullYear(),m=x.getMonth(),d=x.getDate();if(p.range==='day')return[new Date(y,m,d).getTime(),new Date(y,m,d+1).getTime()];if(p.range==='week'){const q=(x.getDay()+6)%7,s=new Date(y,m,d-q);return[s.getTime(),new Date(s.getFullYear(),s.getMonth(),s.getDate()+7).getTime()]};if(p.range==='month')return[new Date(y,m,1).getTime(),new Date(y,m+1,1).getTime()];if(p.range==='year')return[new Date(y,0,1).getTime(),new Date(y+1,0,1).getTime()];return[0,Infinity]}
 function periodLabel(p){const[s,e]=bounds(p),a=new Date(s);if(p.range==='day')return new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'long',year:'numeric'}).format(a);if(p.range==='week')return `${new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short'}).format(a)} — ${new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',year:'numeric'}).format(new Date(e-1))}`;if(p.range==='month')return new Intl.DateTimeFormat('ru-RU',{month:'long',year:'numeric'}).format(a);if(p.range==='year')return `${a.getFullYear()} год`;return'Всё время'}
@@ -346,8 +361,8 @@ function themePreference(){const value=localStorage.getItem(THEME_KEY)||'dark';r
 function applyTheme(){const preference=themePreference(),resolved=preference==='system'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):preference;document.documentElement.dataset.theme=resolved;document.body.dataset.theme=resolved}
 function defaultWallet(){return state.wallets.find(w=>w.type==='household_default'&&!w.archivedAt)||state.wallets.find(w=>!w.archivedAt)}
 function renderEntryWalletWarning(w){const primary=defaultWallet(),warning=$('entryWalletWarning'),unusual=!!w&&!!primary&&w.id!==primary.id;warning._attentionObserver?.disconnect();warning._attentionObserver=null;warning.hidden=!unusual;warning.classList.remove('wallet-attention');if(unusual){$('entryWalletWarningName').textContent=w.name;requestAnimationFrame(()=>{const root=warning.closest('.entry-sheet'),observer=new IntersectionObserver(entries=>{if(!entries.some(e=>e.isIntersecting&&e.intersectionRatio>=.6))return;observer.disconnect();warning._attentionObserver=null;warning.classList.remove('wallet-attention');void warning.offsetWidth;warning.classList.add('wallet-attention');setTimeout(()=>warning.classList.remove('wallet-attention'),1500)},{root,threshold:[.6]});warning._attentionObserver=observer;observer.observe(warning)})}}
-function renderMore(){const available=scopeApi.accessibleWallets(state);if(available.length&&!available.some(w=>w.id===state.activeWalletId))state.activeWalletId=available[0].id;$('walletSelect').innerHTML=available.map(w=>`<option value="${esc(w.id)}"${w.id===state.activeWalletId?' selected':''}>${esc(w.name)} · ${esc(w.nativeCurrency)}</option>`).join('');$('themeSelect').value=themePreference();$('actorSelect').innerHTML=MEMBERS.map(m=>`<option value="${m.id}"${m.id===state.currentMemberId?' selected':''}>${m.name}</option>`).join('');$('trashFlagBtn').classList.toggle('on',state.config.trashRetentionEnabled);$('walletContracts').textContent=state.wallets.map(w=>{const rows=[w.name,`тип = ${w.type}`,`валюта = ${w.nativeCurrency}`,`контекст = ${scopeApi.isPersonalWallet(w)?'личный':'семейный'}`,`в семейном капитале = ${w.includedInHouseholdCapital?'да':'нет'}`];if(w.ownerMemberId)rows.push(`владелец = ${memberName(w.ownerMemberId)}`);return rows.join(String.fromCharCode(10))}).join(String.fromCharCode(10,10))}
-function renderAll(){purgeExpiredTrash();ensureAccessibleActiveWallet();obligationApi.normalizeState(state);applyTheme();const descriptor=scopeDescriptor();$('operationsScopeLabel').textContent=descriptor.operationsLabel;$('analyticsScopeLabel').textContent=descriptor.analyticsLabel;renderPeriods();renderCapital();renderHome();renderOperations();renderAnalytics();renderPlan();renderObligations();renderMore();save()}
+function renderMore(){const available=scopeApi.accessibleWallets(state);$('walletSelect').innerHTML=available.map(w=>`<option value="${esc(w.id)}"${w.id===state.activeWalletId?' selected':''}>${esc(w.name)} · ${esc(w.nativeCurrency)}</option>`).join('');$('themeSelect').value=themePreference();$('actorSelect').innerHTML=MEMBERS.map(m=>`<option value="${m.id}"${m.id===state.currentMemberId?' selected':''}>${m.name}</option>`).join('');$('trashFlagBtn').classList.toggle('on',state.config.trashRetentionEnabled);$('walletContracts').textContent=state.wallets.map(w=>{const rows=[w.name,`тип = ${w.type}`,`валюта = ${w.nativeCurrency}`,`контекст = ${scopeApi.isPersonalWallet(w)?'личный':'семейный'}`,`в семейном капитале = ${w.includedInHouseholdCapital?'да':'нет'}`];if(w.ownerMemberId)rows.push(`владелец = ${memberName(w.ownerMemberId)}`);return rows.join(String.fromCharCode(10))}).join(String.fromCharCode(10,10))}
+function renderAll(){purgeExpiredTrash();ensureAccessibleActiveWallet();applyTheme();const descriptor=scopeDescriptor();$('operationsScopeLabel').textContent=descriptor.operationsLabel;$('analyticsScopeLabel').textContent=descriptor.analyticsLabel;renderPeriods();renderCapital();renderHome();renderOperations();renderAnalytics();renderPlan();renderObligations();renderMore()}
 function showScreen(name){const current=document.querySelector('.screen.active')?.id?.replace('Screen','');if(name==='debts'&&current&&current!=='debts')lastNonDebtScreen=current;document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));$(name+'Screen').classList.add('active');document.querySelectorAll('nav [data-screen]').forEach(b=>b.classList.toggle('active',b.dataset.screen===name));const dockVisible=['home','operations'].includes(name);$('actionDock').classList.toggle('hidden',!dockVisible);document.querySelector('.app').classList.toggle('has-action-dock',dockVisible);window.scrollTo(0,0)}
 function copyHomeToOperations(filter='all'){if(filter!=='all'){periods.operations={...periods.home};rememberOperationCategories();opsTypeFilter=filter;restoreOperationCategoryMemory()}showScreen('operations');renderAll()}
 function shift(context,dir){const p=periods[context],d=new Date(p.anchor);if(p.range==='day')d.setDate(d.getDate()+dir);if(p.range==='week')d.setDate(d.getDate()+7*dir);if(p.range==='month')d.setMonth(d.getMonth()+dir);if(p.range==='year')d.setFullYear(d.getFullYear()+dir);p.anchor=Math.min(d.getTime(),now());renderAll()}
@@ -801,7 +816,7 @@ syncFutureActualOperations();syncDetailReceipt();
     });
   }
 
-  api.normalizeState(state);save();renderAll();
+  api.normalizeState(state);renderAll();
 })();
 /* pf08a-m3-02-inline-ui:end */
 
@@ -908,7 +923,7 @@ syncFutureActualOperations();syncDetailReceipt();
 
   if(new URLSearchParams(location.search).has('test')&&window.__FP_TEST__){window.__FP_TEST__.debts={normalize:()=>{debtApi.normalizeState(state,now());save();renderAll();return true},create:input=>{const result=debtApi.createSourceEvent(state,input,state.currentMemberId,now());save();renderAll();return result},update:(id,input)=>{const result=debtApi.updateSourceEvent(state,id,input,state.currentMemberId,now());save();renderAll();return result},close:id=>{const result=debtApi.closeChain(state,id,state.currentMemberId,now());save();renderAll();return result},keep:id=>debtApi.keepChainOpen(state,id),visible:()=>debtChains().map(chain=>chain.id),totals:()=>debtTotals(),history:id=>debtApi.chainHistory(state,id).map(event=>({...event})),openList:()=>{showScreen('debts');renderAll()},openChain:id=>openDebtChain(id),hasSupersededUi:()=>/Interest|gift|Процент|подар|комисс/i.test($('debtEntryModal')?.textContent||'')||!!document.querySelector('[data-debt-overpayment-choice]'),capital:()=>scopeApi.capitalSnapshot(state)}}
 
-  debtApi.normalizeState(state,now());save();renderAll();
+  debtApi.normalizeState(state,now());renderAll();
 })();
 /* pf08a-m2-01-inline-ui:end */
 
@@ -975,7 +990,7 @@ syncFutureActualOperations();syncDetailReceipt();
 
   if(new URLSearchParams(location.search).has('test')&&window.__FP_TEST__){window.__FP_TEST__.savings={normalize:()=>{savingsApi.normalizeState(state,now());save();renderAll();return true},create:input=>{const result=savingsApi.createGoal(state,input,state.currentMemberId,now());save();renderAll();return result},update:(id,input)=>{const result=savingsApi.updateGoal(state,id,input,state.currentMemberId,now());save();renderAll();return result},archive:id=>{const result=savingsApi.archiveGoal(state,id,state.currentMemberId,now());save();renderAll();return result},active:()=>savingsApi.activeGoals(state).map(goal=>({...goal})),archived:()=>savingsApi.archivedGoals(state).map(goal=>({...goal})),all:()=>state.savingsGoals.map(goal=>({...goal})),summary:()=>savingsApi.summary(state),openList:()=>{savingsFilter='active';showScreen('savingsGoals');renderAll()},openEditor:id=>openSavingsEditor(id),capital:()=>scopeApi.capitalSnapshot(state),ordinaryTotals:()=>totals(scopeOps().filter(operation=>operation.kind==='income'||operation.kind==='expense'))}}
 
-  savingsApi.normalizeState(state,now());save();renderAll();
+  savingsApi.normalizeState(state,now());renderAll();
 })();
 /* pf08a-m4-01-inline-ui:end */
 
@@ -1071,14 +1086,19 @@ syncFutureActualOperations();syncDetailReceipt();
     seedOperation:(walletId,kind='income',amount=100)=>{const t=now(),categoryId=kind==='income'?'cat-inc-other':'cat-exp-other';state.operations.push({id:uid('op-test'),kind,amount,categoryId,walletId,note:'WF-01 verification fixture',occurredAt:t-1000,createdByMemberId:state.currentMemberId,createdAt:t-1000,lastEditedByMemberId:state.currentMemberId,lastEditedAt:t-1000,revisions:[],status:'active',deletedAt:null,deletedByMemberId:null,trashExpiresAt:null,receipt:null,links:{},transferGroupId:null});save();renderAll();return state.operations.at(-1).id}
   }}
 
-  walletManagementApi.normalizeState(state,MEMBERS,now());ensureAccessibleActiveWallet();save();renderAll();
+  walletManagementApi.normalizeState(state,MEMBERS,now());renderAll();
 })();
 /* pf08a-wf01-inline-ui:end */
 
 /* pf08a-wf02-runtime-bridge:start */
+const fpAuthoritativeMutationStatus=document.createElement('div');
+fpAuthoritativeMutationStatus.id='fpAuthoritativeMutationStatus';fpAuthoritativeMutationStatus.hidden=true;fpAuthoritativeMutationStatus.setAttribute('role','status');
+const fpAuthoritativeReload=document.createElement('button');
+fpAuthoritativeReload.type='button';fpAuthoritativeReload.textContent='Обновить авторитетное состояние';fpAuthoritativeReload.onclick=()=>window.__FP_RUNTIME__?.reloadAuthoritative?.();
+fpAuthoritativeMutationStatus.append(document.createElement('br'),fpAuthoritativeReload);document.body.prepend(fpAuthoritativeMutationStatus);
 const wf02RuntimeState=new Proxy({}, {
   get:(_,property)=>state[property],
-  set:(_,property,value)=>(state[property]=value,true),
+  set:()=>false,
   ownKeys:()=>Reflect.ownKeys(state),
   getOwnPropertyDescriptor:(_,property)=>{
     if(!Object.prototype.hasOwnProperty.call(state,property))return undefined;
@@ -1091,7 +1111,15 @@ window.__FP_RUNTIME__=Object.freeze({
   state:wf02RuntimeState,
   members:MEMBERS,
   scopeApi,
-  $,esc,isoLocal,open,close,money,formatDateTime,save,showScreen,toast,ensureAccessibleActiveWallet,now,
+  $,esc,isoLocal,open,close,money,formatDateTime,showScreen,toast,ensureAccessibleActiveWallet,now,
+  commitCanonicalMutation,
+  authoritativeMutationStatus:()=>uiMutationController.status(),
+  activateAuthoritative:async input=>{
+    const supplied=input||{},gateway=supplied.gateway||window.FamilyPilotAuthoritativeMutationGateway?.createGateway?.({adapter:supplied.adapter});
+    const result=await uiMutationController.activateAuthoritative({gateway,householdId:supplied.householdId||state.household?.id});
+    renderAuthoritativeMutationStatus();if(result.ok)renderAll();return result;
+  },
+  reloadAuthoritative:async()=>{const result=await uiMutationController.reloadAuthoritative();renderAuthoritativeMutationStatus();if(result.ok)renderAll();return result},
   renderAll:()=>renderAll(),
   getOperationRow:()=>operationRow,
   setOperationRow:next=>{if(typeof next!=='function')throw new TypeError('operationRow extension must be a function');operationRow=next},
@@ -1109,7 +1137,7 @@ renderAll();
 })();
 </script>
 <script>
-(()=>{'use strict';const $=id=>document.getElementById(id),updateTrashPolicy=()=>{const enabled=window.__FP_RUNTIME__?.state?.config?.trashRetentionEnabled===true;$('trashRetentionLabel').textContent=enabled?'Политика хранения Корзины: 45 дней':'Автоочистка Корзины выключена';$('trashRetentionHelp').textContent=enabled?'Удалённые операции остаются восстановимыми. Автоматическое окончательное удаление в этой версии не включено.':'Удалённые операции остаются восстановимыми; автоматическое окончательное удаление не включено.'};const reset=$('resetBtn');if(reset)reset.onclick=()=>window.__FP_RUNTIME__?.toast?.('Сброс пока недоступен: безопасная инициализация и резервное копирование ещё не реализованы.');const toggle=$('trashFlagBtn');if(toggle)toggle.onclick=()=>{const runtime=window.__FP_RUNTIME__;if(!runtime)return;runtime.state.config.trashRetentionEnabled=runtime.state.config.trashRetentionEnabled!==true;runtime.save();updateTrashPolicy();runtime.renderAll();runtime.toast(runtime.state.config.trashRetentionEnabled?'Политика хранения Корзины: 45 дней':'Автоочистка Корзины выключена; удалённые операции остаются восстановимыми.')};updateTrashPolicy()})();
+(()=>{'use strict';const $=id=>document.getElementById(id),updateTrashPolicy=()=>{const enabled=window.__FP_RUNTIME__?.state?.config?.trashRetentionEnabled===true;$('trashRetentionLabel').textContent=enabled?'Политика хранения Корзины: 45 дней':'Автоочистка Корзины выключена';$('trashRetentionHelp').textContent=enabled?'Удалённые операции остаются восстановимыми. Автоматическое окончательное удаление в этой версии не включено.':'Удалённые операции остаются восстановимыми; автоматическое окончательное удаление не включено.'};const reset=$('resetBtn');if(reset)reset.onclick=()=>window.__FP_RUNTIME__?.toast?.('Сброс пока недоступен: безопасная инициализация и резервное копирование ещё не реализованы.');const toggle=$('trashFlagBtn');if(toggle)toggle.onclick=async()=>{const runtime=window.__FP_RUNTIME__;if(!runtime)return;const enabled=runtime.state.config.trashRetentionEnabled!==true,result=await runtime.commitCanonicalMutation(draft=>{draft.config.trashRetentionEnabled=enabled});if(result.ok){updateTrashPolicy();runtime.renderAll();runtime.toast(enabled?'Политика хранения Корзины: 45 дней':'Автоочистка Корзины выключена; удалённые операции остаются восстановимыми.')}};updateTrashPolicy()})();
 </script>
 <section id="fpCloudAccount" aria-label="Аккаунт FamilyPilot" style="max-width:520px;margin:16px auto;padding:16px;border:1px solid #d7dfec;border-radius:16px;background:#fff">
   <strong>Аккаунт и облачная готовность</strong><p id="fpCloudStatus" style="margin:8px 0;color:#52627a">FamilyPilot работает локально. Войдите, чтобы проверить доступ к облаку.</p>
