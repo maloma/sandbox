@@ -559,10 +559,25 @@ syncFutureActualOperations();syncDetailReceipt();
   const pluralPayments=count=>count%10===1&&count%100!==11?'платёж':(count%10>=2&&count%10<=4&&(count%100<10||count%100>=20)?'платежа':'платежей');
   const latestSchedule=rule=>rule?.scheduleVersions?.[rule.scheduleVersions.length-1]||{firstDueAt:rule?.firstDueAt||rule?.nextDueAt||now(),intervalValue:rule?.intervalValue||1,intervalUnit:rule?.intervalUnit||'month'};
   const scopedRules=()=>api.visibleRules(state,m3WalletIds(),{includeArchived:true});
+  const occurrenceWindowEnd=to=>new Date(new Date(to).getFullYear(),new Date(to).getMonth()+12,1).getTime();
+  async function ensureOccurrenceWindow(from,to,onSuccess){
+    let occurrences=[];
+    const committed=await performCanonicalUiMutation({mutator:draft=>{occurrences=api.ensureOccurrencesWindow(draft,from,to,now())},onSuccess});
+    return committed.ok?{...committed,occurrenceIds:occurrences.map(item=>item.id)}:committed;
+  }
+  async function setObligationMonth(value){
+    const d=new Date(value);
+    monthAnchor=new Date(d.getFullYear(),d.getMonth(),1).getTime();localStorage.setItem(MONTH_KEY,String(monthAnchor));
+    const[,to]=monthBounds(monthAnchor);
+    return ensureOccurrenceWindow(-Infinity,occurrenceWindowEnd(to),()=>renderM302Obligations());
+  }
+  async function shiftObligationMonth(offset){
+    const d=new Date(monthAnchor);
+    return setObligationMonth(new Date(d.getFullYear(),d.getMonth()+Number(offset),1).getTime());
+  }
   const monthOccurrences=()=>{
-    const [from,to]=monthBounds(monthAnchor);
-    api.ensureOccurrencesWindow(state,-Infinity,new Date(new Date(to).getFullYear(),new Date(to).getMonth()+12,1).getTime(),now());
-    return api.visibleOccurrences(state,m3WalletIds(),now(),{from,to});
+    const[from,to]=monthBounds(monthAnchor),walletIds=m3WalletIds(),ruleIds=new Set(state.obligationRules.filter(rule=>walletIds.has(rule.walletId)).map(rule=>rule.id));
+    return state.obligationOccurrences.filter(occurrence=>ruleIds.has(occurrence.ruleId)&&occurrence.dueAt>=from&&occurrence.dueAt<to).sort((left,right)=>left.dueAt-right.dueAt||left.sequence-right.sequence||left.createdAt-right.createdAt);
   };
 
   function totalsByCurrency(items){
@@ -833,7 +848,7 @@ syncFutureActualOperations();syncDetailReceipt();
     const restore=event.target.closest('[data-m302-restore-rule]');
     const closeButton=event.target.closest('[data-m302-close]');
     if(month||quick||detail||restore||closeButton){event.preventDefault();event.stopImmediatePropagation();}
-    if(month){const d=new Date(monthAnchor);monthAnchor=new Date(d.getFullYear(),d.getMonth()+Number(month.dataset.m302Month),1).getTime();localStorage.setItem(MONTH_KEY,String(monthAnchor));renderAll();return}
+    if(month){await shiftObligationMonth(month.dataset.m302Month);return}
     if(quick){quickPay(quick.dataset.m302QuickPay);return}
     if(detail){openObligationDetail(detail.dataset.m302OpenDetail);return}
     if(restore){await restoreObligationRule(restore.dataset.m302RestoreRule);return}
@@ -843,19 +858,31 @@ syncFutureActualOperations();syncDetailReceipt();
   document.addEventListener('keydown',event=>{const detail=event.target.closest?.('[data-m302-open-detail]');if(detail&&(event.key==='Enter'||event.key===' ')){event.preventDefault();openObligationDetail(detail.dataset.m302OpenDetail)}},true);
 
   if(new URLSearchParams(location.search).has('test')&&window.__FP_TEST__?.obligations){
+    const canonicalTestObligationMutation=async mutate=>{
+      let outcome;const committed=await performCanonicalUiMutation({mutator:draft=>{outcome=mutate(draft)}});
+      return outcome?.ok===false?outcome:committed.ok?(outcome||committed):committed;
+    };
     Object.assign(window.__FP_TEST__.obligations,{
-      setMonth:value=>{const d=new Date(value);monthAnchor=new Date(d.getFullYear(),d.getMonth(),1).getTime();localStorage.setItem(MONTH_KEY,String(monthAnchor));renderAll()},
+      setMonth:value=>setObligationMonth(value),
       month:()=>monthAnchor,
       monthOccurrences:()=>monthOccurrences().map(item=>item.id),
-      quickPay:id=>{quickPay(id);return state.obligationOccurrences.find(item=>item.id===id)},
-      correctPayment:(id,input)=>{const result=api.correctPayment(state,id,input,state.currentMemberId,now());save();renderAll();return result},
-      changeExpectedAmount:(id,amount,scope)=>{const result=api.changeExpectedAmount(state,id,amount,scope,state.currentMemberId,now());save();renderAll();return result},
-      archiveRule:id=>{const result=api.archiveRule(state,id,state.currentMemberId,now());save();renderAll();return result},
-      restoreRule:id=>{const result=api.restoreRule(state,id,state.currentMemberId,now());save();renderAll();return result},
-      ensureWindow:(from,to)=>{const result=api.ensureOccurrencesWindow(state,from,to,now());save();renderAll();return result.map(item=>item.id)},
+      quickPay:async id=>{await quickPay(id);return state.obligationOccurrences.find(item=>item.id===id)},
+      normalize:async()=>{const result=await performCanonicalUiMutation({mutator:draft=>api.normalizeState(draft,now())});return result.ok},
+      createRule:input=>canonicalTestObligationMutation(draft=>api.createRule(draft,input,draft.currentMemberId,now())),
+      updateRule:(id,input)=>canonicalTestObligationMutation(draft=>api.updateRule(draft,id,input,draft.currentMemberId,now())),
+      pay:(id,input={})=>canonicalTestObligationMutation(draft=>api.payOccurrence(draft,id,input,draft.currentMemberId,now())),
+      postpone:(id,dueAt)=>canonicalTestObligationMutation(draft=>api.postponeOccurrence(draft,id,dueAt,draft.currentMemberId,now())),
+      skip:id=>canonicalTestObligationMutation(draft=>api.skipOccurrence(draft,id,draft.currentMemberId,now())),
+      correctPayment:(id,input)=>canonicalTestObligationMutation(draft=>api.correctPayment(draft,id,input,draft.currentMemberId,now())),
+      changeExpectedAmount:(id,amount,scope)=>canonicalTestObligationMutation(draft=>api.changeExpectedAmount(draft,id,amount,scope,draft.currentMemberId,now())),
+      archiveRule:id=>canonicalTestObligationMutation(draft=>api.archiveRule(draft,id,draft.currentMemberId,now())),
+      restoreRule:id=>canonicalTestObligationMutation(draft=>api.restoreRule(draft,id,draft.currentMemberId,now())),
+      ensureWindow:async(from,to)=>{const result=await ensureOccurrenceWindow(from,to);return result.ok?result.occurrenceIds:result},
+      visible:()=>{const walletIds=m3WalletIds(),ruleIds=new Set(state.obligationRules.filter(rule=>walletIds.has(rule.walletId)).map(rule=>rule.id));return state.obligationOccurrences.filter(occurrence=>ruleIds.has(occurrence.ruleId)).map(occurrence=>occurrence.id)},
       hasForbiddenSummary:()=>!!document.querySelector('#obligationSummary')||/Сегодня\s*<\/span>/.test(document.querySelector('#obligationsScreen')?.innerHTML||''),
       renderM302:()=>{renderAll();return true}
     });
+    window.__FP_TEST__.setActiveWallet=id=>performCanonicalUiMutation({mutator:draft=>{if(!scopeApi.accessibleWallets(draft).some(wallet=>wallet.id===id))throw new Error('wallet_not_accessible');draft.activeWalletId=id}});
   }
 
   api.normalizeState(state);renderAll();

@@ -1,8 +1,8 @@
 const assert=require('assert'),fs=require('fs'),path=require('path'),vm=require('vm');
 const root=path.resolve(__dirname,'..'),indexPath=path.join(root,'index.html'),mirrorPath=path.join(root,'src','familypilot.html'),index=fs.readFileSync(indexPath,'utf8'),inlineM302Start='/* pf08a-m3-02-inline-ui:start */',inlineM302End='/* pf08a-m3-02-inline-ui:end */',inlineM302=index.slice(index.indexOf(inlineM302Start)+inlineM302Start.length,index.indexOf(inlineM302End));
 const stage=process.argv.find(argument=>argument.startsWith('--stage='));
-if(stage!=='--stage=r3b'){
-  console.error('p4d3b_incomplete_remaining_legacy_families');
+if(stage!=='--stage=r4'){
+  console.error('p4d3b_r4_occurrence_window_stage_required');
   process.exitCode=1;
   return;
 }
@@ -64,6 +64,7 @@ function extractEffectiveM302Declaration(name){
 const production=Object.fromEntries(['performCanonicalUiMutation','revisionBatch','revision','applyOperationMutation','saveOperation','createCategory','setTrashRetentionEnabled','setCurrentActor','setActiveWallet','saveObligationRule','saveObligationPayment','saveObligationPostpone','skipObligationOccurrence'].map(name=>[name,extractProductionFunction(name)]));
 const effectiveM302=Object.fromEntries(['saveObligationRule','saveObligationPayment','saveObligationPostpone'].map(name=>[name,extractEffectiveM302Function(name)]));
 const effectiveM302Remaining=Object.fromEntries(['quickPay','saveExpectedAmount','restoreObligationRule','toggleArchive'].map(name=>[name,extractEffectiveM302Declaration(name)]));
+const effectiveM302Window=extractEffectiveM302Declaration('ensureOccurrenceWindow');
 function fixture(){return{operations:[],categories:[{id:'cat-exp',kind:'expense',name:'Еда',normalizedName:'еда',createdByMemberId:'m1',createdAt:1,lastEditedByMemberId:'m1',lastEditedAt:1,archivedAt:null,history:[]}],wallets:[{id:'w1',name:'Основной'},{id:'w2',name:'Личный'}],config:{allowFutureActualOperations:false,trashRetentionEnabled:false,quickCategoryIds:{income:[],expense:[]}},currentMemberId:'m1',activeWalletId:'w1'}}
 function harness(initial=fixture()){
   const nodes={},ui={close:0,render:0,toasts:[]};
@@ -167,6 +168,11 @@ async function remainingObligationProof(){
 
   const failed=obligationHarness(seededObligation(),functions),failedCommit=installObligationCommit(failed,{result:{ok:false,error:'held_failure'}}),failedId=failed.context.state.obligationOccurrences[0].id,failedResult=await failed.context.quickPay(failedId);assert.equal(failedResult.error,'held_failure');assert.equal(failedCommit.writes,0);assert.equal(failed.context.state.operations.length,0,'failed quick payment has no local fallback');assert.match(failed.ui.alerts.at(-1),/Не удалось сохранить оплату/);
 }
+async function occurrenceWindowProof(){
+  const initial=seededObligation();initial.obligationOccurrences=[];
+  const held=obligationHarness(initial,{...effectiveM302,...effectiveM302Remaining,ensureOccurrenceWindow:effectiveM302Window}),commit=installObligationCommit(held,{held:true}),pending=held.context.ensureOccurrenceWindow(-Infinity,1700000000000);await Promise.resolve();assert.equal(commit.commits,1);assert.equal(held.context.state.obligationOccurrences.length,0,'occurrence window keeps live obligations unchanged while held');commit.release({ok:true});const result=await pending;assert(result.ok);assert.equal(held.context.state.obligationOccurrences.length,1,'occurrence window adopts generated occurrences only after canonical success');
+  const failed=obligationHarness(initial,{...effectiveM302,...effectiveM302Remaining,ensureOccurrenceWindow:effectiveM302Window}),failedCommit=installObligationCommit(failed,{result:{ok:false,error:'held_failure'}}),failedResult=await failed.context.ensureOccurrenceWindow(-Infinity,1700000000000);assert.equal(failedResult.error,'held_failure');assert.equal(failedCommit.writes,0);assert.equal(failed.context.state.obligationOccurrences.length,0,'failed occurrence window has no local fallback');
+}
 async function main(){
   assert(fs.readFileSync(indexPath).equals(fs.readFileSync(mirrorPath)),'root/mirror source bytes are identical');
   assert(index.includes('const P4D3B_INTEGRATION_COMPLETE=false;'),'intermediate integration guard is explicit');
@@ -176,7 +182,9 @@ async function main(){
   for(const name of ['saveObligationRule','saveObligationPayment','saveObligationPostpone','skipObligationOccurrence']){assert.match(production[name],/performCanonicalUiMutation/);assert(!production[name].includes('(state,'),`${name} does not pass live state to the obligation domain API`)}
   for(const name of ['saveObligationRule','saveObligationPayment','saveObligationPostpone']){assert.match(effectiveM302[name],/performCanonicalUiMutation/);assert(!effectiveM302[name].includes('(state,'),`effective M3-02 ${name} does not pass live state to the obligation domain API`)}
   for(const [name,method] of Object.entries({quickPay:'payOccurrence',saveExpectedAmount:'changeExpectedAmount',restoreObligationRule:'restoreRule',toggleArchive:'archiveRule'})){assert.match(effectiveM302Remaining[name],/performCanonicalUiMutation/);assert(!effectiveM302Remaining[name].includes(`api.${method}(state,`),`effective M3-02 ${name} does not pass live state to the obligation domain API`)}
-  await saveOperationProof();await categoryProof();await wrapperProofs();await obligationProof();await remainingObligationProof();
-  console.log('FP85_P4D3B_R3B_OBLIGATIONS_UI_MUTATION_PASS');
+  assert.match(effectiveM302Window,/performCanonicalUiMutation/);assert(!effectiveM302Window.includes('api.ensureOccurrencesWindow(state,'),'effective M3-02 occurrence window does not pass live state to the obligation domain API');
+  const monthOccurrencesSource=inlineM302.match(/const monthOccurrences=\(\)=>\{[\s\S]*?\n  \};/)?.[0]||'';assert(monthOccurrencesSource&&!monthOccurrencesSource.includes('api.ensureOccurrencesWindow')&&!monthOccurrencesSource.includes('api.visibleOccurrences'),'month renderer is a pure state read');assert.match(inlineM302,/async function shiftObligationMonth\(offset\)[\s\S]*?setObligationMonth/,'month navigation routes through the canonical occurrence window');
+  await saveOperationProof();await categoryProof();await wrapperProofs();await obligationProof();await remainingObligationProof();await occurrenceWindowProof();
+  console.log('FP85_P4D3B_R4_OBLIGATIONS_UI_MUTATION_PASS');
 }
 main().catch(error=>{console.error(error.stack||error);process.exitCode=1});

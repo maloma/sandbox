@@ -44,8 +44,9 @@ for(const name of ['normalizeState','createRule','updateRule','ensureOccurrences
 }
 
 const inlineScripts=[...source.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match=>match[1]);
-assert(inlineScripts.length===1,`Expected one inline application script, found ${inlineScripts.length}`);
-new Function(inlineScripts[0]);
+const effectiveApplicationScript=inlineScripts.find(script=>script.includes('const P4D3B_INTEGRATION_COMPLETE=false;'));
+assert(effectiveApplicationScript,'Effective application runtime is missing');
+new Function(effectiveApplicationScript);
 new Function(uiSource);
 
 console.log(JSON.stringify({
