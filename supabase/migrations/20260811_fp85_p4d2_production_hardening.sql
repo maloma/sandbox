@@ -24,4 +24,10 @@ revoke all on function familypilot_internal.compare_and_swap_state(text,bigint,b
 grant execute on function familypilot_internal.compare_and_swap_state(text,bigint,bigint,integer,text,text,bigint,text) to authenticated;
 grant execute on function public.familypilot_compare_and_swap_state(text,bigint,bigint,integer,text,text,bigint,text) to authenticated;
 create index if not exists familypilot_household_access_user_id_idx on public.familypilot_household_access(user_id);
+alter table public.familypilot_household_access enable row level security;
+drop policy if exists "authenticated users read their own household access" on public.familypilot_household_access;
+create policy "authenticated users read their own household access" on public.familypilot_household_access for select to authenticated using (user_id = (select auth.uid()));
+alter table public.familypilot_remote_state enable row level security;
+drop policy if exists "authenticated members read household remote state" on public.familypilot_remote_state;
+create policy "authenticated members read household remote state" on public.familypilot_remote_state for select to authenticated using (exists (select 1 from public.familypilot_household_access access_row where access_row.household_id = familypilot_remote_state.household_id and access_row.user_id = (select auth.uid())));
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types) values('familypilot-protected-backups','familypilot-protected-backups',false,6291456,array['application/vnd.familypilot.protected-backup-chunk','application/vnd.familypilot.protected-backup-manifest+json']) on conflict(id) do update set name=excluded.name,public=excluded.public,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
