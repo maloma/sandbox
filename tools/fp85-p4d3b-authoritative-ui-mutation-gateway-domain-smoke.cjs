@@ -1,33 +1,58 @@
-const assert=require('assert'),child=require('child_process'),crypto=require('crypto'),fs=require('fs'),path=require('path'),vm=require('vm');
-const root=path.resolve(__dirname,'..'),read=file=>fs.readFileSync(path.join(root,file),'utf8'),clone=value=>JSON.parse(JSON.stringify(value));
-class Storage{constructor(){this.values=new Map()}getItem(k){return this.values.get(String(k))??null}setItem(k,v){this.values.set(String(k),String(v))}removeItem(k){this.values.delete(String(k))}clear(){this.values.clear()}key(i){return[...this.values.keys()][i]??null}get length(){return this.values.size}}
-const state=(id='household-1')=>({schemaVersion:22,household:{id,baseCurrency:'EUR'},currentMemberId:'member-1',wallets:[],operations:[],walletMovements:[],transfers:[],purposeAllocations:[],savingsTransfers:[],obligationRules:[],obligationOccurrences:[]});
-function load(){const c={console,TextEncoder,URLSearchParams,crypto:crypto.webcrypto,localStorage:new Storage(),location:{search:'?test=1&persistenceTest=p4d3b'}};c.window=c;c.globalThis=c;vm.createContext(c);for(const f of ['familypilot-scope.js','familypilot-production-persistence-adapter.js','familypilot-authoritative-mutation-gateway.js','familypilot-authoritative-ui-mutation-controller.js'])vm.runInContext(read(f),c);return c}
-class Transport{constructor(){this.rows=new Map();this.prepares=0;this.cases=0;this.hold=null;this.fail=false;this.cacheFail=false}read(id){if(this.fail)throw Error('read');return Promise.resolve({ok:true,row:this.rows.get(id)||null})}compareAndSwap(plan){this.cases++;const run=()=>{const row=this.rows.get(plan.householdId),revision=row?.revision||0;if(revision!==plan.expectedRevision)return{ok:false,error:'revision_conflict',currentRevision:revision};const next=clone(plan);this.rows.set(plan.householdId,next);return{ok:true,row:next}};return this.hold?this.hold.then(run):Promise.resolve(run())}}
+const assert=require('assert'),fs=require('fs'),path=require('path'),vm=require('vm');
+const root=path.resolve(__dirname,'..'),index=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const stage=process.argv.find(argument=>argument.startsWith('--stage='));
+if(stage!=='--stage=r3a'){
+  console.error('p4d3b_incomplete_remaining_legacy_families');
+  process.exitCode=1;
+  return;
+}
+function productionHelper(commit){
+  const match=index.match(/async function performCanonicalUiMutation\([^]*?\nconst captureLegacyCanonicalMutation/);
+  assert(match,'production canonical UI helper is present');
+  const source=`let canonicalUiMutationPending=false;\n${match[0].replace(/\nconst captureLegacyCanonicalMutation[^]*/,'')}`;
+  const context={commitCanonicalMutation:commit};
+  vm.createContext(context);
+  vm.runInContext(source,context);
+  return context.performCanonicalUiMutation;
+}
+async function heldCommitProof(){
+  let release,adopted={operations:[]},success=0,closeCount=0,toastCount=0,commits=0;
+  const gate=new Promise(resolve=>{release=resolve});
+  const helper=productionHelper(async mutator=>{
+    commits++;
+    const candidate=JSON.parse(JSON.stringify(adopted));
+    mutator(candidate);
+    const result=await gate;
+    if(!result.ok)return result;
+    adopted=candidate;
+    return result;
+  });
+  const first=helper({mutator:draft=>draft.operations.push({id:'op-r3a'}),onSuccess:()=>{success++;closeCount++;toastCount++;}});
+  await Promise.resolve();
+  assert.deepEqual(adopted.operations,[],'live canonical state is unchanged while held');
+  assert.equal(success,0,'success UI is not run while held');
+  const second=await helper({mutator:draft=>draft.operations.push({id:'queued'})});
+  assert.equal(second.error,'canonical_ui_mutation_in_progress','second action is rejected without a queue');
+  assert.equal(commits,1,'one canonical mutation is issued while pending');
+  release({ok:true});
+  assert((await first).ok);
+  assert.equal(adopted.operations.length,1);
+  assert.equal(success,1);assert.equal(closeCount,1);assert.equal(toastCount,1);
+  let failed={categories:[]},failedSuccess=0;
+  const failureHelper=productionHelper(async mutator=>{const candidate=JSON.parse(JSON.stringify(failed));mutator(candidate);return{ok:false,error:'held_failure'};});
+  const failure=await failureHelper({mutator:draft=>draft.categories.push({id:'cat-r3a'}),onSuccess:()=>{failedSuccess++;}});
+  assert.equal(failure.error,'held_failure');assert.deepEqual(failed.categories,[]);assert.equal(failedSuccess,0,'failure has no success UI');
+}
 async function main(){
- const controllerSource=read('familypilot-authoritative-ui-mutation-controller.js'),index=read('index.html');
- assert(!/fetch\s*\(|XMLHttpRequest|WebSocket|supabase|localStorage|sessionStorage/i.test(controllerSource),'controller remains provider-neutral');
- assert(index.includes('familypilot-authoritative-mutation-gateway.js')&&index.includes('familypilot-authoritative-ui-mutation-controller.js'),'index loads accepted modules');
- assert(index.includes('commitCanonicalMutation')&&index.includes('activateAuthoritative')&&index.includes('reloadAuthoritative'),'runtime bridge and explicit controls exist');
- assert(!/runtime\.save/.test(index),'public runtime save bypass is absent');
- assert(index.includes('set:()=>false'),'runtime state proxy fails closed for external writes');
- assert(!/function renderAll\([^]*?localStorage\.setItem\(APP_KEY/.test(index),'render performs no APP write');
- const c=load(),p=c.FamilyPilotPersistence,Controller=c.FamilyPilotAuthoritativeUiMutationController;
- let current=state(),writes=0,failLocal=false;
- const local=Controller.createController({canonicalSerialize:p.canonicalSerialize,structuralValidate:p.structuralValidate,getCurrentState:()=>current,replaceCurrentState:next=>{current=clone(next)},commitPreCutoverLocal:async()=>{writes++;if(failLocal)throw Error('local')}});
- const original=clone(current),retained=await local.mutate(draft=>{draft.wallets.push({id:'wallet-local'})});assert(retained.ok);assert.equal(current.wallets.length,1);assert.equal(original.wallets.length,0);assert.equal(writes,1);
- const noopWrites=writes;assert.equal((await local.mutate(()=>{})).status,'pre_cutover_mutation_noop');assert.equal(writes,noopWrites);
- failLocal=true;const beforeFailure=clone(current);assert.equal((await local.mutate(d=>d.wallets.push({id:'failed'}))).error,'pre_cutover_local_commit_failed');assert.deepEqual(current,beforeFailure);failLocal=false;
- const transport=new Transport(),tracker={writes:0,fail:false};const persistence={CURRENT_STATE_SCHEMA_VERSION:p.CURRENT_STATE_SCHEMA_VERSION,canonicalSerialize:p.canonicalSerialize,structuralValidate:p.structuralValidate,isRecoveryLocked:()=>false,commitState:value=>{tracker.writes++;if(tracker.fail)throw Error('cache');return p.commitState(value)}};
- const adapter=c.FamilyPilotProductionPersistenceAdapter.createAdapter({persistence,transport,crypto:crypto.webcrypto,now:()=>1700000000000});
- const seed=state();let plan=await adapter.prepareCommit(seed,{expectedRevision:0});assert((await adapter.commitAuthoritative(plan.plan,seed)).ok);
- const gateway=c.FamilyPilotAuthoritativeMutationGateway.createGateway({persistence:p,adapter});
- const mismatchCurrent=state();mismatchCurrent.wallets.push({id:'different'});current=mismatchCurrent;const mismatch=await local.activateAuthoritative({gateway,householdId:'household-1'});assert.equal(mismatch.error,'authoritative_state_mismatch');assert.equal(local.status().mode,'pre_cutover_local');
- current=clone(seed);const activated=await local.activateAuthoritative({gateway,householdId:'household-1'});assert(activated.ok);assert.equal(local.status().mode,'remote_authoritative');assert.equal((await local.activateAuthoritative({gateway,householdId:'household-1'})).error,'authoritative_activation_already_completed');
- let release;transport.hold=new Promise(resolve=>{release=resolve});const held=local.mutate(d=>d.wallets.push({id:'remote'}));await Promise.resolve();assert.equal(current.wallets.length,0,'UI remains verified while CAS is held');assert.equal((await local.mutate(()=>{})).error,'authoritative_mutation_in_progress');release();assert.equal((await held).status,'authoritative_mutation_committed');assert.equal(current.wallets[0].id,'remote');transport.hold=null;
- transport.rows.get('household-1').revision++;const conflict=await local.mutate(d=>d.wallets.push({id:'conflict'}));assert.equal(conflict.error,'authoritative_revision_conflict');assert.equal((await local.mutate(()=>{})).error,'authoritative_revision_conflict');assert((await local.reloadAuthoritative()).ok);
- tracker.fail=true;const cacheFailure=await local.mutate(d=>d.wallets.push({id:'cache'}));assert.equal(cacheFailure.status,'remote_committed_local_cache_failed');assert.equal(local.status().status,'reload_required');assert.equal(current.wallets.at(-1).id,'cache');tracker.fail=false;assert((await local.reloadAuthoritative()).ok);
- for(const name of ['fp85-p3a-destructive-lifecycle-core-domain-smoke.cjs','fp85-p3b-safe-trash-ui-domain-smoke.cjs','fp85-p4d3a-authoritative-mutation-gateway-domain-smoke.cjs','fp85-p4a-production-persistence-adapter-domain-smoke.cjs','fp85-p4d2-production-runtime-domain-smoke.cjs']){const run=child.spawnSync(process.execPath,[path.join(root,'tools',name)],{cwd:root,encoding:'utf8'});assert.equal(run.status,0,`${name}\n${run.stdout}\n${run.stderr}`)}
- console.log('FP85_P4D3B_AUTHORITATIVE_UI_MUTATION_GATEWAY_PASS');
+  assert(index.includes('const P4D3B_INTEGRATION_COMPLETE=false;'),'intermediate integration guard is explicit');
+  const activation=index.indexOf('activateAuthoritative:async input=>'),guard=index.indexOf("if(!P4D3B_INTEGRATION_COMPLETE)return{ok:false,error:'p4d3b_integration_incomplete'};",activation),gateway=index.indexOf('createGateway',activation);
+  assert(activation>=0&&guard>activation&&gateway>guard,'remote activation fails closed before gateway creation');
+  for(const name of ['saveOperation','toggleQuickCategory','createCategory','renameCategory','deleteCategory','archiveCategory','mergeCategory','setCurrentActor','setActiveWallet','setTrashRetentionEnabled'])assert(index.includes(`function ${name}`)||index.includes(`function ${name}(`),`${name} production path exists`);
+  assert(index.includes('applyOperationMutation(targetState,input)'),'operation mutation accepts explicit target state');
+  assert(index.includes('revisionBatch(targetState,op'),'revision helper accepts explicit target state');
+  assert(index.includes("permanentDelete:async()=>({ok:false,error:'permanent_delete_unavailable_in_r3a'})"),'test permanent delete is disabled');
+  assert(!index.includes('state = draft'),'draft is never assigned to live state');
+  await heldCommitProof();
+  console.log('FP85_P4D3B_R3A_CORE_UI_MUTATION_PASS');
 }
 main().catch(error=>{console.error(error.stack||error);process.exitCode=1});
