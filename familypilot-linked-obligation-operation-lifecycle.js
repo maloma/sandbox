@@ -4,14 +4,14 @@
   const READY_LIMIT=1200,DAY=86400000;
 
   function boot(attempt=0){
-    const runtime=window.__FP_RUNTIME__,partial=window.FamilyPilotPartialPayments;
-    if(!runtime||!partial||!window.__FP_PARTIAL_PAYMENTS_READY__){
+    const runtime=window.__FP_RUNTIME__,obligations=window.FamilyPilotObligations;
+    if(!runtime||!obligations||typeof runtime.performCanonicalUiMutation!=='function'){
       if(attempt<READY_LIMIT)setTimeout(()=>boot(attempt+1),25);
       else window.__FP_LINKED_OBLIGATION_OPERATION_LIFECYCLE_ERROR__='Linked operation lifecycle dependencies did not become ready';
       return;
     }
     window.__FP_LINKED_OBLIGATION_OPERATION_LIFECYCLE__=true;
-    const state=runtime.state,$=runtime.$,save=runtime.save,close=runtime.close,now=runtime.now;
+    const state=runtime.state,$=runtime.$,close=runtime.close,now=runtime.now;
     let detailOperationId='';
 
     const operation=id=>(state.operations||[]).find(item=>item.id===id)||null;
@@ -22,10 +22,10 @@
     const linkedRule=op=>rule(linkedOccurrence(op)?.ruleId||op?.links?.obligationRuleId);
     const formatDate=value=>new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(value));
 
-    function addRevision(target,source,changes){
+    function addRevision(target,source,changes,targetState=state){
       target.revisions=Array.isArray(target.revisions)?target.revisions:[];
-      target.revisions.push({id:`linked-op-rev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`,sequence:target.revisions.length+1,changedByMemberId:state.currentMemberId,changedAt:now(),source,batchId:null,changes});
-      target.lastEditedByMemberId=state.currentMemberId;target.lastEditedAt=now();
+      target.revisions.push({id:`linked-op-rev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`,sequence:target.revisions.length+1,changedByMemberId:targetState.currentMemberId,changedAt:now(),source,batchId:null,changes});
+      target.lastEditedByMemberId=targetState.currentMemberId;target.lastEditedAt=now();
     }
     function editChanges(op){
       const amount=Number(String($('amountInput')?.value||'').trim().replace(',','.'));
@@ -42,20 +42,16 @@
       const item=linkedOccurrence(op),itemRule=linkedRule(op);
       return `Эта операция связана с обязательством «${itemRule?.name||'Обязательство'}» за ${formatDate(item?.dueAt||op.occurredAt)}. После удаления обязательство будет пересчитано и может стать частично оплаченным или неоплаченным. Переместить операцию в Корзину?`;
     }
-    function deleteLinkedOperation(id){
+    async function deleteLinkedOperation(id){
       const op=operation(id),occurrenceId=linkedOccurrenceId(op);if(!op||op.status!=='active'||!occurrenceId)return false;
       if(!window.confirm(deleteWarning(op)))return false;
-      const deletedAt=now();
-      addRevision(op,'linked_obligation_operation_user_delete',[{field:'status',oldValue:'active',newValue:'trash'}]);
-      op.status='trash';op.deletedAt=deletedAt;op.deletedByMemberId=state.currentMemberId;op.trashExpiresAt=deletedAt+Number(state.config?.trashRetentionDays||45)*DAY;
-      op.links={...(op.links||{}),obligationLinkPreservedInTrash:true,obligationLinkPreservedAt:deletedAt};
-      save();close('entryModal');close('operationDetail');partial.deriveAll();runtime.renderAll();runtime.toast('Операция перемещена в Корзину. Обязательство пересчитано.');return true;
+      const result=await runtime.performCanonicalUiMutation({mutator:draft=>{const target=draft.operations.find(item=>item.id===id&&item.status==='active');if(!target)throw new Error('linked_operation_not_found');const deletedAt=now();addRevision(target,'linked_obligation_operation_user_delete',[{field:'status',oldValue:'active',newValue:'trash'}],draft);target.status='trash';target.deletedAt=deletedAt;target.deletedByMemberId=draft.currentMemberId;target.trashExpiresAt=deletedAt+Number(draft.config?.trashRetentionDays||45)*DAY;target.links={...(target.links||{}),obligationLinkPreservedInTrash:true,obligationLinkPreservedAt:deletedAt};obligations.syncPaymentLinks(draft,now())},onSuccess:()=>{close('entryModal');close('operationDetail');runtime.renderAll();runtime.toast('Операция перемещена в Корзину. Обязательство пересчитано.')}});
+      return result.ok;
     }
-    function afterRestore(id){
-      const op=operation(id);if(!op||op.status!=='active'||!linkedOccurrenceId(op))return false;
-      op.links={...(op.links||{})};delete op.links.obligationLinkPreservedInTrash;delete op.links.obligationLinkPreservedAt;
-      addRevision(op,'linked_obligation_operation_restored',[{field:'obligationPaymentState',oldValue:'excluded_while_in_trash',newValue:'included_after_restore'}]);
-      partial.deriveAll();save();runtime.renderAll();runtime.toast('Операция и связь с обязательством восстановлены.');return true;
+    async function afterRestore(id){
+      const op=operation(id);if(!op||op.status!=='active'||!linkedOccurrenceId(op)||!op.links?.obligationLinkPreservedInTrash)return false;
+      const result=await runtime.performCanonicalUiMutation({mutator:draft=>{const target=draft.operations.find(item=>item.id===id&&item.status==='active');if(!target)throw new Error('linked_operation_not_found');target.links={...(target.links||{})};delete target.links.obligationLinkPreservedInTrash;delete target.links.obligationLinkPreservedAt;addRevision(target,'linked_obligation_operation_restored',[{field:'obligationPaymentState',oldValue:'excluded_while_in_trash',newValue:'included_after_restore'}],draft);obligations.syncPaymentLinks(draft,now())},onSuccess:()=>{runtime.renderAll();runtime.toast('Операция и связь с обязательством восстановлены.')}});
+      return result.ok;
     }
 
     window.addEventListener('click',event=>{
@@ -66,7 +62,6 @@
       if(saveButton){
         const id=$('editingId')?.value||'',op=operation(id),changes=editChanges(op);
         if(op?.status==='active'&&linkedOccurrenceId(op)&&changes.length&&!window.confirm(editWarning(op,changes))){event.preventDefault();event.stopImmediatePropagation();return}
-        if(op?.status==='active'&&linkedOccurrenceId(op)&&changes.length)queueMicrotask(()=>{partial.deriveAll();save();runtime.renderAll();runtime.toast('Операция изменена. Обязательство пересчитано.')});
         return;
       }
 
@@ -76,11 +71,6 @@
         if(op?.status==='active'&&linkedOccurrenceId(op)){event.preventDefault();event.stopImmediatePropagation();deleteLinkedOperation(op.id);return}
       }
 
-      const restoreButton=event.target.closest?.('[data-trash-restore]');
-      if(restoreButton){
-        const id=restoreButton.dataset.trashRestore,op=operation(id);
-        if(op?.status==='trash'&&linkedOccurrenceId(op))queueMicrotask(()=>afterRestore(id));
-      }
     },true);
 
     const api={linkedOccurrenceId,editChanges,editWarning,deleteWarning,deleteLinkedOperation,afterRestore,setDetailOperation:id=>{detailOperationId=id},detailOperation:()=>detailOperationId};

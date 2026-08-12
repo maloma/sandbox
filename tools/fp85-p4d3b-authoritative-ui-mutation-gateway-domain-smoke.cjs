@@ -1,8 +1,8 @@
 const assert=require('assert'),fs=require('fs'),path=require('path'),vm=require('vm');
 const root=path.resolve(__dirname,'..'),indexPath=path.join(root,'index.html'),mirrorPath=path.join(root,'src','familypilot.html'),index=fs.readFileSync(indexPath,'utf8'),inlineM302Start='/* pf08a-m3-02-inline-ui:start */',inlineM302End='/* pf08a-m3-02-inline-ui:end */',inlineM302=index.slice(index.indexOf(inlineM302Start)+inlineM302Start.length,index.indexOf(inlineM302End));
 const stage=process.argv.find(argument=>argument.startsWith('--stage='));
-if(stage!=='--stage=r4'){
-  console.error('p4d3b_r4_occurrence_window_stage_required');
+if(stage!=='--stage=r4-r1'){
+  console.error('p4d3b_r4_r1_correction_stage_required');
   process.exitCode=1;
   return;
 }
@@ -65,6 +65,7 @@ const production=Object.fromEntries(['performCanonicalUiMutation','revisionBatch
 const effectiveM302=Object.fromEntries(['saveObligationRule','saveObligationPayment','saveObligationPostpone'].map(name=>[name,extractEffectiveM302Function(name)]));
 const effectiveM302Remaining=Object.fromEntries(['quickPay','saveExpectedAmount','restoreObligationRule','toggleArchive'].map(name=>[name,extractEffectiveM302Declaration(name)]));
 const effectiveM302Window=extractEffectiveM302Declaration('ensureOccurrenceWindow');
+const effectiveM302Month=extractEffectiveM302Declaration('setObligationMonth');
 function fixture(){return{operations:[],categories:[{id:'cat-exp',kind:'expense',name:'Еда',normalizedName:'еда',createdByMemberId:'m1',createdAt:1,lastEditedByMemberId:'m1',lastEditedAt:1,archivedAt:null,history:[]}],wallets:[{id:'w1',name:'Основной'},{id:'w2',name:'Личный'}],config:{allowFutureActualOperations:false,trashRetentionEnabled:false,quickCategoryIds:{income:[],expense:[]}},currentMemberId:'m1',activeWalletId:'w1'}}
 function harness(initial=fixture()){
   const nodes={},ui={close:0,render:0,toasts:[]};
@@ -173,6 +174,15 @@ async function occurrenceWindowProof(){
   const held=obligationHarness(initial,{...effectiveM302,...effectiveM302Remaining,ensureOccurrenceWindow:effectiveM302Window}),commit=installObligationCommit(held,{held:true}),pending=held.context.ensureOccurrenceWindow(-Infinity,1700000000000);await Promise.resolve();assert.equal(commit.commits,1);assert.equal(held.context.state.obligationOccurrences.length,0,'occurrence window keeps live obligations unchanged while held');commit.release({ok:true});const result=await pending;assert(result.ok);assert.equal(held.context.state.obligationOccurrences.length,1,'occurrence window adopts generated occurrences only after canonical success');
   const failed=obligationHarness(initial,{...effectiveM302,...effectiveM302Remaining,ensureOccurrenceWindow:effectiveM302Window}),failedCommit=installObligationCommit(failed,{result:{ok:false,error:'held_failure'}}),failedResult=await failed.context.ensureOccurrenceWindow(-Infinity,1700000000000);assert.equal(failedResult.error,'held_failure');assert.equal(failedCommit.writes,0);assert.equal(failed.context.state.obligationOccurrences.length,0,'failed occurrence window has no local fallback');
 }
+async function monthCommitOrderingProof(){
+  const oldMonth=new Date(2023,10,1).getTime(),nextMonth=new Date(2023,11,1).getTime(),writes=[],ui={render:0};let release;
+  const gate=new Promise(resolve=>{release=resolve});
+  const context={monthAnchor:oldMonth,Date,localStorage:{setItem:(key,value)=>writes.push([key,value])},MONTH_KEY:'test-month',monthBounds:value=>[value,value+1],occurrenceWindowEnd:value=>value,renderM302Obligations:()=>{ui.render++},ensureOccurrenceWindow:async(from,to,onSuccess)=>{const outcome=await gate;if(outcome.ok)onSuccess?.();return outcome}};
+  vm.createContext(context);vm.runInContext(`${effectiveM302Month};this.setMonth=setObligationMonth`,context);
+  const pending=context.setMonth(nextMonth);await Promise.resolve();assert.equal(context.monthAnchor,oldMonth,'month anchor remains unchanged while its occurrence window commit is pending');assert.deepEqual(writes,[],'month preference is not persisted before its occurrence window commits');assert.equal(ui.render,0,'month calendar is not rendered before its occurrence window commits');release({ok:true});const success=await pending;assert(success.ok);assert.equal(context.monthAnchor,nextMonth,'month anchor advances only after the occurrence window commits');assert.deepEqual(writes,[['test-month',String(nextMonth)]],'committed month preference is persisted exactly once');assert.equal(ui.render,1,'month calendar renders after the committed month anchor is installed');
+  const rejected={monthAnchor:oldMonth,Date,localStorage:{setItem:()=>{throw new Error('failed month must not persist')}},MONTH_KEY:'test-month',monthBounds:value=>[value,value+1],occurrenceWindowEnd:value=>value,renderM302Obligations:()=>{throw new Error('failed month must not render')},ensureOccurrenceWindow:async()=>({ok:false,error:'held_failure'})};
+  vm.createContext(rejected);vm.runInContext(`${effectiveM302Month};this.setMonth=setObligationMonth`,rejected);const failure=await rejected.setMonth(nextMonth);assert.equal(failure.error,'held_failure');assert.equal(rejected.monthAnchor,oldMonth,'failed month window commit leaves the selected month unchanged');
+}
 async function main(){
   assert(fs.readFileSync(indexPath).equals(fs.readFileSync(mirrorPath)),'root/mirror source bytes are identical');
   assert(index.includes('const P4D3B_INTEGRATION_COMPLETE=false;'),'intermediate integration guard is explicit');
@@ -182,9 +192,9 @@ async function main(){
   for(const name of ['saveObligationRule','saveObligationPayment','saveObligationPostpone','skipObligationOccurrence']){assert.match(production[name],/performCanonicalUiMutation/);assert(!production[name].includes('(state,'),`${name} does not pass live state to the obligation domain API`)}
   for(const name of ['saveObligationRule','saveObligationPayment','saveObligationPostpone']){assert.match(effectiveM302[name],/performCanonicalUiMutation/);assert(!effectiveM302[name].includes('(state,'),`effective M3-02 ${name} does not pass live state to the obligation domain API`)}
   for(const [name,method] of Object.entries({quickPay:'payOccurrence',saveExpectedAmount:'changeExpectedAmount',restoreObligationRule:'restoreRule',toggleArchive:'archiveRule'})){assert.match(effectiveM302Remaining[name],/performCanonicalUiMutation/);assert(!effectiveM302Remaining[name].includes(`api.${method}(state,`),`effective M3-02 ${name} does not pass live state to the obligation domain API`)}
-  assert.match(effectiveM302Window,/performCanonicalUiMutation/);assert(!effectiveM302Window.includes('api.ensureOccurrencesWindow(state,'),'effective M3-02 occurrence window does not pass live state to the obligation domain API');
+  assert.match(effectiveM302Window,/performCanonicalUiMutation/);assert(!effectiveM302Window.includes('api.ensureOccurrencesWindow(state,'),'effective M3-02 occurrence window does not pass live state to the obligation domain API');assert.match(effectiveM302Month,/nextMonthAnchor/);assert.match(effectiveM302Month,/ensureOccurrenceWindow/);
   const monthOccurrencesSource=inlineM302.match(/const monthOccurrences=\(\)=>\{[\s\S]*?\n  \};/)?.[0]||'';assert(monthOccurrencesSource&&!monthOccurrencesSource.includes('api.ensureOccurrencesWindow')&&!monthOccurrencesSource.includes('api.visibleOccurrences'),'month renderer is a pure state read');assert.match(inlineM302,/async function shiftObligationMonth\(offset\)[\s\S]*?setObligationMonth/,'month navigation routes through the canonical occurrence window');
-  await saveOperationProof();await categoryProof();await wrapperProofs();await obligationProof();await remainingObligationProof();await occurrenceWindowProof();
-  console.log('FP85_P4D3B_R4_OBLIGATIONS_UI_MUTATION_PASS');
+  await saveOperationProof();await categoryProof();await wrapperProofs();await obligationProof();await remainingObligationProof();await occurrenceWindowProof();await monthCommitOrderingProof();
+  console.log('FP85_P4D3B_R4_R1_OBLIGATIONS_UI_MUTATION_PASS');
 }
 main().catch(error=>{console.error(error.stack||error);process.exitCode=1});
