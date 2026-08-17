@@ -1,6 +1,8 @@
 (()=>{
   'use strict';
 
+  if(window.__FP_SCOPE_LOAD_FAILED__===true)return;
+
   const api=window.FamilyPilotObligations;
   if(!api||window.__FP_M3_02_UI__)return;
   window.__FP_M3_02_UI__=true;
