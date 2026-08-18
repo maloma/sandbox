@@ -141,10 +141,19 @@
     ];
 
     let finalizeResult={ok:false,error:'not_finalized'};
+    let cleanupResult={status:'not_run'};
     if(!mode.locked&&!mode.dependencyFailure){
       finalizeResult=persistence.finalizeBootstrap(state,descriptors);
       if(finalizeResult.ok){
-        try{save()}catch(error){window.__FP_PERSISTENCE_RUNTIME_ERROR__=String(error?.message||error)}
+        const runCleanup=()=>{
+          if(cleanupResult.status!=='not_run')return;
+          try{cleanupResult=persistence.cleanupNonCanonicalArtifacts();}catch(error){cleanupResult={status:'failed',error:String(error?.message||error)}}
+        };
+        try{
+          const saveResult=save();
+          if(saveResult&&typeof saveResult.then==='function')saveResult.then(runCleanup,()=>undefined);
+          else runCleanup();
+        }catch(error){window.__FP_PERSISTENCE_RUNTIME_ERROR__=String(error?.message||error)}
       }else{
         window.__FP_PERSISTENCE_RUNTIME_ERROR__=String(finalizeResult.error||'Persistence finalization failed');
       }
