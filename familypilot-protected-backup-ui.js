@@ -17,8 +17,7 @@
   }
   function canShareFile(file,options={}){
     const env=shareEnvironment(options),navigatorApi=env&&env.navigator;
-    if(!file||!navigatorApi||typeof navigatorApi.share!=='function')return false;
-    if(typeof navigatorApi.canShare!=='function')return true;
+    if(!file||!navigatorApi||typeof navigatorApi.share!=='function'||typeof navigatorApi.canShare!=='function')return false;
     try{return navigatorApi.canShare({files:[file]})===true}catch{return false}
   }
   function getShareCapability(options={}){
