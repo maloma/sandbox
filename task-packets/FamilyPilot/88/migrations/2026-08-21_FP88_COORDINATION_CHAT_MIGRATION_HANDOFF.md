@@ -315,6 +315,10 @@ Prevention: перед write проверять exact target/action.
 Сначала Search placement был преждевременно привязан к prototype layout, затем Coordinator переисправил это и сделал full redesign/Figma prerequisite для Search.
 Current correction: Search функционально идёт сейчас; redesign/Figma — позже и отдельно.
 
+### Error Ledger #673 — CLOSED
+Founder запросил migration, но Coordinator сначала поставил самого себя в `Next Action` вместо немедленной публикации доступного handoff.
+Current correction: migration handoff опубликован и прочитан обратно до завершения текущего чата.
+
 ### Earlier #85 ledgers
 #637, #642, #660, #661, #662 закрыты; не переоткрывать без нового evidence.
 
