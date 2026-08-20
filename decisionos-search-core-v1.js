@@ -34,28 +34,25 @@
     const results=[];
     for(const document of documents){
       if(!document||typeof document!=='object') throw new TypeError('document must be an object');
+      const documentId=assertString(document.documentId,'documentId');
+      const sourceType=assertString(document.sourceType,'sourceType');
+      const sourceLabel=assertString(document.sourceLabel,'sourceLabel');
       if(!Array.isArray(document.fields)) throw new TypeError('document.fields must be an array');
-      const matchedFields=[];
+      const matches=[];
       for(const field of document.fields){
         if(!field||typeof field!=='object') throw new TypeError('field must be an object');
+        const fieldId=assertString(field.fieldId,'fieldId');
         const text=assertString(field.text,'field text');
-        const spans=exactSpans(text,query);
-        if(spans.length){
-          matchedFields.push({
-            key:field.key,
-            label:field.label,
-            text,
-            spans,
-          });
-        }
+        for(const span of exactSpans(text,query)) matches.push({fieldId,start:span.start,end:span.end});
       }
-      if(matchedFields.length){
+      if(matches.length){
         results.push({
-          id:document.id,
-          source:document.source,
-          section:document.section,
+          documentId,
+          sourceType,
+          sourceLabel,
           target:document.target,
-          matchedFields,
+          matches,
+          matchCount:matches.length,
         });
       }
     }
