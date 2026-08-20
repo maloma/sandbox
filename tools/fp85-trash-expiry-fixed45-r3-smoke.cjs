@@ -13,6 +13,8 @@ function load(){const context={localStorage:new Storage(),location:{search:'?tes
 function state(operation={},config={}){return{schemaVersion:22,household:{id:'h',baseCurrency:'EUR',openingCapital:0},config:{trashRetentionEnabled:true,trashRetentionDays:45,quickCategoryIds:{expense:[],income:[]},...config},currentMemberId:'member-1',activeWalletId:null,wallets:[],operations:[{id:'op-1',kind:'expense',amount:91,status:'active',deletedAt:null,deletedByMemberId:null,trashExpiresAt:null,trashRetentionProvenance:null,revisions:[],links:{},...operation}],walletMovements:[],transfers:[],purposeAllocations:[],savingsTransfers:[],obligationRules:[],obligationOccurrences:[]}}
 function confirmed(d,prepared){const result=d.confirm(prepared.plan,{action:prepared.plan.action,acknowledged:true});assert(result.ok,result.error);return result.confirmation}
 const {p,d}=load(),DAY=d.DAY,at=1700000000000;
+for(const deletedAt of [null,undefined,'1700000000000','',true,NaN,Infinity,-Infinity]){assert.strictEqual(d.hasEligibleRetention({deletedAt,trashExpiresAt:at,trashRetentionProvenance:{version:1,kind:'fixed_45_day_trash_retention',enabledAtDeletion:true,daysAtDeletion:45}}),false);assert.deepStrictEqual(d.trashEntryRetention(state(),deletedAt),{trashExpiresAt:null,trashRetentionProvenance:null})}
+assert.strictEqual(d.trashEntryRetention(state(),at).trashExpiresAt,at+45*DAY);
 assert.strictEqual(d.retentionPolicy(state()).classification,'ENABLED_FIXED_45');
 for(const days of [1,30,90,undefined,'45',45.5,Infinity])assert.strictEqual(d.retentionPolicy(state({}, {trashRetentionDays:days})).classification,'INVALID_FAIL_CLOSED');
 assert.strictEqual(d.retentionPolicy(state({}, {trashRetentionEnabled:false})).classification,'DISABLED');

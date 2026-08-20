@@ -49,12 +49,12 @@
     return{classification:'ENABLED_FIXED_45',enabled:true,days:FIXED_RETENTION_DAYS,valid:true};
   }
   function trashEntryRetention(state,deletedAt){
-    const retention=retentionPolicy(state),timestamp=Number(deletedAt);
+    const retention=retentionPolicy(state),timestamp=deletedAt;
     if(retention.classification!=='ENABLED_FIXED_45'||!Number.isFinite(timestamp))return{trashExpiresAt:null,trashRetentionProvenance:null};
     return{trashExpiresAt:timestamp+FIXED_RETENTION_DAYS*DAY,trashRetentionProvenance:{version:RETENTION_PROVENANCE_VERSION,kind:'fixed_45_day_trash_retention',enabledAtDeletion:true,daysAtDeletion:FIXED_RETENTION_DAYS}};
   }
   function hasEligibleRetention(operation){
-    const deletedAt=Number(operation?.deletedAt),expiresAt=Number(operation?.trashExpiresAt),provenance=operation?.trashRetentionProvenance;
+    const deletedAt=operation?.deletedAt,expiresAt=operation?.trashExpiresAt,provenance=operation?.trashRetentionProvenance;
     return Number.isFinite(deletedAt)&&Number.isFinite(expiresAt)&&provenance&&typeof provenance==='object'&&
       provenance.version===RETENTION_PROVENANCE_VERSION&&provenance.kind==='fixed_45_day_trash_retention'&&
       provenance.enabledAtDeletion===true&&provenance.daysAtDeletion===FIXED_RETENTION_DAYS&&
