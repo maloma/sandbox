@@ -115,9 +115,36 @@
       if(planModules.has(record.moduleId))makePlanEntry(record.moduleId);else makeMoreEntry(record.moduleId);
     }
   }
+
+  function loadScript(src,ready){
+    if(ready())return Promise.resolve();
+    return new Promise((resolve,reject)=>{
+      const existingScript=[...document.scripts].find(script=>script.getAttribute('src')===src);
+      if(existingScript){
+        if(ready())resolve();else existingScript.addEventListener('load',()=>ready()?resolve():reject(new Error(`Search dependency did not initialize: ${src}`)),{once:true});
+        return;
+      }
+      const script=document.createElement('script');
+      script.src=src;
+      script.async=false;
+      script.addEventListener('load',()=>ready()?resolve():reject(new Error(`Search dependency did not initialize: ${src}`)),{once:true});
+      script.addEventListener('error',()=>reject(new Error(`Search dependency failed to load: ${src}`)),{once:true});
+      document.head.appendChild(script);
+    });
+  }
+  let searchLoadStarted=false;
+  function ensureSearch(){
+    if(searchLoadStarted||window.__FP_SEARCH_V1_READY__)return;
+    searchLoadStarted=true;
+    loadScript('./decisionos-search-core-v1.js',()=>Boolean(window.DecisionOSSearchCoreV1))
+      .then(()=>loadScript('./familypilot-search-v1.js',()=>Boolean(window.__FP_SEARCH_V1_READY__)))
+      .catch(error=>console.error('FamilyPilot Search v1 unavailable',error));
+  }
+
   function wait(){
     if(window.FamilyPilotModuleRegistry&&window.__FP_RUNTIME__){
       sync();
+      ensureSearch();
       window.addEventListener('familypilot:module-state',sync);
       new MutationObserver(sync).observe(document.querySelector('main'),{subtree:true,childList:true});
       window.__FP_MODULE_ENTRY_BRIDGE_READY__=true;
