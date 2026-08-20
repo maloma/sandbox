@@ -1,7 +1,7 @@
 (()=>{
   'use strict';
   if(window.__FP_LINKED_OBLIGATION_OPERATION_LIFECYCLE__)return;
-  const READY_LIMIT=1200,DAY=86400000;
+  const READY_LIMIT=1200;
 
   function boot(attempt=0){
     const runtime=window.__FP_RUNTIME__,partial=window.FamilyPilotPartialPayments;
@@ -47,7 +47,8 @@
       if(!window.confirm(deleteWarning(op)))return false;
       const deletedAt=now();
       addRevision(op,'linked_obligation_operation_user_delete',[{field:'status',oldValue:'active',newValue:'trash'}]);
-      op.status='trash';op.deletedAt=deletedAt;op.deletedByMemberId=state.currentMemberId;op.trashExpiresAt=deletedAt+Number(state.config?.trashRetentionDays||45)*DAY;
+      const entryRetention=window.FamilyPilotDestructiveLifecycleCore?.trashEntryRetention?.(state,deletedAt)||{trashExpiresAt:null,trashRetentionProvenance:null};
+      op.status='trash';op.deletedAt=deletedAt;op.deletedByMemberId=state.currentMemberId;op.trashExpiresAt=entryRetention.trashExpiresAt;op.trashRetentionProvenance=entryRetention.trashRetentionProvenance;
       op.links={...(op.links||{}),obligationLinkPreservedInTrash:true,obligationLinkPreservedAt:deletedAt};
       save();close('entryModal');close('operationDetail');partial.deriveAll();runtime.renderAll();runtime.toast('Операция перемещена в Корзину. Обязательство пересчитано.');return true;
     }
