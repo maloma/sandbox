@@ -7,18 +7,18 @@
   'use strict';
 
   const STATIC_ENTRIES=Object.freeze([
-    {id:'screen-operations',source:'Функции',section:'Операции',fields:[['title','Название','Операции']],target:{kind:'screen',screen:'operations'},available:()=>Boolean(root.document?.getElementById('operationsScreen'))},
-    {id:'screen-analytics',source:'Функции',section:'Аналитика',fields:[['title','Название','Аналитика']],target:{kind:'screen',screen:'analytics'},available:()=>Boolean(root.document?.getElementById('analyticsScreen'))},
-    {id:'screen-plans',source:'Функции',section:'План',fields:[['title','Название','План']],target:{kind:'screen',screen:'plans'},available:()=>Boolean(root.document?.getElementById('plansScreen'))},
-    {id:'wallet-management',source:'Настройки',section:'Кошельки',fields:[['title','Название','Управление кошельками']],target:{kind:'element',screen:'more',elementId:'walletManagementOpen',activate:true},available:()=>Boolean(root.document?.getElementById('walletManagementOpen'))},
-    {id:'category-management',source:'Настройки',section:'Категории',fields:[['title','Название','Управление категориями']],target:{kind:'element',screen:'more',elementId:'openCategoryManager',activate:true},available:()=>Boolean(root.document?.getElementById('openCategoryManager'))},
-    {id:'main-wallet-setting',source:'Настройки',section:'Кошельки',fields:[['title','Название','Основной кошелёк']],target:{kind:'element',screen:'more',elementId:'walletSelect'},available:()=>Boolean(root.document?.getElementById('walletSelect'))},
-    {id:'theme-setting',source:'Настройки',section:'Оформление',fields:[['title','Название','Оформление'],['options','Варианты','Светлая Тёмная Как в системе']],target:{kind:'element',screen:'more',elementId:'themeSelect'},available:()=>Boolean(root.document?.getElementById('themeSelect'))},
-    {id:'actor-setting',source:'Настройки',section:'Операции',fields:[['title','Название','Кто добавляет операции']],target:{kind:'element',screen:'more',elementId:'actorSelect'},available:()=>Boolean(root.document?.getElementById('actorSelect'))},
-    {id:'trash-retention-setting',source:'Настройки',section:'Хранение',fields:[['title','Название','Политика хранения Корзины: 45 дней']],target:{kind:'element',screen:'more',elementId:'trashFlagBtn'},available:()=>Boolean(root.document?.getElementById('trashFlagBtn'))},
-    {id:'future-operations-setting',source:'Настройки',section:'Операции',fields:[['title','Название','Будущие фактические операции']],target:{kind:'element',screen:'more',elementId:'futureActualOperationsBtn'},available:()=>Boolean(root.document?.getElementById('futureActualOperationsBtn'))},
-    {id:'learning-function',source:'Функции',section:'Помощь',fields:[['title','Название','Как пользоваться FamilyPilot']],target:{kind:'element',screen:'more',elementId:'learningModeEntry',activate:true},available:()=>Boolean(root.document?.getElementById('learningModeEntry'))},
-    {id:'persistence-function',source:'Функции',section:'Данные',fields:[['title','Название','Хранение и восстановление данных']],target:{kind:'element',screen:'more',elementId:'persistenceEntry',activate:true},available:()=>Boolean(root.document?.getElementById('persistenceEntry'))},
+    {id:'screen-operations',sourceType:'function',sourceLabel:'Функции · Операции',fields:[['title','Операции']],target:{kind:'screen',screen:'operations'},available:()=>Boolean(root.document?.getElementById('operationsScreen'))},
+    {id:'screen-analytics',sourceType:'function',sourceLabel:'Функции · Аналитика',fields:[['title','Аналитика']],target:{kind:'screen',screen:'analytics'},available:()=>Boolean(root.document?.getElementById('analyticsScreen'))},
+    {id:'screen-plans',sourceType:'function',sourceLabel:'Функции · План',fields:[['title','План']],target:{kind:'screen',screen:'plans'},available:()=>Boolean(root.document?.getElementById('plansScreen'))},
+    {id:'wallet-management',sourceType:'setting',sourceLabel:'Настройки · Кошельки',fields:[['title','Управление кошельками']],target:{kind:'element',screen:'more',elementId:'walletManagementOpen',activate:true},available:()=>Boolean(root.document?.getElementById('walletManagementOpen'))},
+    {id:'category-management',sourceType:'setting',sourceLabel:'Настройки · Категории',fields:[['title','Управление категориями']],target:{kind:'element',screen:'more',elementId:'openCategoryManager',activate:true},available:()=>Boolean(root.document?.getElementById('openCategoryManager'))},
+    {id:'main-wallet-setting',sourceType:'setting',sourceLabel:'Настройки · Кошельки',fields:[['title','Основной кошелёк']],target:{kind:'element',screen:'more',elementId:'walletSelect'},available:()=>Boolean(root.document?.getElementById('walletSelect'))},
+    {id:'theme-setting',sourceType:'setting',sourceLabel:'Настройки · Оформление',fields:[['title','Оформление'],['options','Светлая Тёмная Как в системе']],target:{kind:'element',screen:'more',elementId:'themeSelect'},available:()=>Boolean(root.document?.getElementById('themeSelect'))},
+    {id:'actor-setting',sourceType:'setting',sourceLabel:'Настройки · Операции',fields:[['title','Кто добавляет операции']],target:{kind:'element',screen:'more',elementId:'actorSelect'},available:()=>Boolean(root.document?.getElementById('actorSelect'))},
+    {id:'trash-retention-setting',sourceType:'setting',sourceLabel:'Настройки · Хранение',fields:[['title','Политика хранения Корзины: 45 дней']],target:{kind:'element',screen:'more',elementId:'trashFlagBtn'},available:()=>Boolean(root.document?.getElementById('trashFlagBtn'))},
+    {id:'future-operations-setting',sourceType:'setting',sourceLabel:'Настройки · Операции',fields:[['title','Будущие фактические операции']],target:{kind:'element',screen:'more',elementId:'futureActualOperationsBtn'},available:()=>Boolean(root.document?.getElementById('futureActualOperationsBtn'))},
+    {id:'learning-function',sourceType:'function',sourceLabel:'Функции · Помощь',fields:[['title','Как пользоваться FamilyPilot']],target:{kind:'element',screen:'more',elementId:'learningModeEntry',activate:true},available:()=>Boolean(root.document?.getElementById('learningModeEntry'))},
+    {id:'persistence-function',sourceType:'function',sourceLabel:'Функции · Данные',fields:[['title','Хранение и восстановление данных']],target:{kind:'element',screen:'more',elementId:'persistenceEntry',activate:true},available:()=>Boolean(root.document?.getElementById('persistenceEntry'))},
   ]);
 
   function rawText(value){return typeof value==='string'?value:''}
@@ -38,14 +38,14 @@
       const categoryName=rawText(category?.name);
       const note=rawText(operation.note);
       const walletName=rawText(wallet?.name);
-      if(categoryName!=='') fields.push({key:'category',label:'Категория',text:categoryName});
-      if(note!=='') fields.push({key:'note',label:'Комментарий',text:note});
-      if(walletName!=='') fields.push({key:'wallet',label:'Кошелёк',text:walletName});
+      if(categoryName!=='') fields.push({fieldId:'category',text:categoryName});
+      if(note!=='') fields.push({fieldId:'note',text:note});
+      if(walletName!=='') fields.push({fieldId:'wallet',text:walletName});
       if(!fields.length) continue;
       docs.push({
-        id:`operation:${operation.id}`,
-        source:'Операции',
-        section:categoryName||'Операция',
+        documentId:`operation:${operation.id}`,
+        sourceType:'operation',
+        sourceLabel:`Операции · ${categoryName||'Операция'}`,
         target:{kind:'operation',operationId:operation.id},
         fields,
       });
@@ -57,16 +57,20 @@
     return STATIC_ENTRIES.filter(entry=>{
       try{return entry.available()}catch{return false}
     }).map(entry=>({
-      id:`static:${entry.id}`,
-      source:entry.source,
-      section:entry.section,
+      documentId:`static:${entry.id}`,
+      sourceType:entry.sourceType,
+      sourceLabel:entry.sourceLabel,
       target:{...entry.target},
-      fields:entry.fields.map(([key,label,text])=>({key,label,text})),
+      fields:entry.fields.map(([fieldId,text])=>({fieldId,text})),
     }));
   }
 
   function buildDocuments(state,scopeApi){
     return [...operationDocuments(state,scopeApi),...staticDocuments()];
+  }
+
+  function fieldLabel(fieldId){
+    return ({category:'Категория',note:'Комментарий',wallet:'Кошелёк',title:'Название',options:'Варианты'})[fieldId]||fieldId;
   }
 
   function renderMarkedText(container,text,spans){
@@ -150,20 +154,26 @@
     function render(){
       const query=input.value;
       resultsNode.textContent='';
-      const matches=core.search(buildDocuments(runtime.state,scopeApi),query);
+      const documents=buildDocuments(runtime.state,scopeApi);
+      const matches=core.search(documents,query);
       if(query===''){
         const empty=root.document.createElement('div');empty.className='fp-search-empty';empty.textContent='Введите точный фрагмент текста.';resultsNode.appendChild(empty);return;
       }
       if(!matches.length){
         const empty=root.document.createElement('div');empty.className='fp-search-empty';empty.textContent='Совпадений нет.';resultsNode.appendChild(empty);return;
       }
+      const documentsById=new Map(documents.map(document=>[document.documentId,document]));
       for(const result of matches){
+        const document=documentsById.get(result.documentId);
+        if(!document) continue;
         const button=root.document.createElement('button');button.type='button';button.className='fp-search-result';
-        const meta=root.document.createElement('div');meta.className='fp-search-meta';meta.textContent=`${result.source||''}${result.section?` · ${result.section}`:''}`;button.appendChild(meta);
-        for(const field of result.matchedFields){
+        const meta=root.document.createElement('div');meta.className='fp-search-meta';meta.textContent=result.sourceLabel;button.appendChild(meta);
+        for(const field of document.fields){
+          const spans=result.matches.filter(match=>match.fieldId===field.fieldId).map(match=>({start:match.start,end:match.end}));
+          if(!spans.length) continue;
           const row=root.document.createElement('div');row.className='fp-search-field';
-          const label=root.document.createElement('span');label.className='fp-search-field-label';label.textContent=`${field.label||field.key}:`;row.appendChild(label);
-          const value=root.document.createElement('span');renderMarkedText(value,field.text,field.spans);row.appendChild(value);button.appendChild(row);
+          const label=root.document.createElement('span');label.className='fp-search-field-label';label.textContent=`${fieldLabel(field.fieldId)}:`;row.appendChild(label);
+          const value=root.document.createElement('span');renderMarkedText(value,field.text,spans);row.appendChild(value);button.appendChild(row);
         }
         button.addEventListener('click',()=>navigate(result.target));
         resultsNode.appendChild(button);
