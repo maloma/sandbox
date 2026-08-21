@@ -139,7 +139,7 @@
     let limitOutcome=null,reasonCode=null,retryAfterMs=0,limitRules=[];
     for(const check of plan.checks){
       const existing=own(current,check.budgetKey)?current[check.budgetKey]:null;
-      if(existing!=null&&(!existing||typeof existing!=='object'||Array.isArray(existing)))return failure('invalid_protection_state');
+      if(existing!=null&&(!existing||typeof existing!=='object'||Array.isArray(existing)||!own(existing,'short')||!own(existing,'long')))return failure('invalid_protection_state');
       const shortResult=bucketAfter(existing?.short,check.shortWindow,check.amount,nowMs);
       const longResult=bucketAfter(existing?.long,check.longWindow,check.amount,nowMs);
       if(!shortResult.ok||!longResult.ok)return failure('invalid_protection_state');
