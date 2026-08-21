@@ -22,6 +22,7 @@ const build=(operationClass,overrides={})=>FP.buildRequest({
 
 assert(Object.values(FP.OPS).every(op=>FP.rulesFor(op).length>0),'every FamilyPilot operation class must have explicit rules');
 assert(FP.RULES.every(rule=>rule.identityDimension!=='global'&&rule.identityDimension!=='product'),'no product-global abuse limiter is allowed');
+assert(FP.RULES.every(rule=>rule.failureMode==='FAIL_CLOSED'),'FamilyPilot v1 mutation protection policy must fail closed');
 assert(String(FP.INTEGRATION_POINTS.authoritativeMutation).includes('prepareCommit/commitAuthoritative'));
 assert(String(FP.INTEGRATION_POINTS.authoritativeMutation).includes('browser-only'));
 
@@ -32,6 +33,19 @@ assert.equal(financial.request.cost.writes,1);
 assert(financial.rules.some(rule=>rule.identityDimension==='household'));
 assert(financial.rules.some(rule=>rule.identityDimension==='account'));
 assert(financial.rules.some(rule=>rule.identityDimension==='session'));
+
+const opaque=build(FP.OPS.SENSITIVE_FINANCIAL_WRITE,{
+  identities:{source:' src-a ',session:' sess-a '},
+  requestId:' request-id ',
+  idempotencyKey:' idem-key ',
+  replayKey:' replay-key '
+});
+assert.equal(opaque.ok,true);
+assert.equal(opaque.request.identities.find(identity=>identity.dimension==='source').value,' src-a ');
+assert.equal(opaque.request.identities.find(identity=>identity.dimension==='session').value,' sess-a ');
+assert.equal(opaque.request.requestId,' request-id ');
+assert.equal(opaque.request.idempotencyKey,' idem-key ');
+assert.equal(opaque.request.replayKey,' replay-key ');
 
 const missingIdem=build(FP.OPS.FINANCIAL_WRITE,{idempotencyKey:null,replayKey:null});
 assert.equal(missingIdem.ok,false);
