@@ -1,0 +1,4 @@
+<key>NSMicrophoneUsageDescription</key>
+<string>FamilyPilot использует микрофон только для локального голосового ввода операции.</string>
+<key>NSSpeechRecognitionUsageDescription</key>
+<string>FamilyPilot использует системное распознавание речи на устройстве для заполнения черновика операции.</string>
