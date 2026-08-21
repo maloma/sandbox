@@ -10,7 +10,7 @@
   const MAX_NOTE_LENGTH=1000;
   const WORD_CHAR=/[\p{L}\p{N}_]/u;
   const NUMERIC_RUN=/[+\-−]?(?:\d[\d.,]*|[.,]\d[\d.,]*)/gu;
-  const VALID_AMOUNT_TOKEN=/^(?:\d{1,6}(?:[.,]\d{1,2})?|[.,]\d{1,2})$/u;
+  const VALID_AMOUNT_TOKEN=/^(?:\d{1,6}(?:[.,]\d{0,2})?|[.,]\d{1,2})$/u;
 
   const freeze=value=>Object.freeze(value);
   const failure=error=>freeze({ok:false,error});
