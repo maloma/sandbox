@@ -17,7 +17,7 @@
     SYSTEM_WRITE:'system.write'
   });
   const opSet=new Set(Object.values(OPS));
-  const cleanString=value=>typeof value==='string'&&value.trim()?value.trim():null;
+  const nonBlankString=value=>typeof value==='string'&&value.trim()?value:null;
   const nonNegativeInteger=value=>Number.isSafeInteger(value)&&value>=0;
   const clone=value=>JSON.parse(JSON.stringify(value));
   const freeze=value=>Object.freeze(value);
@@ -94,21 +94,21 @@
   }
 
   function buildRequest(input={}){
-    const operationClass=cleanString(input.operationClass);
+    const operationClass=nonBlankString(input.operationClass);
     if(!operationClass||!opSet.has(operationClass))return failure('unknown_family_protection_operation');
     const spec=SPECS[operationClass];
     const identitiesInput=input.identities;
     if(!identitiesInput||typeof identitiesInput!=='object'||Array.isArray(identitiesInput))return failure('trusted_protection_identities_required');
     const identities=[];
     for(const dimension of spec.required){
-      const value=cleanString(identitiesInput[dimension]);
+      const value=nonBlankString(identitiesInput[dimension]);
       if(!value)return failure(`trusted_identity_missing:${dimension}`);
       identities.push(freeze({dimension,value}));
     }
-    const requestId=cleanString(input.requestId);
+    const requestId=nonBlankString(input.requestId);
     if(!requestId)return failure('trusted_request_id_required');
-    const idempotencyKey=input.idempotencyKey==null?null:cleanString(input.idempotencyKey);
-    const replayKey=input.replayKey==null?null:cleanString(input.replayKey);
+    const idempotencyKey=input.idempotencyKey==null?null:nonBlankString(input.idempotencyKey);
+    const replayKey=input.replayKey==null?null:nonBlankString(input.replayKey);
     if(spec.idempotency&&!idempotencyKey)return failure('idempotency_key_required');
     if(spec.replay&&!replayKey)return failure('replay_key_required');
     const writes=input.writes==null?(operationClass===OPS.AUTH_LOGIN||operationClass===OPS.ACCESS_RECOVERY?0:1):input.writes;
