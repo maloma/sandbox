@@ -61,6 +61,19 @@ assert.notEqual(
   'distinct opaque identity values must not collapse through normalization'
 );
 
+const rollbackRule=[{ruleId:'rollback-source',operationClass:'write',lane:'interactive',identityDimension:'source',metric:'writes',shortWindow:{ms:1000,limit:2},longWindow:{ms:1000,limit:2},outcomeOnLimit:'RETRY_LATER',failureMode:'FAIL_CLOSED'}];
+const rollbackCompiled=Core.compile({...baseRequest,identities:[{dimension:'source',value:'rollback'}]},rollbackRule);
+assert.equal(rollbackCompiled.ok,true);
+const rollbackFirst=Core.evaluate(rollbackCompiled.plan,{},1000);
+assert.equal(rollbackFirst.decision.outcome,'ALLOW');
+const rollbackSecond=Core.evaluate(rollbackCompiled.plan,rollbackFirst.nextState,0);
+assert.equal(rollbackSecond.decision.outcome,'ALLOW');
+const rollbackKey=rollbackCompiled.plan.checks[0].budgetKey;
+assert.equal(rollbackSecond.nextState[rollbackKey].short.lastMs,1000,'clock rollback must not regress stored short-window time');
+assert.equal(rollbackSecond.nextState[rollbackKey].long.lastMs,1000,'clock rollback must not regress stored long-window time');
+const rollbackThird=Core.evaluate(rollbackCompiled.plan,rollbackSecond.nextState,500);
+assert.equal(rollbackThird.decision.outcome,'RETRY_LATER','clock rollback followed by recovery must not create artificial refill');
+
 const invalidState=Core.evaluate(compiled.plan,{[compiled.plan.checks[0].budgetKey]:{short:{tokens:'bad',lastMs:0},long:{tokens:1,lastMs:0}}},1000);
 assert.equal(invalidState.ok,false);
 assert.equal(invalidState.error,'invalid_protection_state');
