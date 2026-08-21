@@ -9,7 +9,8 @@
   const MAX_AMOUNT=999999.99;
   const MAX_NOTE_LENGTH=1000;
   const WORD_CHAR=/[\p{L}\p{N}_]/u;
-  const AMOUNT_TOKEN=/(?<![\p{L}\p{N}_])\d{1,6}(?:[.,]\d{1,2})?(?![\p{L}\p{N}_])/gu;
+  const NUMERIC_RUN=/[+\-−]?(?:\d[\d.,]*|[.,]\d[\d.,]*)/gu;
+  const VALID_AMOUNT_TOKEN=/^(?:\d{1,6}(?:[.,]\d{1,2})?|[.,]\d{1,2})$/u;
 
   const freeze=value=>Object.freeze(value);
   const failure=error=>freeze({ok:false,error});
@@ -33,19 +34,28 @@
     return (!before||!WORD_CHAR.test(before))&&(!after||!WORD_CHAR.test(after));
   }
 
-  function findAmount(text){
-    const matches=[];
-    AMOUNT_TOKEN.lastIndex=0;
-    for(const match of text.matchAll(AMOUNT_TOKEN)){
-      const raw=match[0];
-      const prefix=match.index>0?text[match.index-1]:'';
-      if(prefix==='-'||prefix==='−'||prefix==='+') continue;
-      const value=Number(raw.replace(',','.'));
-      if(Number.isFinite(value)&&value>=0.01&&value<=MAX_AMOUNT){
-        matches.push(freeze({start:match.index,end:match.index+raw.length,raw,value:Math.round(value*100)/100}));
-      }
+  function numericCandidates(text){
+    const candidates=[];
+    NUMERIC_RUN.lastIndex=0;
+    for(const match of text.matchAll(NUMERIC_RUN)){
+      const raw=match[0],start=match.index,end=match.index+raw.length;
+      if(!boundaryOkay(text,start,end)) continue;
+      const unsigned=raw[0]!=='-'&&raw[0]!=='−'&&raw[0]!=='+';
+      const valid=unsigned&&VALID_AMOUNT_TOKEN.test(raw);
+      const value=valid?Number(raw.replace(',','.')):NaN;
+      candidates.push(freeze({
+        start,end,raw,valid:valid&&Number.isFinite(value)&&value>=0.01&&value<=MAX_AMOUNT,
+        value:Number.isFinite(value)?Math.round(value*100)/100:null
+      }));
     }
-    return matches.length===1?matches[0]:null;
+    return freeze(candidates);
+  }
+
+  function findAmount(text){
+    const candidates=numericCandidates(text);
+    if(candidates.length!==1||!candidates[0].valid) return null;
+    const candidate=candidates[0];
+    return freeze({start:candidate.start,end:candidate.end,raw:candidate.raw,value:candidate.value});
   }
 
   function findCategory(text,categories,excludedSpan){
