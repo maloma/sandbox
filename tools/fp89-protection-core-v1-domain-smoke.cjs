@@ -79,17 +79,28 @@ assert.equal(invalidState.ok,false);
 assert.equal(invalidState.error,'invalid_protection_state');
 
 const activeBudgetKey=compiled.plan.checks[0].budgetKey;
+const validSubbucket={tokens:1,lastMs:0};
 const incompleteStates=[
   {},
-  {short:{tokens:1,lastMs:0}},
-  {long:{tokens:1,lastMs:0}},
-  null
+  {short:validSubbucket},
+  {long:validSubbucket},
+  null,
+  {short:null,long:validSubbucket},
+  {short:undefined,long:validSubbucket},
+  {short:validSubbucket,long:null},
+  {short:validSubbucket,long:undefined},
+  {short:[],long:validSubbucket},
+  {short:validSubbucket,long:[]}
 ];
 for(const incomplete of incompleteStates){
   const invalid=Core.evaluate(compiled.plan,{[activeBudgetKey]:incomplete},1000);
-  assert.equal(invalid.ok,false,'incomplete persisted budget state must fail closed');
+  assert.equal(invalid.ok,false,'incomplete or malformed persisted budget state must fail closed');
   assert.equal(invalid.error,'invalid_protection_state');
 }
+
+const absentBudget=Core.evaluate(compiled.plan,{},1000);
+assert.equal(absentBudget.ok,true,'a truly absent budget key may initialize fresh capacity');
+assert.equal(absentBudget.decision.outcome,'ALLOW');
 
 const invalidRule=Core.compile(baseRequest,[{...rules[0],ruleId:'x',shortWindow:{ms:0,limit:2}}]);
 assert.equal(invalidRule.ok,false);
@@ -97,3 +108,4 @@ assert.equal(invalidRule.error,'invalid_protection_rule');
 
 console.log('FP89_PROTECTION_CORE_V1_PASS');
 console.log('FP89_INCOMPLETE_STATE_FAIL_CLOSED_PASS');
+console.log('FP89_MALFORMED_SUBBUCKET_FAIL_CLOSED_PASS');
