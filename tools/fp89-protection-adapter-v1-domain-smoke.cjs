@@ -26,6 +26,18 @@ assert(FP.RULES.every(rule=>rule.failureMode==='FAIL_CLOSED'),'FamilyPilot v1 mu
 assert(String(FP.INTEGRATION_POINTS.authoritativeMutation).includes('prepareCommit/commitAuthoritative'));
 assert(String(FP.INTEGRATION_POINTS.authoritativeMutation).includes('browser-only'));
 
+for(const operationClass of [FP.OPS.IMPORT_BATCH,FP.OPS.SYNC_BATCH]){
+  const rules=FP.rulesFor(operationClass);
+  const spec=FP.SPECS[operationClass];
+  assert(rules.some(rule=>rule.metric==='requests'),`${operationClass} must bound request rate`);
+  assert(rules.some(rule=>rule.metric==='writes'),`${operationClass} must bound write rate`);
+  for(const dimension of spec.required){
+    assert(rules.some(rule=>rule.identityDimension===dimension),`${operationClass} must protect required identity ${dimension}`);
+  }
+  assert(rules.some(rule=>rule.identityDimension==='account'&&rule.metric==='writes'),`${operationClass} must have account-scoped write budget`);
+  assert(rules.some(rule=>rule.identityDimension==='household'&&rule.metric==='writes'),`${operationClass} must have household-scoped write budget`);
+}
+
 const financial=build(FP.OPS.FINANCIAL_WRITE,{replayKey:null});
 assert.equal(financial.ok,true);
 assert.equal(financial.request.lane,'interactive');
@@ -70,6 +82,28 @@ compiled=Core.compile(syncTooLarge.request,syncTooLarge.rules);
 evaluated=Core.evaluate(compiled.plan,{},1_000);
 assert.equal(evaluated.decision.outcome,'REJECT');
 assert.equal(evaluated.decision.reasonCode,'hard_byte_cap_exceeded');
+
+for(const operationClass of [FP.OPS.IMPORT_BATCH,FP.OPS.SYNC_BATCH]){
+  const hugeWrite=build(operationClass,{writes:1_000_000,items:1,bytes:1,requestId:`huge-write-${operationClass}`});
+  assert.equal(hugeWrite.ok,true);
+  const c=Core.compile(hugeWrite.request,hugeWrite.rules);
+  assert.equal(c.ok,true);
+  const before={};
+  const r=Core.evaluate(c.plan,before,1_000);
+  assert.equal(r.ok,true);
+  assert.equal(r.decision.outcome,'RETRY_LATER',`${operationClass} huge write cost must be bounded`);
+  assert(r.decision.matchedRuleIds.some(ruleId=>ruleId.includes('.account.writes')),`${operationClass} account write rule must participate in rejection`);
+  assert(r.decision.matchedRuleIds.some(ruleId=>ruleId.includes('.household.writes')),`${operationClass} household write rule must participate in rejection`);
+  assert.deepStrictEqual(before,{},'huge write rejection must not mutate input state');
+  assert.deepStrictEqual(r.nextState,{},'huge write rejection must not partially consume batch/sync budgets');
+}
+
+for(const operationClass of [FP.OPS.IMPORT_BATCH,FP.OPS.SYNC_BATCH]){
+  const normalBatch=build(operationClass,{writes:10,items:10,bytes:1000,requestId:`normal-batch-${operationClass}`});
+  const c=Core.compile(normalBatch.request,normalBatch.rules);
+  const r=Core.evaluate(c.plan,{},2_000);
+  assert.equal(r.decision.outcome,'ALLOW',`${operationClass} bounded normal work should remain allowed`);
+}
 
 let recoveryState={};
 for(let i=0;i<3;i++){
@@ -126,4 +160,5 @@ assert.equal(rejectedAgainResult.decision.outcome,'RETRY_LATER');
 assert.equal(JSON.stringify(rejectedAgainResult.nextState),attackerStateSnapshot,'rejected admission must not partially consume budgets');
 
 console.log('FP89_PROTECTION_ADAPTER_V1_PASS');
+console.log('FP89_BATCH_SYNC_WRITE_BOUNDARY_PASS');
 console.log(`FP89_OVERLOAD_ISOLATION_PASS attacker_allowed=${attackerAllowed} attacker_limited=${attackerLimited} normal_allowed=${normalAllowed}`);
