@@ -53,6 +53,11 @@ assert.equal(r.draft.amount,null,'number words are not interpreted by FamilyPilo
 assert.equal(r.draft.categoryId,'cat-grocery');
 assert.equal(r.draft.note,'сорок семь Lidl');
 
+r=Voice.parseTranscript({text:'-47 Продукты возврат',categories});
+assert.equal(r.draft.amount,null,'signed numeric text must not be silently converted to a positive amount');
+assert.equal(r.draft.categoryId,'cat-grocery');
+assert.equal(r.draft.note,'-47 возврат');
+
 r=Voice.parseTranscript({text:'47 12 Продукты',categories});
 assert.equal(r.draft.amount,null,'multiple numeric candidates must not be guessed');
 assert.equal(r.draft.categoryId,'cat-grocery');
