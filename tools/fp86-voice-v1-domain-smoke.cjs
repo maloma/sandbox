@@ -48,6 +48,10 @@ r=Voice.parseTranscript({text:'.47 Продукты мелочь',categories});
 assert.equal(r.draft.amount,0.47,'leading-decimal token must be consumed as the whole amount, never inner 47');
 assert.equal(r.draft.note,'мелочь');
 
+r=Voice.parseTranscript({text:'47. Продукты хвост',categories});
+assert.equal(r.draft.amount,47,'trailing decimal separator supported by manual amount grammar must be consumed as one whole token');
+assert.equal(r.draft.note,'хвост');
+
 r=Voice.parseTranscript({text:'0.001 Продукты тест',categories});
 assert.equal(r.draft.amount,null,'unsupported precision must not yield a numeric substring');
 assert.equal(r.draft.categoryId,'cat-grocery');
