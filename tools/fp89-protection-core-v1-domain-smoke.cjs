@@ -78,8 +78,22 @@ const invalidState=Core.evaluate(compiled.plan,{[compiled.plan.checks[0].budgetK
 assert.equal(invalidState.ok,false);
 assert.equal(invalidState.error,'invalid_protection_state');
 
+const activeBudgetKey=compiled.plan.checks[0].budgetKey;
+const incompleteStates=[
+  {},
+  {short:{tokens:1,lastMs:0}},
+  {long:{tokens:1,lastMs:0}},
+  null
+];
+for(const incomplete of incompleteStates){
+  const invalid=Core.evaluate(compiled.plan,{[activeBudgetKey]:incomplete},1000);
+  assert.equal(invalid.ok,false,'incomplete persisted budget state must fail closed');
+  assert.equal(invalid.error,'invalid_protection_state');
+}
+
 const invalidRule=Core.compile(baseRequest,[{...rules[0],ruleId:'x',shortWindow:{ms:0,limit:2}}]);
 assert.equal(invalidRule.ok,false);
 assert.equal(invalidRule.error,'invalid_protection_rule');
 
 console.log('FP89_PROTECTION_CORE_V1_PASS');
+console.log('FP89_INCOMPLETE_STATE_FAIL_CLOSED_PASS');
