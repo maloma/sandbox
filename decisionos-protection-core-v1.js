@@ -113,17 +113,18 @@
   }
 
   function bucketAfter(bucket,window,amount,nowMs){
-    let tokens=window.limit;
+    let tokens=window.limit,effectiveNow=nowMs;
     if(bucket!=null){
       if(!bucket||typeof bucket!=='object'||!Number.isFinite(bucket.tokens)||bucket.tokens<0||bucket.tokens>window.limit||!Number.isFinite(bucket.lastMs)||bucket.lastMs<0)return {ok:false};
-      const elapsed=Math.max(0,nowMs-bucket.lastMs);
+      effectiveNow=Math.max(nowMs,bucket.lastMs);
+      const elapsed=effectiveNow-bucket.lastMs;
       tokens=Math.min(window.limit,bucket.tokens+(elapsed*window.limit/window.ms));
     }
     if(tokens+Number.EPSILON<amount){
       const deficit=amount-tokens;
-      return {ok:true,allowed:false,retryAfterMs:Math.max(1,Math.ceil(deficit*window.ms/window.limit)),next:Object.freeze({tokens,lastMs:nowMs})};
+      return {ok:true,allowed:false,retryAfterMs:Math.max(1,Math.ceil(deficit*window.ms/window.limit)),next:Object.freeze({tokens,lastMs:effectiveNow})};
     }
-    return {ok:true,allowed:true,retryAfterMs:0,next:Object.freeze({tokens:tokens-amount,lastMs:nowMs})};
+    return {ok:true,allowed:true,retryAfterMs:0,next:Object.freeze({tokens:tokens-amount,lastMs:effectiveNow})};
   }
 
   function evaluate(plan,stateInput,nowMs){
