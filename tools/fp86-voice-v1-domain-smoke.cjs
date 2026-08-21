@@ -44,6 +44,23 @@ r=Voice.parseTranscript({text:'47,50 Продукты без пакета',categ
 assert.equal(r.draft.amount,47.5);
 assert.equal(r.draft.note,'без пакета');
 
+r=Voice.parseTranscript({text:'.47 Продукты мелочь',categories});
+assert.equal(r.draft.amount,0.47,'leading-decimal token must be consumed as the whole amount, never inner 47');
+assert.equal(r.draft.note,'мелочь');
+
+r=Voice.parseTranscript({text:'0.001 Продукты тест',categories});
+assert.equal(r.draft.amount,null,'unsupported precision must not yield a numeric substring');
+assert.equal(r.draft.categoryId,'cat-grocery');
+assert.equal(r.draft.note,'0.001 тест');
+
+r=Voice.parseTranscript({text:'1,234,56 Продукты тест',categories});
+assert.equal(r.draft.amount,null,'repeated separators must not yield a numeric substring');
+assert.equal(r.draft.note,'1,234,56 тест');
+
+r=Voice.parseTranscript({text:'1000000 Продукты тест',categories});
+assert.equal(r.draft.amount,null,'out-of-grammar integer must remain unconsumed');
+assert.equal(r.draft.note,'1000000 тест');
+
 r=Voice.parseTranscript({text:'47 EUR Продукты Lidl',categories});
 assert.equal(r.draft.amount,47);
 assert.equal(r.draft.note,'EUR Lidl','currency words/tokens not modeled by v1 remain in note');
@@ -103,4 +120,5 @@ assert.deepStrictEqual(categories,sourceCategories,'parser must not mutate categ
   console.log('FP86_EXACT_CATEGORY_ONLY_PASS');
   console.log('FP86_REMAINDER_TO_NOTE_PASS');
   console.log('FP86_ON_DEVICE_PROVIDER_BOUNDARY_PASS');
+  console.log('FP86_WHOLE_NUMERIC_TOKEN_BOUNDARY_PASS');
 })();
