@@ -38,6 +38,8 @@
     AMOUNT_TOKEN.lastIndex=0;
     for(const match of text.matchAll(AMOUNT_TOKEN)){
       const raw=match[0];
+      const prefix=match.index>0?text[match.index-1]:'';
+      if(prefix==='-'||prefix==='−'||prefix==='+') continue;
       const value=Number(raw.replace(',','.'));
       if(Number.isFinite(value)&&value>=0.01&&value<=MAX_AMOUNT){
         matches.push(freeze({start:match.index,end:match.index+raw.length,raw,value:Math.round(value*100)/100}));
