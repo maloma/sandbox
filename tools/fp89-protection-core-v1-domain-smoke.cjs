@@ -47,6 +47,24 @@ const emojiIdentity='device-😀';
 const utfRequest={...baseRequest,requestId:'utf',identities:[{dimension:'account',value:'a2'},{dimension:'source',value:emojiIdentity}]};
 assert.equal(Core.compile(utfRequest,rules).ok,true,'opaque identity values must survive without normalization');
 
+const plainOpaque=Core.compile({...baseRequest,requestId:' opaque-request ',idempotencyKey:' idem ',replayKey:' replay ',identities:[{dimension:'account',value:'a2'},{dimension:'source',value:'src'}]},rules);
+const spacedOpaque=Core.compile({...baseRequest,requestId:' opaque-request ',idempotencyKey:' idem ',replayKey:' replay ',identities:[{dimension:'account',value:'a2'},{dimension:'source',value:' src '}]},rules);
+assert.equal(plainOpaque.ok,true);
+assert.equal(spacedOpaque.ok,true);
+assert.equal(spacedOpaque.plan.request.requestId,' opaque-request ');
+assert.equal(spacedOpaque.plan.request.idempotencyKey,' idem ');
+assert.equal(spacedOpaque.plan.request.replayKey,' replay ');
+assert.equal(spacedOpaque.plan.request.identities.find(identity=>identity.dimension==='source').value,' src ');
+assert.notEqual(
+  plainOpaque.plan.checks.find(check=>check.identityDimension==='source').budgetKey,
+  spacedOpaque.plan.checks.find(check=>check.identityDimension==='source').budgetKey,
+  'distinct opaque identity values must not collapse through normalization'
+);
+
+const invalidState=Core.evaluate(compiled.plan,{[compiled.plan.checks[0].budgetKey]:{short:{tokens:'bad',lastMs:0},long:{tokens:1,lastMs:0}}},1000);
+assert.equal(invalidState.ok,false);
+assert.equal(invalidState.error,'invalid_protection_state');
+
 const invalidRule=Core.compile(baseRequest,[{...rules[0],ruleId:'x',shortWindow:{ms:0,limit:2}}]);
 assert.equal(invalidRule.ok,false);
 assert.equal(invalidRule.error,'invalid_protection_rule');
