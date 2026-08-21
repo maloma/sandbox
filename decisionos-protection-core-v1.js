@@ -8,7 +8,7 @@
   const LIMIT_OUTCOMES=new Set(['RETRY_LATER','REJECT','CHALLENGE']);
   const FAILURE_MODES=new Set(['FAIL_CLOSED','FAIL_OPEN']);
   const own=(obj,key)=>Object.prototype.hasOwnProperty.call(obj,key);
-  const cleanString=value=>typeof value==='string'&&value.trim()?value.trim():null;
+  const nonBlankString=value=>typeof value==='string'&&value.trim()?value:null;
   const nonNegativeInteger=value=>Number.isSafeInteger(value)&&value>=0;
   const positiveInteger=value=>Number.isSafeInteger(value)&&value>0;
   const clone=value=>JSON.parse(JSON.stringify(value));
@@ -23,13 +23,13 @@
 
   function normalizeRequest(input){
     if(!input||typeof input!=='object'||Array.isArray(input))return failure('invalid_protection_request');
-    const productId=cleanString(input.productId),operationClass=cleanString(input.operationClass),lane=cleanString(input.lane),requestId=cleanString(input.requestId);
+    const productId=nonBlankString(input.productId),operationClass=nonBlankString(input.operationClass),lane=nonBlankString(input.lane),requestId=nonBlankString(input.requestId);
     if(!productId||!operationClass||!lane||!LANES.has(lane)||!requestId)return failure('invalid_protection_request');
     if(!Array.isArray(input.identities)||!input.identities.length)return failure('invalid_protection_identities');
     const seen=new Set(),identities=[];
     for(const identity of input.identities){
       if(!identity||typeof identity!=='object'||Array.isArray(identity))return failure('invalid_protection_identities');
-      const dimension=cleanString(identity.dimension),value=cleanString(identity.value);
+      const dimension=nonBlankString(identity.dimension),value=nonBlankString(identity.value);
       if(!dimension||!value||seen.has(dimension))return failure('invalid_protection_identities');
       seen.add(dimension);
       identities.push(Object.freeze({dimension,value}));
@@ -43,8 +43,8 @@
       bytes:rawCost.bytes
     };
     if(!positiveInteger(cost.requests)||!nonNegativeInteger(cost.writes)||!nonNegativeInteger(cost.items)||!nonNegativeInteger(cost.bytes))return failure('invalid_protection_cost');
-    const idempotencyKey=input.idempotencyKey==null?null:cleanString(input.idempotencyKey);
-    const replayKey=input.replayKey==null?null:cleanString(input.replayKey);
+    const idempotencyKey=input.idempotencyKey==null?null:nonBlankString(input.idempotencyKey);
+    const replayKey=input.replayKey==null?null:nonBlankString(input.replayKey);
     if(input.idempotencyKey!=null&&!idempotencyKey)return failure('invalid_idempotency_key');
     if(input.replayKey!=null&&!replayKey)return failure('invalid_replay_key');
     return Object.freeze({
@@ -61,7 +61,7 @@
 
   function normalizeRule(rule){
     if(!rule||typeof rule!=='object'||Array.isArray(rule))return failure('invalid_protection_rule');
-    const ruleId=cleanString(rule.ruleId),operationClass=cleanString(rule.operationClass),lane=cleanString(rule.lane),identityDimension=cleanString(rule.identityDimension),metric=cleanString(rule.metric),outcomeOnLimit=cleanString(rule.outcomeOnLimit),failureMode=cleanString(rule.failureMode);
+    const ruleId=nonBlankString(rule.ruleId),operationClass=nonBlankString(rule.operationClass),lane=nonBlankString(rule.lane),identityDimension=nonBlankString(rule.identityDimension),metric=nonBlankString(rule.metric),outcomeOnLimit=nonBlankString(rule.outcomeOnLimit),failureMode=nonBlankString(rule.failureMode);
     const shortWindow=normalizeWindow(rule.shortWindow),longWindow=normalizeWindow(rule.longWindow);
     if(!ruleId||!operationClass||!lane||!LANES.has(lane)||!identityDimension||!metric||!METRICS.has(metric)||!shortWindow||!longWindow||!outcomeOnLimit||!LIMIT_OUTCOMES.has(outcomeOnLimit)||!failureMode||!FAILURE_MODES.has(failureMode))return failure('invalid_protection_rule');
     const maxItems=rule.maxItems==null?null:rule.maxItems,maxBytes=rule.maxBytes==null?null:rule.maxBytes;
@@ -113,10 +113,9 @@
   }
 
   function bucketAfter(bucket,window,amount,nowMs){
-    let tokens=window.limit,lastMs=nowMs;
+    let tokens=window.limit;
     if(bucket!=null){
       if(!bucket||typeof bucket!=='object'||!Number.isFinite(bucket.tokens)||bucket.tokens<0||bucket.tokens>window.limit||!Number.isFinite(bucket.lastMs)||bucket.lastMs<0)return {ok:false};
-      lastMs=Math.min(nowMs,bucket.lastMs);
       const elapsed=Math.max(0,nowMs-bucket.lastMs);
       tokens=Math.min(window.limit,bucket.tokens+(elapsed*window.limit/window.ms));
     }
