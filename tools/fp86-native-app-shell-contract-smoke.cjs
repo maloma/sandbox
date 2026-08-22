@@ -1,0 +1,50 @@
+'use strict';
+const assert=require('assert');
+const fs=require('fs');
+const path=require('path');
+const root=path.resolve(__dirname,'..');
+const read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const gradle=read('mobile/android-app/app/build.gradle.kts');
+const manifest=read('mobile/android-app/app/src/main/AndroidManifest.xml');
+const activity=read('mobile/android-app/app/src/main/java/com/familypilot/app/MainActivity.kt');
+const iosVC=read('mobile/ios-app/FamilyPilotApp/FamilyPilotViewController.swift');
+const iosHandler=read('mobile/ios-app/FamilyPilotApp/FamilyPilotAssetSchemeHandlerV1.swift');
+const plist=read('mobile/ios-app/FamilyPilotApp/Info.plist');
+const pbx=read('mobile/ios-app/FamilyPilotApp.xcodeproj/project.pbxproj');
+const workflow=read('.github/workflows/fp86-native-app-shell.yml');
+
+assert.match(gradle,/androidx\.webkit:webkit:1\.17\.0/);
+assert.match(gradle,/androidx\.core:core-ktx:1\.19\.0/);
+assert.match(gradle,/include\("familypilot-\*\.js"\)/);
+assert.match(activity,/WebViewAssetLoader/);
+assert.match(activity,/https:\/\/appassets\.androidplatform\.net/);
+assert.match(activity,/allowedOriginRules\s*=\s*setOf\(APP_ORIGIN\)/);
+assert.match(activity,/BuildConfig\.FAMILY_PILOT_VOICE_LOCALE/);
+assert.doesNotMatch(activity,/SpeechRecognizer\.createSpeechRecognizer/);
+assert.match(manifest,/android\.permission\.RECORD_AUDIO/);
+assert.match(manifest,/usesCleartextTraffic="false"/);
+
+assert.match(iosVC,/familypilot:\/\/app\/index\.html/);
+assert.match(iosVC,/allowedSchemes:\s*\["familypilot"\]/);
+assert.match(iosVC,/allowedHosts:\s*\["app"\]/);
+assert.match(iosVC,/FamilyPilotVoiceLocale/);
+assert.match(iosHandler,/url\.scheme == "familypilot"/);
+assert.match(iosHandler,/url\.host == "app"/);
+assert.match(iosHandler,/!relative\.contains\("\.\."\)/);
+assert.match(plist,/NSSpeechRecognitionUsageDescription/);
+assert.match(plist,/NSMicrophoneUsageDescription/);
+assert.match(pbx,/Copy FamilyPilot Web Assets/);
+assert.match(pbx,/FamilyPilotOnDeviceSpeechV1\.swift/);
+assert.match(pbx,/FamilyPilotSpeechWebBridgeV1\.swift/);
+assert.match(pbx,/\.\.\/\.\.\/ios\/FamilyPilotOnDeviceSpeechV1\.swift/);
+assert.match(pbx,/\.\.\/\.\.\/ios\/FamilyPilotSpeechWebBridgeV1\.swift/);
+
+assert.match(workflow,/assembleDebug/);
+assert.match(workflow,/xcodebuild/);
+assert.match(workflow,/FAMILY_PILOT_VOICE_LOCALE=en-US/);
+assert.match(workflow,/voiceLocaleTag=en-US/);
+
+console.log('FP86_NATIVE_APP_SHELL_CONTRACT_PASS');
+console.log('FP86_ANDROID_LOCAL_ASSET_ORIGIN_PASS');
+console.log('FP86_IOS_LOCAL_SCHEME_ORIGIN_PASS');
+console.log('FP86_EXPLICIT_BUILD_LOCALE_PASS');
