@@ -31,6 +31,26 @@ assert.match(android,/supportedOnDeviceLanguages/);
 assert.match(android,/triggerModelDownload/);
 assert.doesNotMatch(android,/http:\/\/|https:\/\//);
 
+const availabilityBlock=android.match(/fun checkAvailability\(callback:[\s\S]*?private fun checkAvailabilityOnMain/);
+assert.ok(availabilityBlock,'checkAvailability public entrypoint must exist');
+assert.match(availabilityBlock[0],/mainHandler\.post\s*\{/,'checkAvailability must marshal to mainHandler');
+
+const downloadBlock=android.match(/fun requestLanguageModelDownload\(callback:[\s\S]*?fun recognize/);
+assert.ok(downloadBlock,'requestLanguageModelDownload callback entrypoint must exist');
+assert.match(downloadBlock[0],/mainHandler\.post\s*\{/,'model download must marshal to mainHandler');
+assert.match(downloadBlock[0],/createOnDeviceSpeechRecognizer/);
+assert.match(downloadBlock[0],/triggerModelDownload/);
+assert.match(downloadBlock[0],/temporary\.destroy\(\)/);
+
+const recognizeBlock=android.match(/fun recognize\(callback:[\s\S]*?fun cancel/);
+assert.ok(recognizeBlock);
+assert.match(recognizeBlock[0],/mainHandler\.post\s*\{/,'recognize must marshal to mainHandler');
+const cancelBlock=android.match(/fun cancel\(\)[\s\S]*?private fun intent/);
+assert.ok(cancelBlock);
+assert.match(cancelBlock[0],/mainHandler\.post\s*\{/,'cancel must marshal to mainHandler');
+assert.match(android,/Looper\.myLooper\(\)\s*==\s*Looper\.getMainLooper\(\)/,'finish path must enforce main-thread cleanup');
+assert.match(android,/private fun finishOnMain/);
+
 const context={
   FamilyPilotNativeSpeechHostV1:{
     isAvailable:async()=>true,
@@ -60,5 +80,6 @@ assert.equal(context.__FP_NATIVE_SPEECH_PROVIDER_V1_READY__,true);
   console.log('FP86_NATIVE_STT_CONTRACT_PASS');
   console.log('FP86_IOS_ON_DEVICE_ONLY_PASS');
   console.log('FP86_ANDROID_ON_DEVICE_ONLY_PASS');
+  console.log('FP86_ANDROID_MAIN_THREAD_BOUNDARY_PASS');
   console.log('FP86_NO_CLOUD_FALLBACK_PASS');
 })();
