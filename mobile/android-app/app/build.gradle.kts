@@ -34,7 +34,7 @@ android {
     }
 
     sourceSets["main"].java.srcDir("../../android")
-    sourceSets["main"].assets.srcDir(generatedWebAssets)
+    sourceSets["main"].assets.srcDir(generatedWebAssets.get().asFile)
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
