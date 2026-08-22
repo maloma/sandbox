@@ -2,6 +2,7 @@ import Foundation
 import WebKit
 
 /// Main-frame-only bridge from trusted FamilyPilot web content to on-device iOS speech.
+/// Async replies stay pinned to the originating WKFrameInfo/security origin.
 final class FamilyPilotSpeechWebBridgeV1: NSObject, WKScriptMessageHandler {
     static let handlerName = "FamilyPilotNativeSpeechIOSBridgeV1"
     private static let entryBootstrap = """
@@ -50,30 +51,30 @@ final class FamilyPilotSpeechWebBridgeV1: NSObject, WKScriptMessageHandler {
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.frameInfo.isMainFrame, isAllowed(message.frameInfo.securityOrigin) else {
-            respond(id: "", values: ["ok": false, "error": "native_speech_bridge_origin_rejected"])
+        let frame = message.frameInfo
+        guard frame.isMainFrame, isAllowed(frame.securityOrigin) else {
             return
         }
         guard let body = message.body as? [String: Any],
               let id = body["id"] as? String,
               let action = body["action"] as? String else {
-            respond(id: "", values: ["ok": false, "error": "native_speech_bridge_invalid_request"])
+            respond(id: "", values: ["ok": false, "error": "native_speech_bridge_invalid_request"], frame: frame)
             return
         }
         switch action {
         case "isAvailable":
-            respond(id: id, values: ["available": speech.isAvailable()])
+            respond(id: id, values: ["available": speech.isAvailable()], frame: frame)
         case "recognize":
             speech.recognize { [weak self] result in
                 switch result {
                 case .success(let text):
-                    self?.respond(id: id, values: ["ok": true, "text": text])
+                    self?.respond(id: id, values: ["ok": true, "text": text], frame: frame)
                 case .failure(let error):
-                    self?.respond(id: id, values: ["ok": false, "error": Self.errorCode(error)])
+                    self?.respond(id: id, values: ["ok": false, "error": Self.errorCode(error)], frame: frame)
                 }
             }
         default:
-            respond(id: id, values: ["ok": false, "error": "native_speech_bridge_unknown_action"])
+            respond(id: id, values: ["ok": false, "error": "native_speech_bridge_unknown_action"], frame: frame)
         }
     }
 
@@ -83,14 +84,25 @@ final class FamilyPilotSpeechWebBridgeV1: NSObject, WKScriptMessageHandler {
         return allowedHosts.contains(origin.host)
     }
 
-    private func respond(id: String, values: [String: Any]) {
+    private func respond(id: String, values: [String: Any], frame: WKFrameInfo) {
+        guard frame.isMainFrame, isAllowed(frame.securityOrigin) else { return }
         var payload = values
         payload["id"] = id
         guard JSONSerialization.isValidJSONObject(payload),
               let data = try? JSONSerialization.data(withJSONObject: payload),
               let json = String(data: data, encoding: .utf8) else { return }
-        DispatchQueue.main.async { [weak webView] in
-            webView?.evaluateJavaScript("globalThis.__FP_NATIVE_SPEECH_BRIDGE_V1_DELIVER__(\(json))")
+
+        DispatchQueue.main.async { [weak self, weak webView] in
+            guard let self, let webView else { return }
+            guard frame.isMainFrame, self.isAllowed(frame.securityOrigin) else { return }
+            webView.evaluateJavaScript(
+                "globalThis.__FP_NATIVE_SPEECH_BRIDGE_V1_DELIVER__(\(json))",
+                in: frame,
+                in: .page
+            ) { _ in
+                // Deliberately no fallback to the current frame.
+                // Navigation invalidates the captured frame and drops the reply.
+            }
         }
     }
 
