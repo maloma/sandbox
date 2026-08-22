@@ -18,7 +18,7 @@ val prepareFamilyPilotWebAssets by tasks.registering(Sync::class) {
 
 android {
     namespace = "com.familypilot.app"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.familypilot.app"
@@ -33,7 +33,7 @@ android {
         buildConfig = true
     }
 
-    sourceSets["main"].java.srcDir("../../android")
+    sourceSets["main"].kotlin.srcDir("../../android")
     sourceSets["main"].assets.srcDir(generatedWebAssets.get().asFile)
 
     compileOptions {
