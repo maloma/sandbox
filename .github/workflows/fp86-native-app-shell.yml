@@ -3,6 +3,8 @@ name: FP86 Native App Shell
 on:
   push:
     branches: [fp86-native-app-shell-v1]
+  pull_request:
+    branches: [fp86-native-app-shell-base]
   workflow_dispatch:
 
 jobs:
