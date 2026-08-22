@@ -1,0 +1,57 @@
+import org.gradle.api.tasks.Sync
+
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
+
+val voiceLocaleTag = providers.gradleProperty("voiceLocaleTag").orElse("")
+val repoRoot = rootProject.projectDir.parentFile.parentFile
+val generatedWebAssets = layout.buildDirectory.dir("generated/familypilotWebAssets")
+
+val prepareFamilyPilotWebAssets by tasks.registering(Sync::class) {
+    from(repoRoot) {
+        include("index.html")
+        include("familypilot-*.js")
+    }
+    into(generatedWebAssets)
+}
+
+android {
+    namespace = "com.familypilot.app"
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId = "com.familypilot.app"
+        minSdk = 31
+        targetSdk = 36
+        versionCode = 1
+        versionName = "0.1.0"
+        buildConfigField("String", "FAMILY_PILOT_VOICE_LOCALE", "\"${voiceLocaleTag.get()}\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    sourceSets["main"].java.srcDir("../../android")
+    sourceSets["main"].assets.srcDir(generatedWebAssets)
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+kotlin {
+    jvmToolchain(17)
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(prepareFamilyPilotWebAssets)
+}
+
+dependencies {
+    implementation("androidx.core:core-ktx:1.19.0")
+    implementation("androidx.webkit:webkit:1.17.0")
+}
