@@ -24,13 +24,25 @@ assert.match(android,/DOCUMENT_START_SCRIPT/);
 assert.match(android,/WEB_MESSAGE_LISTENER/);
 
 assert.match(ios,/WKScriptMessageHandler/);
-assert.match(ios,/message\.frameInfo\.isMainFrame/);
-assert.match(ios,/securityOrigin/);
+assert.match(ios,/let frame = message\.frameInfo/);
+assert.match(ios,/frame\.isMainFrame/);
+assert.match(ios,/frame\.securityOrigin/);
 assert.match(ios,/allowedSchemes/);
 assert.match(ios,/allowedHosts/);
 assert.match(ios,/FamilyPilotOnDeviceSpeechV1/);
 assert.doesNotMatch(ios,/URLSession|http:\/\/|https:\/\//);
 assert.match(ios,/forMainFrameOnly:\s*true/);
+assert.match(ios,/respond\(id: id,[\s\S]*frame: frame\)/,'async/sync replies must carry originating frame');
+assert.match(ios,/private func respond\(id: String, values: \[String: Any\], frame: WKFrameInfo\)/);
+assert.match(ios,/guard frame\.isMainFrame, isAllowed\(frame\.securityOrigin\) else \{ return \}/);
+assert.match(ios,/guard frame\.isMainFrame, self\.isAllowed\(frame\.securityOrigin\) else \{ return \}/);
+assert.match(ios,/evaluateJavaScript\([\s\S]*in: frame,[\s\S]*in: \.page/,'reply must target captured frame and page world');
+assert.doesNotMatch(
+  ios,
+  /webView\??\.evaluateJavaScript\("globalThis\.__FP_NATIVE_SPEECH_BRIDGE_V1_DELIVER__[^,]*\)\s*\)/,
+  'must not use current-frame evaluateJavaScript overload'
+);
+assert.match(ios,/Deliberately no fallback to the current frame/);
 
 assert.match(entry,/familypilot-native-speech-web-host-v1\.js/);
 assert.match(entry,/familypilot-native-speech-provider-v1\.js/);
@@ -66,5 +78,6 @@ assert.doesNotMatch(entry,/SpeechRecognition|webkitSpeechRecognition/);
   console.log('FP86_NATIVE_BRIDGE_CONTRACT_PASS');
   console.log('FP86_ANDROID_ORIGIN_SCOPED_BRIDGE_PASS');
   console.log('FP86_IOS_MAIN_FRAME_ORIGIN_BRIDGE_PASS');
+  console.log('FP86_IOS_ASYNC_REPLY_FRAME_PIN_PASS');
   console.log('FP86_NATIVE_ENTRY_NO_BROWSER_FALLBACK_PASS');
 })();
