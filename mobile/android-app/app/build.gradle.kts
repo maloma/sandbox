@@ -2,7 +2,6 @@ import org.gradle.api.tasks.Sync
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
 }
 
 val voiceLocaleTag = providers.gradleProperty("voiceLocaleTag").orElse("")
@@ -41,10 +40,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-}
-
-kotlin {
-    jvmToolchain(17)
 }
 
 tasks.named("preBuild").configure {
