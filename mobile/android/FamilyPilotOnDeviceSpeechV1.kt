@@ -19,6 +19,7 @@ import java.util.Locale
  * FamilyPilot v1 system speech recognizer.
  * Uses only SpeechRecognizer.createOnDeviceSpeechRecognizer().
  * It never creates the generic recognizer and never provides a cloud fallback.
+ * All SpeechRecognizer API work is marshalled onto the main application thread.
  */
 class FamilyPilotOnDeviceSpeechV1(
     private val context: Context,
@@ -46,6 +47,10 @@ class FamilyPilotOnDeviceSpeechV1(
     private var finished = false
 
     fun checkAvailability(callback: (Availability) -> Unit) {
+        mainHandler.post { checkAvailabilityOnMain(callback) }
+    }
+
+    private fun checkAvailabilityOnMain(callback: (Availability) -> Unit) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             callback(Availability.UNSUPPORTED_ANDROID_VERSION)
             return
@@ -88,17 +93,29 @@ class FamilyPilotOnDeviceSpeechV1(
         })
     }
 
-    fun requestLanguageModelDownload(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
-        if (!SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) return false
-        val temporary = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-        return try {
-            temporary.triggerModelDownload(intent())
-            true
-        } catch (_: RuntimeException) {
-            false
-        } finally {
-            temporary.destroy()
+    fun requestLanguageModelDownload(callback: (Boolean) -> Unit) {
+        mainHandler.post {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                !SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+            ) {
+                callback(false)
+                return@post
+            }
+            val temporary = try {
+                SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+            } catch (_: RuntimeException) {
+                callback(false)
+                return@post
+            }
+            val requested = try {
+                temporary.triggerModelDownload(intent())
+                true
+            } catch (_: RuntimeException) {
+                false
+            } finally {
+                temporary.destroy()
+            }
+            callback(requested)
         }
     }
 
@@ -123,7 +140,13 @@ class FamilyPilotOnDeviceSpeechV1(
 
             this.callback = callback
             finished = false
-            val speechRecognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+            val speechRecognizer = try {
+                SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+            } catch (_: RuntimeException) {
+                this.callback = null
+                callback(Result.Failure("on_device_speech_unavailable"))
+                return@post
+            }
             recognizer = speechRecognizer
             speechRecognizer.setRecognitionListener(listener)
             speechRecognizer.startListening(intent())
@@ -132,7 +155,7 @@ class FamilyPilotOnDeviceSpeechV1(
     }
 
     fun cancel() {
-        mainHandler.post { finish(Result.Failure("recognition_cancelled"), cancel = true) }
+        mainHandler.post { finishOnMain(Result.Failure("recognition_cancelled"), cancel = true) }
     }
 
     private fun intent(): Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -167,10 +190,18 @@ class FamilyPilotOnDeviceSpeechV1(
     }
 
     private val timeout = Runnable {
-        finish(Result.Failure("recognition_timed_out"), cancel = true)
+        finishOnMain(Result.Failure("recognition_timed_out"), cancel = true)
     }
 
     private fun finish(result: Result, cancel: Boolean = false) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            finishOnMain(result, cancel)
+        } else {
+            mainHandler.post { finishOnMain(result, cancel) }
+        }
+    }
+
+    private fun finishOnMain(result: Result, cancel: Boolean = false) {
         if (finished || callback == null) return
         finished = true
         mainHandler.removeCallbacks(timeout)
