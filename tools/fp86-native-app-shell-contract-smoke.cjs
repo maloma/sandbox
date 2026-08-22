@@ -4,6 +4,7 @@ const fs=require('fs');
 const path=require('path');
 const root=path.resolve(__dirname,'..');
 const read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const rootGradle=read('mobile/android-app/build.gradle.kts');
 const gradle=read('mobile/android-app/app/build.gradle.kts');
 const manifest=read('mobile/android-app/app/src/main/AndroidManifest.xml');
 const activity=read('mobile/android-app/app/src/main/java/com/familypilot/app/MainActivity.kt');
@@ -13,6 +14,11 @@ const plist=read('mobile/ios-app/FamilyPilotApp/Info.plist');
 const pbx=read('mobile/ios-app/FamilyPilotApp.xcodeproj/project.pbxproj');
 const workflow=read('.github/workflows/fp86-native-app-shell.yml');
 
+assert.doesNotMatch(rootGradle,/org\.jetbrains\.kotlin\.android/,'AGP 9 built-in Kotlin must not apply the legacy Kotlin Android plugin');
+assert.match(gradle,/compileSdk\s*=\s*37/);
+assert.match(gradle,/targetSdk\s*=\s*36/);
+assert.match(gradle,/sourceSets\["main"\]\.kotlin\.srcDir\("\.\.\/\.\.\/android"\)/,'accepted voice Kotlin sources must be registered as Kotlin sources');
+assert.doesNotMatch(gradle,/sourceSets\["main"\]\.java\.srcDir\("\.\.\/\.\.\/android"\)/);
 assert.match(gradle,/androidx\.webkit:webkit:1\.17\.0/);
 assert.match(gradle,/androidx\.core:core-ktx:1\.19\.0/);
 assert.match(gradle,/include\("familypilot-\*\.js"\)/);
@@ -45,6 +51,7 @@ assert.match(workflow,/FAMILY_PILOT_VOICE_LOCALE=en-US/);
 assert.match(workflow,/voiceLocaleTag=en-US/);
 
 console.log('FP86_NATIVE_APP_SHELL_CONTRACT_PASS');
+console.log('FP86_ANDROID_AGP9_KOTLIN_SOURCE_PASS');
 console.log('FP86_ANDROID_LOCAL_ASSET_ORIGIN_PASS');
 console.log('FP86_IOS_LOCAL_SCHEME_ORIGIN_PASS');
 console.log('FP86_EXPLICIT_BUILD_LOCALE_PASS');
