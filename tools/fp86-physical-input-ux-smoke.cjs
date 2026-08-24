@@ -83,10 +83,10 @@ noteEvents.length=0;
 const parsed=api.parseCurrentNote();
 assert.strictEqual(parsed.ok,true);
 assert.strictEqual(parserCall.text,'47 Продукты Lidl по дороге домой');
-assert.deepStrictEqual(parserCall.categories,[
+assert.strictEqual(JSON.stringify(parserCall.categories),JSON.stringify([
   {id:'products',name:'Продукты'},
   {id:'transport',name:'Транспорт'}
-]);
+]));
 assert.strictEqual(amount.value,'47');
 assert.strictEqual(category.value,'products');
 assert.strictEqual(note.value,'Lidl по дороге домой');
