@@ -99,7 +99,7 @@ assert.strictEqual(api.insertAmountToken(')'),false);
 
 amount.value='12/5';
 api.updateAmountResult();
-assert.strictEqual(resultNode.textContent,'2,40 €');
+assert.match(resultNode.textContent,/^2,40\s€$/u);
 assert.strictEqual(resultNode.style.fontSize,'32px');
 amount.value='999999,99';
 api.updateAmountResult();
