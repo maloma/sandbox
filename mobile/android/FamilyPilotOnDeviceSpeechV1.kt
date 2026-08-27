@@ -15,25 +15,15 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import java.util.Locale
 
-/**
- * FamilyPilot v1 system speech recognizer.
- * Uses only SpeechRecognizer.createOnDeviceSpeechRecognizer().
- * It never creates the generic recognizer and never provides a cloud fallback.
- * All SpeechRecognizer API work is marshalled onto the main application thread.
- */
+/** FamilyPilot v1 system speech recognizer. On-device only. */
 class FamilyPilotOnDeviceSpeechV1(
     private val context: Context,
     private val locale: Locale,
 ) {
     enum class Availability {
-        READY,
-        MICROPHONE_PERMISSION_REQUIRED,
-        UNSUPPORTED_ANDROID_VERSION,
-        ON_DEVICE_SERVICE_UNAVAILABLE,
-        LANGUAGE_DOWNLOAD_REQUIRED,
-        LANGUAGE_SUPPORT_PENDING,
-        LANGUAGE_SUPPORT_UNKNOWN,
-        LANGUAGE_UNAVAILABLE,
+        READY, MICROPHONE_PERMISSION_REQUIRED, UNSUPPORTED_ANDROID_VERSION,
+        ON_DEVICE_SERVICE_UNAVAILABLE, LANGUAGE_DOWNLOAD_REQUIRED,
+        LANGUAGE_SUPPORT_PENDING, LANGUAGE_SUPPORT_UNKNOWN, LANGUAGE_UNAVAILABLE,
     }
 
     sealed class Result {
@@ -51,22 +41,10 @@ class FamilyPilotOnDeviceSpeechV1(
     }
 
     private fun checkAvailabilityOnMain(callback: (Availability) -> Unit) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            callback(Availability.UNSUPPORTED_ANDROID_VERSION)
-            return
-        }
-        if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            callback(Availability.MICROPHONE_PERMISSION_REQUIRED)
-            return
-        }
-        if (!SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
-            callback(Availability.ON_DEVICE_SERVICE_UNAVAILABLE)
-            return
-        }
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            callback(Availability.LANGUAGE_SUPPORT_UNKNOWN)
-            return
-        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) { callback(Availability.UNSUPPORTED_ANDROID_VERSION); return }
+        if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { callback(Availability.MICROPHONE_PERMISSION_REQUIRED); return }
+        if (!SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) { callback(Availability.ON_DEVICE_SERVICE_UNAVAILABLE); return }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) { callback(Availability.LANGUAGE_SUPPORT_UNKNOWN); return }
 
         val temporary = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
         temporary.checkRecognitionSupport(intent(), context.mainExecutor, object : RecognitionSupportCallback {
@@ -76,87 +54,43 @@ class FamilyPilotOnDeviceSpeechV1(
                 val supported = support.supportedOnDeviceLanguages.any { sameLanguageTag(it, tag) }
                 val pending = support.pendingOnDeviceLanguages.any { sameLanguageTag(it, tag) }
                 temporary.destroy()
-                callback(
-                    when {
-                        installed -> Availability.READY
-                        pending -> Availability.LANGUAGE_SUPPORT_PENDING
-                        supported -> Availability.LANGUAGE_DOWNLOAD_REQUIRED
-                        else -> Availability.LANGUAGE_UNAVAILABLE
-                    }
-                )
+                callback(when { installed -> Availability.READY; pending -> Availability.LANGUAGE_SUPPORT_PENDING; supported -> Availability.LANGUAGE_DOWNLOAD_REQUIRED; else -> Availability.LANGUAGE_UNAVAILABLE })
             }
-
-            override fun onError(error: Int) {
-                temporary.destroy()
-                callback(Availability.LANGUAGE_UNAVAILABLE)
-            }
+            override fun onError(error: Int) { temporary.destroy(); callback(Availability.LANGUAGE_UNAVAILABLE) }
         })
     }
 
     fun requestLanguageModelDownload(callback: (Boolean) -> Unit) {
         mainHandler.post {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-                !SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
-            ) {
-                callback(false)
-                return@post
-            }
-            val temporary = try {
-                SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-            } catch (_: RuntimeException) {
-                callback(false)
-                return@post
-            }
-            val requested = try {
-                temporary.triggerModelDownload(intent())
-                true
-            } catch (_: RuntimeException) {
-                false
-            } finally {
-                temporary.destroy()
-            }
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || !SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) { callback(false); return@post }
+            val temporary = try { SpeechRecognizer.createOnDeviceSpeechRecognizer(context) } catch (_: RuntimeException) { callback(false); return@post }
+            val requested = try { temporary.triggerModelDownload(intent()); true } catch (_: RuntimeException) { false } finally { temporary.destroy() }
             callback(requested)
         }
     }
 
     fun recognize(callback: (Result) -> Unit) {
         mainHandler.post {
-            if (this.callback != null) {
-                callback(Result.Failure("recognition_busy"))
-                return@post
-            }
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                callback(Result.Failure("on_device_speech_unavailable"))
-                return@post
-            }
-            if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                callback(Result.Failure("microphone_permission_denied"))
-                return@post
-            }
-            if (!SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
-                callback(Result.Failure("on_device_speech_unavailable"))
-                return@post
-            }
+            if (this.callback != null) { callback(Result.Failure("recognition_busy")); return@post }
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) { callback(Result.Failure("on_device_speech_unavailable")); return@post }
+            if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { callback(Result.Failure("microphone_permission_denied")); return@post }
+            if (!SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) { callback(Result.Failure("on_device_speech_unavailable")); return@post }
 
             this.callback = callback
             finished = false
-            val speechRecognizer = try {
-                SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-            } catch (_: RuntimeException) {
-                this.callback = null
-                callback(Result.Failure("on_device_speech_unavailable"))
-                return@post
+            val speechRecognizer = try { SpeechRecognizer.createOnDeviceSpeechRecognizer(context) } catch (_: RuntimeException) {
+                this.callback = null; callback(Result.Failure("on_device_speech_unavailable")); return@post
             }
             recognizer = speechRecognizer
             speechRecognizer.setRecognitionListener(listener)
             speechRecognizer.startListening(intent())
-            mainHandler.postDelayed(timeout, 20_000)
         }
     }
 
-    fun cancel() {
-        mainHandler.post { finishOnMain(Result.Failure("recognition_cancelled"), cancel = true) }
-    }
+    /** Ask the current system segment to finalize. The app-level bridge decides when the whole session ends. */
+    fun stopListening() { mainHandler.post { recognizer?.stopListening() } }
+
+    fun cancel() { mainHandler.post { finishOnMain(Result.Failure("recognition_cancelled"), cancel = true) } }
 
     private fun intent(): Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -167,19 +101,10 @@ class FamilyPilotOnDeviceSpeechV1(
 
     private val listener = object : RecognitionListener {
         override fun onResults(results: Bundle?) {
-            val text = results
-                ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                ?.firstOrNull()
-                ?.trim()
-                .orEmpty()
-            if (text.isEmpty()) finish(Result.Failure("empty_transcript"))
-            else finish(Result.Success(text))
+            val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim().orEmpty()
+            if (text.isEmpty()) finish(Result.Failure("empty_transcript")) else finish(Result.Success(text))
         }
-
-        override fun onError(error: Int) {
-            finish(Result.Failure("speech_recognition_failed:$error"))
-        }
-
+        override fun onError(error: Int) { finish(Result.Failure("speech_recognition_failed:$error")) }
         override fun onReadyForSpeech(params: Bundle?) = Unit
         override fun onBeginningOfSpeech() = Unit
         override fun onRmsChanged(rmsdB: Float) = Unit
@@ -189,22 +114,13 @@ class FamilyPilotOnDeviceSpeechV1(
         override fun onEvent(eventType: Int, params: Bundle?) = Unit
     }
 
-    private val timeout = Runnable {
-        finishOnMain(Result.Failure("recognition_timed_out"), cancel = true)
-    }
-
     private fun finish(result: Result, cancel: Boolean = false) {
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            finishOnMain(result, cancel)
-        } else {
-            mainHandler.post { finishOnMain(result, cancel) }
-        }
+        if (Looper.myLooper() == Looper.getMainLooper()) finishOnMain(result, cancel) else mainHandler.post { finishOnMain(result, cancel) }
     }
 
     private fun finishOnMain(result: Result, cancel: Boolean = false) {
         if (finished || callback == null) return
         finished = true
-        mainHandler.removeCallbacks(timeout)
         val current = recognizer
         recognizer = null
         if (cancel) current?.cancel()
@@ -215,8 +131,5 @@ class FamilyPilotOnDeviceSpeechV1(
     }
 
     private fun sameLanguageTag(candidate: String, expected: String): Boolean =
-        Locale.forLanguageTag(candidate).toLanguageTag().equals(
-            Locale.forLanguageTag(expected).toLanguageTag(),
-            ignoreCase = true,
-        )
+        Locale.forLanguageTag(candidate).toLanguageTag().equals(Locale.forLanguageTag(expected).toLanguageTag(), ignoreCase = true)
 }

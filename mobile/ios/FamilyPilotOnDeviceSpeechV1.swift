@@ -5,7 +5,7 @@ import AVFAudio
 /// FamilyPilot v1 system speech recognizer.
 /// - Never permits network recognition.
 /// - Never persists raw audio.
-/// - Returns only the final raw transcript to the caller.
+/// - Returns one finalized on-device transcript segment to the caller.
 final class FamilyPilotOnDeviceSpeechV1 {
     enum VoiceError: Error, Equatable {
         case speechPermissionDenied
@@ -13,7 +13,6 @@ final class FamilyPilotOnDeviceSpeechV1 {
         case onDeviceRecognitionUnavailable
         case recognitionBusy
         case recognitionFailed
-        case recognitionTimedOut
         case emptyTranscript
     }
 
@@ -23,7 +22,6 @@ final class FamilyPilotOnDeviceSpeechV1 {
     private let audioEngine = AVAudioEngine()
     private var recognitionTask: SFSpeechRecognitionTask?
     private var request: SFSpeechAudioBufferRecognitionRequest?
-    private var timeoutWorkItem: DispatchWorkItem?
     private var completion: Completion?
     private var recognizing = false
 
@@ -45,6 +43,16 @@ final class FamilyPilotOnDeviceSpeechV1 {
             self.recognizing = true
             self.completion = completion
             self.authorizeAndStart()
+        }
+    }
+
+    /// Finalize the current system segment without cancelling its transcript.
+    /// The bridge decides whether the whole FamilyPilot voice session should end.
+    func stopListening() {
+        DispatchQueue.main.async {
+            guard self.recognizing else { return }
+            if self.audioEngine.isRunning { self.audioEngine.stop() }
+            self.request?.endAudio()
         }
     }
 
@@ -151,20 +159,12 @@ final class FamilyPilotOnDeviceSpeechV1 {
                 self.finish(.failure(.recognitionFailed))
             }
         }
-
-        let timeout = DispatchWorkItem { [weak self] in
-            self?.finish(.failure(.recognitionTimedOut), cancelTask: true)
-        }
-        timeoutWorkItem = timeout
-        DispatchQueue.main.asyncAfter(deadline: .now() + 20, execute: timeout)
     }
 
     private func finish(_ result: Result<String, VoiceError>, cancelTask: Bool = false) {
         DispatchQueue.main.async {
             guard self.recognizing else { return }
             self.recognizing = false
-            self.timeoutWorkItem?.cancel()
-            self.timeoutWorkItem = nil
             if self.audioEngine.isRunning { self.audioEngine.stop() }
             self.audioEngine.inputNode.removeTap(onBus: 0)
             self.request?.endAudio()

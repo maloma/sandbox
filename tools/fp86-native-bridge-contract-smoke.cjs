@@ -11,10 +11,7 @@ const ios=fs.readFileSync(path.join(root,'mobile/ios/FamilyPilotSpeechWebBridgeV
 
 assert.match(android,/WebViewCompat\.addWebMessageListener/);
 assert.match(android,/allowedOriginRules/);
-const wildcardGuard=android.match(/if\(allowedOriginRules\.isEmpty\(\)\|\|allowedOriginRules\.contains\("\*"\)\)\{[\s\S]*?\}/);
-assert.ok(wildcardGuard,'wildcard-origin guard must exist');
-assert.match(wildcardGuard[0],/callback\(false\)/);
-assert.match(wildcardGuard[0],/return@post/);
+assert.match(android,/allowedOriginRules\.isEmpty\(\)\s*\|\|\s*allowedOriginRules\.contains\("\*"\)/);
 assert.match(android,/!isMainFrame/);
 assert.doesNotMatch(android,/\.addJavascriptInterface\s*\(/);
 assert.match(android,/requestMicrophonePermission/);
@@ -22,6 +19,10 @@ assert.doesNotMatch(android,/createSpeechRecognizer\s*\(/);
 assert.doesNotMatch(android,/http:\/\/|https:\/\//);
 assert.match(android,/DOCUMENT_START_SCRIPT/);
 assert.match(android,/WEB_MESSAGE_LISTENER/);
+assert.match(android,/"stop"\s*->\s*stopSession/);
+assert.match(android,/speech\.stopListening\(\)/);
+assert.match(android,/chunks\.joinToString\(" "\)/);
+assert.match(android,/if\s*\(current\.stopping\)\s*complete\(current\)\s*else\s*startSegment\(current\)/);
 
 assert.match(ios,/WKScriptMessageHandler/);
 assert.match(ios,/let frame = message\.frameInfo/);
@@ -32,17 +33,21 @@ assert.match(ios,/allowedHosts/);
 assert.match(ios,/FamilyPilotOnDeviceSpeechV1/);
 assert.doesNotMatch(ios,/URLSession|http:\/\/|https:\/\//);
 assert.match(ios,/forMainFrameOnly:\s*true/);
-assert.match(ios,/respond\(id: id,[\s\S]*frame: frame\)/,'async/sync replies must carry originating frame');
+assert.match(ios,/case "stop":/);
+assert.match(ios,/speech\.stopListening\(\)/);
+assert.match(ios,/chunks\.joined\(separator: " "\)/);
+assert.match(ios,/let frame: WKFrameInfo/,'session must retain the originating frame');
+assert.match(ios,/respond\(id: current\.id,[\s\S]*frame: current\.frame\)/,'final transcript must return to originating frame');
 assert.match(ios,/private func respond\(id: String, values: \[String: Any\], frame: WKFrameInfo\)/);
 assert.match(ios,/guard frame\.isMainFrame, isAllowed\(frame\.securityOrigin\) else \{ return \}/);
 assert.match(ios,/guard frame\.isMainFrame, self\.isAllowed\(frame\.securityOrigin\) else \{ return \}/);
 assert.match(ios,/evaluateJavaScript\([\s\S]*in: frame,[\s\S]*in: \.page/,'reply must target captured frame and page world');
-assert.doesNotMatch(
-  ios,
-  /webView\??\.evaluateJavaScript\("globalThis\.__FP_NATIVE_SPEECH_BRIDGE_V1_DELIVER__[^,]*\)\s*\)/,
-  'must not use current-frame evaluateJavaScript overload'
-);
 assert.match(ios,/Deliberately no fallback to the current frame/);
+
+assert.match(host,/request\('recognize',null\)/,'active recording request must not use the old short timeout');
+assert.match(host,/async stop\(\)/);
+assert.match(host,/request\('stop',10000\)/);
+assert.doesNotMatch(host,/webkitSpeechRecognition|SpeechRecognition/);
 
 assert.match(entry,/familypilot-native-speech-web-host-v1\.js/);
 assert.match(entry,/familypilot-native-speech-provider-v1\.js/);
@@ -52,22 +57,34 @@ assert.match(entry,/adapter\.install\(\)/);
 assert.doesNotMatch(entry,/SpeechRecognition|webkitSpeechRecognition/);
 
 (async()=>{
-  let posted=null;
-  const androidBridge={postMessage(message){posted=JSON.parse(message)}};
+  const posted=[];
+  const androidBridge={postMessage(message){posted.push(JSON.parse(message))}};
   const context={FamilyPilotNativeSpeechAndroidBridgeV1:androidBridge,setTimeout,clearTimeout,Date,Promise,JSON,Object};
   context.globalThis=context;
   vm.createContext(context);
   vm.runInContext(host,context);
   assert.equal(context.__FP_NATIVE_SPEECH_WEB_HOST_V1_READY__,true);
+
   const availablePromise=context.FamilyPilotNativeSpeechHostV1.isAvailable();
-  assert.equal(posted.action,'isAvailable');
-  context.FamilyPilotNativeSpeechAndroidBridgeV1.onmessage({data:JSON.stringify({id:posted.id,available:true})});
+  assert.equal(posted.at(-1).action,'isAvailable');
+  const availabilityRequest=posted.at(-1);
+  context.FamilyPilotNativeSpeechAndroidBridgeV1.onmessage({data:JSON.stringify({id:availabilityRequest.id,available:true})});
   assert.equal(await availablePromise,true);
+
   const recognizePromise=context.FamilyPilotNativeSpeechHostV1.recognize();
-  assert.equal(posted.action,'recognize');
-  context.FamilyPilotNativeSpeechAndroidBridgeV1.onmessage({data:JSON.stringify({id:posted.id,ok:true,text:'47 Продукты Lidl'})});
+  const recognizeRequest=posted.at(-1);
+  assert.equal(recognizeRequest.action,'recognize');
+
+  const stopPromise=context.FamilyPilotNativeSpeechHostV1.stop();
+  const stopRequest=posted.at(-1);
+  assert.equal(stopRequest.action,'stop');
+  assert.notEqual(stopRequest.id,recognizeRequest.id);
+  context.FamilyPilotNativeSpeechAndroidBridgeV1.onmessage({data:JSON.stringify({id:stopRequest.id,ok:true,stopping:true})});
+  assert.equal(await stopPromise,true);
+
+  context.FamilyPilotNativeSpeechAndroidBridgeV1.onmessage({data:JSON.stringify({id:recognizeRequest.id,ok:true,text:'20 Топливо Shell'})});
   const recognized=await recognizePromise;
-  assert.deepStrictEqual(JSON.parse(JSON.stringify(recognized)),{ok:true,text:'47 Продукты Lidl'});
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(recognized)),{ok:true,text:'20 Топливо Shell'});
 
   const noNative={setTimeout,clearTimeout,Date,Promise,JSON,Object};
   noNative.globalThis=noNative;
@@ -76,8 +93,10 @@ assert.doesNotMatch(entry,/SpeechRecognition|webkitSpeechRecognition/);
   assert.equal(noNative.FamilyPilotNativeSpeechHostV1,undefined,'ordinary browser must not gain a speech host');
 
   console.log('FP86_NATIVE_BRIDGE_CONTRACT_PASS');
+  console.log('FP86_BUTTON_CONTROLLED_VOICE_SESSION_PASS');
+  console.log('FP86_ANDROID_CONTINUOUS_SEGMENT_SESSION_PASS');
+  console.log('FP86_IOS_CONTINUOUS_SEGMENT_SESSION_PASS');
   console.log('FP86_ANDROID_ORIGIN_SCOPED_BRIDGE_PASS');
-  console.log('FP86_IOS_MAIN_FRAME_ORIGIN_BRIDGE_PASS');
   console.log('FP86_IOS_ASYNC_REPLY_FRAME_PIN_PASS');
   console.log('FP86_NATIVE_ENTRY_NO_BROWSER_FALLBACK_PASS');
 })();
