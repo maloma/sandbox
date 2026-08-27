@@ -1,238 +1,27 @@
-(function installFamilyPilotVoiceV1FormAdapter(root,factory){
-  'use strict';
-  const api=factory(root);
-  if(typeof module==='object'&&module.exports) module.exports=api;
-  if(root&&root.document) root.FamilyPilotVoiceV1FormAdapter=api;
-})(typeof globalThis!=='undefined'?globalThis:this,function createFamilyPilotVoiceV1FormAdapter(root){
-  'use strict';
-
-  const byId=id=>root?.document?.getElementById(id)||null;
-  const provider=()=>root?.FamilyPilotOnDeviceSpeechV1||null;
-  const OPERATOR_MAP=Object.freeze({'+':'+','−':'-','-':'-','×':'*','*':'*','÷':'/','/':'/'});
-  const VOICE_PREF='familypilot.voice.enabled.v1';
-  const HINTS_PREF='familypilot.hints.enabled.v1';
-  let recording=false;
-  let stopping=false;
-  let activeRecognition=null;
-
-  function readPref(key,defaultValue=true){
-    try{const value=root.localStorage?.getItem(key);return value===null?defaultValue:value!=='false'}catch{return defaultValue}
-  }
-  function writePref(key,value){try{root.localStorage?.setItem(key,value?'true':'false')}catch{}}
-
-  function categoriesFromForm(){
-    const select=byId('categoryInput');
-    if(!select) return [];
-    return [...select.options].map(option=>({id:String(option.value),name:String(option.textContent||'')}));
-  }
-  function dispatchInput(node){node.dispatchEvent(new Event('input',{bubbles:true}))}
-
-  function applyParsed(result){
-    if(!result?.ok||!result.draft) return result;
-    const amount=byId('amountInput'),category=byId('categoryInput'),note=byId('noteInput');
-    if(!amount||!category||!note) return Object.freeze({ok:false,error:'voice_form_unavailable'});
-    if(result.draft.amount!=null){amount.value=String(result.draft.amount).replace('.',',');dispatchInput(amount)}
-    if(result.draft.categoryId!=null){category.value=result.draft.categoryId;category.dispatchEvent(new Event('change',{bubbles:true}))}
-    note.value=result.draft.note;dispatchInput(note);
-    return Object.freeze({ok:true,draft:result.draft});
-  }
-
-  function calculateExpression(raw){
-    const text=String(raw||'').trim();
-    if(!text)return{empty:true};
-    const compact=text.replace(/\s+/gu,'').replace(/,/g,'.').replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-');
-    if(!/^[0-9.+\-*/()]+$/u.test(compact))return{error:'invalid'};
-    const tokens=compact.match(/(?:\d+(?:\.\d*)?|\.\d+)|[()+\-*/]/g);
-    if(!tokens||tokens.join('')!==compact)return{error:'invalid'};
-    let position=0;
-    const primary=()=>{const token=tokens[position++];if(token==='('){const value=sum();if(tokens[position++]!==')')throw Error();return value}if(token==='+'||token==='-')return(token==='-'?-1:1)*primary();const value=Number(token);if(!Number.isFinite(value))throw Error();return value};
-    const product=()=>{let value=primary();while(tokens[position]==='*'||tokens[position]==='/'){const op=tokens[position++],right=primary();if(op==='/'&&right===0)throw Error();value=op==='*'?value*right:value/right}return value};
-    const sum=()=>{let value=product();while(tokens[position]==='+'||tokens[position]==='-'){const op=tokens[position++],right=product();value=op==='+'?value+right:value-right}return value};
-    try{const value=sum();return position===tokens.length&&Number.isFinite(value)?{value:Math.round(value*100)/100}:{error:'invalid'}}catch{return{error:'invalid'}}
-  }
-
-  function normalizeVoicePrefix(text){
-    let value=String(text||'').trim();
-    value=value
-      .replace(/\b(?:умножить|помножить)\s+на\b/giu,'*')
-      .replace(/\b(?:разделить|делить)\s+на\b/giu,'/')
-      .replace(/\bплюс\b/giu,'+')
-      .replace(/\bминус\b/giu,'-')
-      .replace(/\bзапятая\b/giu,',')
-      .replace(/\bточка\b/giu,'.')
-      .replace(/(?<=\d):(?=\d{2}(?:\s|$))/u,',')
-      .replace(/\s*([,.])\s*/gu,'$1');
-
-    const prefix=value.match(/^\s*((?:\d+(?:[.,]\d*)?|[.,]\d+)(?:\s*[+\-*/]\s*(?:\d+(?:[.,]\d*)?|[.,]\d+))*)/u);
-    if(!prefix) return value;
-    const calculated=calculateExpression(prefix[1]);
-    if(calculated.error||calculated.empty||!Number.isFinite(calculated.value)) return value;
-    let rest=value.slice(prefix[0].length).replace(/^\s*(?:€|EUR|евро)\b\s*/iu,' ').trimStart();
-    const amount=String(Math.round(calculated.value*100)/100).replace('.',',');
-    return rest?`${amount} ${rest}`:amount;
-  }
-
-  function parseStructuredText(text){
-    const core=root?.FamilyPilotVoiceV1;
-    if(!core?.parseTranscript) return Object.freeze({ok:false,error:'voice_core_unavailable'});
-    const normalized=normalizeVoicePrefix(text);
-    let result=core.parseTranscript({text:normalized,categories:categoriesFromForm()});
-    if(!result?.ok) return result;
-    const amount=result.consumed?.find(item=>item.kind==='amount')||null;
-    const category=result.consumed?.find(item=>item.kind==='category')||null;
-    const firstNonSpace=normalized.search(/\S/u);
-    const orderOkay=amount&&amount.start===firstNonSpace&&(!category||!normalized.slice(amount.end,category.start).trim());
-    if(orderOkay) return result;
-    result=core.parseTranscript({text:normalized,categories:[]});
-    return result;
-  }
-
-  function applyText(text){return applyParsed(parseStructuredText(text))}
-  function parseCurrentNote(){
-    const note=byId('noteInput');
-    if(!note) return Object.freeze({ok:false,error:'voice_form_unavailable'});
-    const text=String(note.value||'').trim();
-    if(!text) return Object.freeze({ok:false,error:'note_empty'});
-    return applyText(text);
-  }
-
-  function formatResult(value){
-    const fractional=Math.abs(value-Math.round(value))>1e-9;
-    return new Intl.NumberFormat('ru-RU',{minimumFractionDigits:fractional?2:0,maximumFractionDigits:2}).format(value)+' €';
-  }
-  function updateAmountResult(){
-    const amount=byId('amountInput'),resultNode=byId('amountCalculation');
-    if(!amount||!resultNode)return;
-    const result=calculateExpression(amount.value);
-    const text=result.empty?'0 €':result.error?'—':formatResult(result.value);
-    resultNode.textContent=text;
-    resultNode.className='fp-amount-result';
-    resultNode.style.display='block';
-    resultNode.style.marginTop='9px';
-    resultNode.style.fontWeight='950';
-    resultNode.style.lineHeight='1.05';
-    resultNode.style.textAlign='right';
-    resultNode.style.color=result.error?'var(--red)':'var(--ink)';
-    const length=text.replace(/\s/g,'').length;
-    resultNode.style.fontSize=length<=8?'32px':length<=11?'28px':length<=15?'24px':'20px';
-  }
-
-  function insertAmountToken(displayToken){
-    const amount=byId('amountInput'),token=OPERATOR_MAP[displayToken];
-    if(!amount||!token)return false;
-    const value=String(amount.value||''),start=Number.isInteger(amount.selectionStart)?amount.selectionStart:value.length,end=Number.isInteger(amount.selectionEnd)?amount.selectionEnd:start;
-    amount.value=value.slice(0,start)+token+value.slice(end);
-    const caret=start+token.length;dispatchInput(amount);updateAmountResult();
-    if(typeof amount.focus==='function')amount.focus();
-    if(typeof amount.setSelectionRange==='function'){try{amount.setSelectionRange(caret,caret)}catch{}}
-    return true;
-  }
-
-  async function dictate(){
-    const p=provider();
-    if(!p||p.mode!=='on_device'||typeof p.recognize!=='function')return Object.freeze({ok:false,error:'on_device_speech_unavailable'});
-    let recognized;try{recognized=await p.recognize()}catch{return Object.freeze({ok:false,error:'speech_recognition_failed'})}
-    if(!recognized?.ok||typeof recognized.text!=='string')return Object.freeze({ok:false,error:recognized?.error||'speech_recognition_failed'});
-    return applyText(recognized.text);
-  }
-  async function stopDictation(){
-    const p=provider();
-    if(!recording||!p||typeof p.stop!=='function')return false;
-    stopping=true;syncVoiceButton();
-    try{return (await p.stop())===true}catch{return false}
-  }
-  async function available(){
-    const p=provider();if(!p||p.mode!=='on_device'||typeof p.recognize!=='function')return false;
-    if(typeof p.isAvailable!=='function')return true;
-    try{return(await p.isAvailable())===true}catch{return false}
-  }
-
-  function makeHelper(text){const helper=root.document.createElement('div');helper.className='field-help';helper.textContent=text;helper.style.marginTop='6px';return helper}
-
-  function installStyle(){
-    if(byId('fpVoiceV2Style'))return;
-    const style=root.document.createElement('style');style.id='fpVoiceV2Style';style.textContent=`
-      @keyframes fpVoicePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.72)}}
-      #voiceOperationBtn.fp-recording{background:#d93025!important;color:#fff!important;border-color:#d93025!important}
-      #voiceOperationBtn .fp-record-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#fff;margin-right:8px;animation:fpVoicePulse 1s ease-in-out infinite}
-      .fp-hints-hidden .meta-note,.fp-hints-hidden .field-help,.fp-hints-hidden .settings-subtitle,.fp-hints-hidden .manager-help,.fp-hints-hidden .obligation-help{display:none!important}
-    `;root.document.head.appendChild(style);
-  }
-
-  function installArithmeticControls(amount){
-    if(byId('amountOperatorControls'))return;
-    const row=root.document.createElement('div');row.id='amountOperatorControls';row.setAttribute('aria-label','Арифметические действия');row.style.display='grid';row.style.gridTemplateColumns='repeat(4,minmax(0,1fr))';row.style.gap='7px';row.style.marginTop='9px';
-    for(const label of ['+','−','×','÷']){const button=root.document.createElement('button');button.type='button';button.className='btn secondary';button.textContent=label;button.dataset.amountOperator=OPERATOR_MAP[label];button.setAttribute('aria-label',`Вставить ${label}`);button.style.minHeight='44px';button.style.padding='8px 4px';button.addEventListener('click',()=>insertAmountToken(label));row.appendChild(button)}
-    amount.insertAdjacentElement('afterend',row);
-    const hint=byId('amountCalculation');if(hint)row.insertAdjacentElement('afterend',hint);
-    amount.addEventListener('input',updateAmountResult);amount.addEventListener('blur',updateAmountResult);updateAmountResult();
-  }
-
-  function installNoteParseAction(note){
-    if(byId('parseOperationNoteBtn'))return;
-    const wrap=root.document.createElement('div');wrap.id='parseOperationNoteWrap';wrap.style.marginTop='8px';
-    const button=root.document.createElement('button');button.type='button';button.id='parseOperationNoteBtn';button.className='btn secondary';button.textContent='Разобрать текст';button.style.width='100%';button.addEventListener('click',()=>{const error=byId('entryError');if(error)error.textContent='';const result=parseCurrentNote();if(!result.ok&&result.error!=='note_empty'&&error)error.textContent='Не удалось разобрать текст.'});
-    wrap.appendChild(button);wrap.appendChild(makeHelper('Порядок: сумма, точная категория, затем примечание. Для копеек можно сказать «7 запятая 61».'));note.insertAdjacentElement('afterend',wrap);
-  }
-
-  function syncVoiceButton(){
-    const button=byId('voiceOperationBtn');if(!button)return;
-    button.classList.toggle('fp-recording',recording&&!stopping);
-    if(recording&&!stopping){button.disabled=false;button.innerHTML='<span class="fp-record-dot"></span>Слушаю — нажмите, чтобы закончить';button.setAttribute('aria-label','Идёт запись. Нажмите, чтобы закончить и разобрать операцию.');return}
-    if(recording&&stopping){button.disabled=true;button.textContent='Обрабатываю…';return}
-    button.disabled=false;button.textContent='🎤 Продиктовать операцию';button.setAttribute('aria-label','Начать голосовой ввод операции FamilyPilot');
-  }
-
-  async function startVoiceSession(){
-    if(recording)return stopDictation();
-    const error=byId('entryError');if(error)error.textContent='';
-    const active=root.document.activeElement;if(active&&typeof active.blur==='function')active.blur();
-    recording=true;stopping=false;syncVoiceButton();
-    activeRecognition=dictate();
-    const result=await activeRecognition;
-    activeRecognition=null;recording=false;stopping=false;syncVoiceButton();
-    if(!result.ok&&error)error.textContent=result.error==='speech_recognition_failed'?'Не удалось распознать речь.':'Голосовой ввод недоступен.';
-    return result;
-  }
-
-  async function installVoiceAction(sheet,voiceAvailable){
-    if(byId('voiceOperationBtn'))return;
-    const anchor=byId('voiceOperationAnchor'),wrap=root.document.createElement('div');wrap.id='voiceOperationWrap';wrap.style.marginTop='18px';wrap.style.marginBottom='12px';
-    const button=root.document.createElement('button');button.type='button';button.id='voiceOperationBtn';button.className='btn secondary';button.style.width='100%';button.disabled=!voiceAvailable;
-    button.textContent=voiceAvailable?'🎤 Продиктовать операцию':'Голосовой ввод FamilyPilot недоступен';
-    if(voiceAvailable)button.addEventListener('click',()=>startVoiceSession());
-    wrap.appendChild(button);wrap.appendChild(makeHelper(voiceAvailable?'Говорите по порядку: сумма → точная категория → примечание. Нажмите кнопку ещё раз, чтобы закончить запись.':'Локальное распознавание для выбранного языка недоступно. Используйте ручной ввод.'));
-    if(anchor)anchor.appendChild(wrap);else{const head=sheet.querySelector('.entry-head');if(head?.nextSibling)sheet.insertBefore(wrap,head.nextSibling);else sheet.prepend(wrap)}
-  }
-
-  function syncSwitch(button,on){if(!button)return;button.classList.toggle('on',on);button.setAttribute('aria-pressed',String(on))}
-  function applyPreferences(){
-    const voiceEnabled=readPref(VOICE_PREF,true),hintsEnabled=readPref(HINTS_PREF,true);
-    const voiceWrap=byId('voiceOperationWrap');if(voiceWrap)voiceWrap.hidden=!voiceEnabled;
-    root.document.body?.classList.toggle('fp-hints-hidden',!hintsEnabled);
-    syncSwitch(byId('fpVoiceEnabledBtn'),voiceEnabled);syncSwitch(byId('fpHintsEnabledBtn'),hintsEnabled);
-  }
-  function settingRow(id,label,help){
-    const row=root.document.createElement('div');row.className='config-row';const copy=root.document.createElement('div'),title=root.document.createElement('label'),small=root.document.createElement('small'),button=root.document.createElement('button');title.textContent=label;small.textContent=help;copy.append(title,small);button.id=id;button.type='button';button.className='switch';button.setAttribute('aria-label',label);row.append(copy,button);return{row,button};
-  }
-  function installPreferences(){
-    if(byId('fpVoiceEnabledBtn')){applyPreferences();return}
-    const group=root.document.querySelector('#moreScreen .settings-group');if(!group)return;
-    const voice=settingRow('fpVoiceEnabledBtn','Голосовой ввод','Показывать кнопку голосового ввода операции.');
-    const hints=settingRow('fpHintsEnabledBtn','Подсказки','Показывать поясняющий текст для освоения приложения.');
-    const wide=group.querySelector('.settings-wide-action');group.insertBefore(voice.row,wide||null);group.insertBefore(hints.row,wide||null);
-    voice.button.addEventListener('click',()=>{writePref(VOICE_PREF,!readPref(VOICE_PREF,true));applyPreferences()});
-    hints.button.addEventListener('click',()=>{writePref(HINTS_PREF,!readPref(HINTS_PREF,true));applyPreferences()});
-    applyPreferences();
-  }
-
-  async function install(){
-    if(!root?.document||root.__FP_VOICE_V1_FORM_READY__)return false;
-    const amount=byId('amountInput'),note=byId('noteInput'),sheet=amount?.closest('.sheet');if(!amount||!note||!sheet||!root.FamilyPilotVoiceV1)return false;
-    installStyle();installArithmeticControls(amount);installNoteParseAction(note);installPreferences();
-    const voiceAvailable=await available();await installVoiceAction(sheet,voiceAvailable);applyPreferences();
-    root.__FP_VOICE_V1_FORM_READY__=true;return true;
-  }
-
-  return Object.freeze({version:2,categoriesFromForm,applyText,parseStructuredText,parseCurrentNote,normalizeVoicePrefix,calculateExpression,updateAmountResult,insertAmountToken,dictate,stopDictation,available,install});
-});
+(function(root,factory){'use strict';const api=factory(root);if(typeof module==='object'&&module.exports)module.exports=api;if(root&&root.document)root.FamilyPilotVoiceV1FormAdapter=api})(typeof globalThis!=='undefined'?globalThis:this,function(root){'use strict';
+const $=id=>root?.document?.getElementById(id)||null,p=()=>root?.FamilyPilotOnDeviceSpeechV1||null,OPS=Object.freeze({'+':'+','−':'-','-':'-','×':'*','*':'*','÷':'/','/':'/'}),VP='familypilot.voice.enabled.v1',HP='familypilot.hints.enabled.v1';let recording=false,stopping=false;
+const pref=(k,d=true)=>{try{const v=root.localStorage?.getItem(k);return v===null?d:v!=='false'}catch{return d}},setPref=(k,v)=>{try{root.localStorage?.setItem(k,v?'true':'false')}catch{}},input=n=>n.dispatchEvent(new Event('input',{bubbles:true}));
+function cats(){const s=$('categoryInput');return s?[...s.options].map(o=>({id:String(o.value),name:String(o.textContent||'')})):[]}
+function calc(raw){const t=String(raw||'').trim();if(!t)return{empty:true};const c=t.replace(/\s+/gu,'').replace(/,/g,'.').replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-');if(!/^[0-9.+\-*/()]+$/u.test(c))return{error:'invalid'};const z=c.match(/(?:\d+(?:\.\d*)?|\.\d+)|[()+\-*/]/g);if(!z||z.join('')!==c)return{error:'invalid'};let i=0;const a=()=>{const x=z[i++];if(x==='('){const v=s();if(z[i++]!==')')throw 0;return v}if(x==='+'||x==='-')return(x==='-'?-1:1)*a();const v=Number(x);if(!Number.isFinite(v))throw 0;return v},m=()=>{let v=a();while(z[i]==='*'||z[i]==='/'){const o=z[i++],r=a();if(o==='/'&&r===0)throw 0;v=o==='*'?v*r:v/r}return v},s=()=>{let v=m();while(z[i]==='+'||z[i]==='-'){const o=z[i++],r=m();v=o==='+'?v+r:v-r}return v};try{const v=s();return i===z.length&&Number.isFinite(v)?{value:Math.round(v*100)/100}:{error:'invalid'}}catch{return{error:'invalid'}}}
+function normalize(text){const v=String(text||'').trim(),num='(?:\\d+\\s+(?:запятая|точка)\\s+\\d{1,2}|\\d+:\\d{1,2}|\\d+(?:[.,]\\d+)?|[.,]\\d+)',op='(?:[+\\-−×*÷/]|плюс|минус|(?:умножить|помножить)\\s+на|(?:разделить|делить)\\s+на)',q=v.match(new RegExp(`^\\s*(${num}(?:\\s*${op}\\s*${num})*)`,'iu'));if(!q)return v;const e=q[1].replace(/(\d+)\s+(?:запятая|точка)\s+(\d{1,2})/giu,'$1,$2').replace(/(\d+):(\d{1,2})/gu,'$1,$2').replace(/(?:умножить|помножить)\s+на/giu,'*').replace(/(?:разделить|делить)\s+на/giu,'/').replace(/плюс/giu,'+').replace(/минус/giu,'-').replace(/[×]/g,'*').replace(/[÷]/g,'/').replace(/[−]/g,'-').replace(/\s+/gu,''),r=calc(e);if(r.error||r.empty||!Number.isFinite(r.value))return v;const tail=v.slice(q[0].length).replace(/^\s*(?:€|EUR|евро)(?=\s|$)\s*/iu,'').trimStart(),amount=String(Math.round(r.value*100)/100).replace('.',',');return tail?`${amount} ${tail}`:amount}
+function structured(text){const c=root?.FamilyPilotVoiceV1;if(!c?.parseTranscript)return Object.freeze({ok:false,error:'voice_core_unavailable'});const t=normalize(text);let r=c.parseTranscript({text:t,categories:cats()});if(!r?.ok)return r;const a=r.consumed?.find(x=>x.kind==='amount'),g=r.consumed?.find(x=>x.kind==='category'),start=t.search(/\S/u);if(a&&a.start===start&&(!g||!t.slice(a.end,g.start).trim()))return r;return c.parseTranscript({text:t,categories:[]})}
+function amountResult(){const a=$('amountInput'),n=$('amountCalculation');if(!a||!n)return;const r=calc(a.value),frac=!r.error&&!r.empty&&Math.abs(r.value-Math.round(r.value))>1e-9,text=r.empty?'0 €':r.error?'—':new Intl.NumberFormat('ru-RU',{minimumFractionDigits:frac?2:0,maximumFractionDigits:2}).format(r.value)+' €';n.textContent=text;n.className='fp-amount-result';Object.assign(n.style,{display:'block',marginTop:'9px',fontWeight:'950',lineHeight:'1.05',textAlign:'right',color:r.error?'var(--red)':'var(--ink)',fontSize:text.replace(/\s/gu,'').length<=8?'32px':text.replace(/\s/gu,'').length<=11?'28px':text.replace(/\s/gu,'').length<=15?'24px':'20px'})}
+function apply(r){if(!r?.ok||!r.draft)return r;const a=$('amountInput'),g=$('categoryInput'),n=$('noteInput');if(!a||!g||!n)return Object.freeze({ok:false,error:'voice_form_unavailable'});if(r.draft.amount!=null){a.value=String(r.draft.amount).replace('.',',');input(a)}if(r.draft.categoryId!=null){g.value=r.draft.categoryId;g.dispatchEvent(new Event('change',{bubbles:true}))}n.value=r.draft.note;input(n);amountResult();return Object.freeze({ok:true,draft:r.draft})}
+const applyText=t=>apply(structured(t));function parseNote(){const n=$('noteInput');if(!n)return Object.freeze({ok:false,error:'voice_form_unavailable'});const t=String(n.value||'').trim();return t?applyText(t):Object.freeze({ok:false,error:'note_empty'})}
+function insert(o){const a=$('amountInput'),t=OPS[o];if(!a||!t)return false;const v=String(a.value||''),s=Number.isInteger(a.selectionStart)?a.selectionStart:v.length,e=Number.isInteger(a.selectionEnd)?a.selectionEnd:s;a.value=v.slice(0,s)+t+v.slice(e);input(a);amountResult();a.focus?.();try{a.setSelectionRange?.(s+t.length,s+t.length)}catch{}return true}
+async function dictate(){const x=p();if(!x||x.mode!=='on_device'||typeof x.recognize!=='function')return Object.freeze({ok:false,error:'on_device_speech_unavailable'});let r;try{r=await x.recognize()}catch{return Object.freeze({ok:false,error:'speech_recognition_failed'})}return r?.ok&&typeof r.text==='string'?applyText(r.text):Object.freeze({ok:false,error:r?.error||'speech_recognition_failed'})}
+function voiceButton(){const b=$('voiceOperationBtn');if(!b)return;b.classList.toggle('fp-recording',recording&&!stopping);if(recording&&!stopping){b.disabled=false;b.innerHTML='<span class="fp-record-dot"></span>Слушаю — нажмите, чтобы закончить';b.setAttribute('aria-label','Идёт запись. Нажмите, чтобы закончить и разобрать операцию.')}else if(recording){b.disabled=true;b.textContent='Обрабатываю…'}else{b.disabled=false;b.textContent='🎤 Продиктовать операцию';b.setAttribute('aria-label','Начать голосовой ввод операции FamilyPilot')}}
+async function stop(){const x=p();if(!recording||!x||typeof x.stop!=='function')return false;stopping=true;voiceButton();try{const ok=(await x.stop())===true;if(!ok){stopping=false;voiceButton()}return ok}catch{stopping=false;voiceButton();return false}}
+async function session(){if(recording)return stop();const e=$('entryError');if(e)e.textContent='';root.document.activeElement?.blur?.();recording=true;stopping=false;voiceButton();const r=await dictate();recording=false;stopping=false;voiceButton();if(!r.ok&&e)e.textContent=r.error==='speech_recognition_failed'?'Не удалось распознать речь.':'Голосовой ввод недоступен.';return r}
+async function available(){const x=p();if(!x||x.mode!=='on_device'||typeof x.recognize!=='function')return false;if(typeof x.isAvailable!=='function')return true;try{return(await x.isAvailable())===true}catch{return false}}
+const help=t=>{const d=root.document.createElement('div');d.className='field-help';d.textContent=t;d.style.marginTop='6px';return d};
+function style(){if($('fpVoiceV2Style'))return;const s=root.document.createElement('style');s.id='fpVoiceV2Style';s.textContent='@keyframes fpVoicePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.72)}}#voiceOperationBtn.fp-recording{background:#d93025!important;color:#fff!important;border-color:#d93025!important}#voiceOperationBtn .fp-record-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#fff;margin-right:8px;animation:fpVoicePulse 1s ease-in-out infinite}.fp-hints-hidden .meta-note,.fp-hints-hidden .field-help,.fp-hints-hidden .settings-subtitle,.fp-hints-hidden .manager-help,.fp-hints-hidden .obligation-help{display:none!important}';root.document.head.appendChild(s)}
+function arithmetic(a){if($('amountOperatorControls'))return;const r=root.document.createElement('div');r.id='amountOperatorControls';r.setAttribute('aria-label','Арифметические действия');Object.assign(r.style,{display:'grid',gridTemplateColumns:'repeat(4,minmax(0,1fr))',gap:'7px',marginTop:'9px'});for(const l of ['+','−','×','÷']){const b=root.document.createElement('button');b.type='button';b.className='btn secondary';b.textContent=l;b.dataset.amountOperator=OPS[l];b.setAttribute('aria-label',`Вставить ${l}`);Object.assign(b.style,{minHeight:'44px',padding:'8px 4px'});b.addEventListener('click',()=>insert(l));r.appendChild(b)}a.insertAdjacentElement('afterend',r);const n=$('amountCalculation');if(n)r.insertAdjacentElement('afterend',n);a.addEventListener('input',amountResult);a.addEventListener('blur',amountResult);amountResult()}
+function noteAction(n){if($('parseOperationNoteBtn'))return;const w=root.document.createElement('div'),b=root.document.createElement('button');w.id='parseOperationNoteWrap';w.style.marginTop='8px';b.type='button';b.id='parseOperationNoteBtn';b.className='btn secondary';b.textContent='Разобрать текст';b.style.width='100%';b.addEventListener('click',()=>{const e=$('entryError');if(e)e.textContent='';const r=parseNote();if(!r.ok&&r.error!=='note_empty'&&e)e.textContent='Не удалось разобрать текст.'});w.append(b,help('Порядок: сумма, точная категория, затем примечание. Для копеек можно сказать «7 запятая 61».'));n.insertAdjacentElement('afterend',w)}
+async function voice(sheet,ok){if($('voiceOperationBtn'))return;const w=root.document.createElement('div'),b=root.document.createElement('button'),anchor=$('voiceOperationAnchor');w.id='voiceOperationWrap';Object.assign(w.style,{marginTop:'18px',marginBottom:'12px'});b.type='button';b.id='voiceOperationBtn';b.className='btn secondary';b.style.width='100%';b.disabled=!ok;b.textContent=ok?'🎤 Продиктовать операцию':'Голосовой ввод FamilyPilot недоступен';if(ok)b.addEventListener('click',()=>session());w.append(b,help(ok?'Говорите по порядку: сумма → точная категория → примечание. Нажмите кнопку ещё раз, чтобы закончить запись.':'Локальное распознавание для выбранного языка недоступно. Используйте ручной ввод.'));if(anchor)anchor.appendChild(w);else{const h=sheet.querySelector('.entry-head');h?.nextSibling?sheet.insertBefore(w,h.nextSibling):sheet.prepend(w)}}
+const sw=(b,on)=>{if(!b)return;b.classList.toggle('on',on);b.setAttribute('aria-pressed',String(on))};function prefs(){const v=pref(VP),h=pref(HP),w=$('voiceOperationWrap');if(w)w.hidden=!v;root.document.body?.classList.toggle('fp-hints-hidden',!h);sw($('fpVoiceEnabledBtn'),v);sw($('fpHintsEnabledBtn'),h)}
+function row(id,label,small){const r=root.document.createElement('div'),c=root.document.createElement('div'),l=root.document.createElement('label'),s=root.document.createElement('small'),b=root.document.createElement('button');r.className='config-row';l.textContent=label;s.textContent=small;c.append(l,s);b.id=id;b.type='button';b.className='switch';b.setAttribute('aria-label',label);r.append(c,b);return[r,b]}
+function settings(){if($('fpVoiceEnabledBtn'))return prefs();const g=root.document.querySelector('#moreScreen .settings-group');if(!g)return;const[v,vb]=row('fpVoiceEnabledBtn','Голосовой ввод','Показывать кнопку голосового ввода операции.'),[h,hb]=row('fpHintsEnabledBtn','Подсказки','Показывать поясняющий текст для освоения приложения.'),before=g.querySelector('.settings-wide-action');g.insertBefore(v,before||null);g.insertBefore(h,before||null);vb.addEventListener('click',()=>{setPref(VP,!pref(VP));prefs()});hb.addEventListener('click',()=>{setPref(HP,!pref(HP));prefs()});prefs()}
+function openSync(){const m=$('entryModal');if(!m||!root.MutationObserver||root.__FP_AMOUNT_RESULT_OBSERVER__)return;const o=new root.MutationObserver(()=>{if(m.classList.contains('open'))root.setTimeout?.(amountResult,0)});o.observe(m,{attributes:true,attributeFilter:['class']});root.__FP_AMOUNT_RESULT_OBSERVER__=o}
+async function install(){if(!root?.document||root.__FP_VOICE_V1_FORM_READY__)return false;const a=$('amountInput'),n=$('noteInput'),sheet=a?.closest('.sheet');if(!a||!n||!sheet||!root.FamilyPilotVoiceV1)return false;style();arithmetic(a);openSync();noteAction(n);settings();await voice(sheet,await available());prefs();root.__FP_VOICE_V1_FORM_READY__=true;return true}
+return Object.freeze({version:2,categoriesFromForm:cats,applyText,parseStructuredText:structured,parseCurrentNote:parseNote,normalizeVoicePrefix:normalize,calculateExpression:calc,updateAmountResult:amountResult,insertAmountToken:insert,dictate,stopDictation:stop,available,install})});
