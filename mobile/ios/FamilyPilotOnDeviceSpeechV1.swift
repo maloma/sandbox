@@ -6,6 +6,7 @@ import AVFAudio
 /// - Never permits network recognition.
 /// - Never persists raw audio.
 /// - Returns one finalized on-device transcript segment to the caller.
+/// - May also emit display-only partial text before finalization.
 final class FamilyPilotOnDeviceSpeechV1 {
     enum VoiceError: Error, Equatable {
         case speechPermissionDenied
@@ -23,6 +24,7 @@ final class FamilyPilotOnDeviceSpeechV1 {
     private var recognitionTask: SFSpeechRecognitionTask?
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var completion: Completion?
+    private var partialHandler: ((String) -> Void)?
     private var recognizing = false
 
     init(localeIdentifier: String) {
@@ -34,7 +36,10 @@ final class FamilyPilotOnDeviceSpeechV1 {
         return recognizer.supportsOnDeviceRecognition
     }
 
-    func recognize(completion: @escaping Completion) {
+    func recognize(
+        onPartial: @escaping (String) -> Void = { _ in },
+        completion: @escaping Completion
+    ) {
         DispatchQueue.main.async {
             guard !self.recognizing else {
                 completion(.failure(.recognitionBusy))
@@ -42,6 +47,7 @@ final class FamilyPilotOnDeviceSpeechV1 {
             }
             self.recognizing = true
             self.completion = completion
+            self.partialHandler = onPartial
             self.authorizeAndStart()
         }
     }
@@ -125,7 +131,7 @@ final class FamilyPilotOnDeviceSpeechV1 {
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.requiresOnDeviceRecognition = true
-        request.shouldReportPartialResults = false
+        request.shouldReportPartialResults = true
         self.request = request
 
         do {
@@ -148,12 +154,18 @@ final class FamilyPilotOnDeviceSpeechV1 {
 
         recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
             guard let self else { return }
-            if let result, result.isFinal {
-                let text = result.bestTranscription.formattedString
-                self.finish(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    ? .failure(.emptyTranscript)
-                    : .success(text))
-                return
+            if let result {
+                let text = result.bestTranscription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
+                if result.isFinal {
+                    self.finish(text.isEmpty ? .failure(.emptyTranscript) : .success(text))
+                    return
+                }
+                if !text.isEmpty {
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self, self.recognizing else { return }
+                        self.partialHandler?(text)
+                    }
+                }
             }
             if error != nil {
                 self.finish(.failure(.recognitionFailed))
@@ -174,6 +186,7 @@ final class FamilyPilotOnDeviceSpeechV1 {
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             let callback = self.completion
             self.completion = nil
+            self.partialHandler = nil
             callback?(result)
         }
     }

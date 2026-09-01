@@ -22,6 +22,7 @@ final class FamilyPilotSpeechWebBridgeV1: NSObject, WKScriptMessageHandler {
         let id: String
         let frame: WKFrameInfo
         var chunks: [String] = []
+        var partial = ""
         var stopping = false
 
         init(id: String, frame: WKFrameInfo) {
@@ -97,29 +98,62 @@ final class FamilyPilotSpeechWebBridgeV1: NSObject, WKScriptMessageHandler {
 
     private func startSegment(_ current: Session) {
         guard session === current, !current.stopping else { return }
-        speech.recognize { [weak self, weak current] result in
-            guard let self, let current else { return }
-            DispatchQueue.main.async {
-                guard self.session === current else { return }
-                switch result {
-                case .success(let text):
+        current.partial = ""
+        speech.recognize(
+            onPartial: { [weak self, weak current] text in
+                guard let self, let current else { return }
+                DispatchQueue.main.async {
+                    guard self.session === current, !current.stopping else { return }
                     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !trimmed.isEmpty { current.chunks.append(trimmed) }
-                    if current.stopping { self.complete(current) }
-                    else { self.startSegment(current) }
-                case .failure(let error):
-                    if current.stopping { self.complete(current) }
-                    else if error == .emptyTranscript || error == .recognitionFailed {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self, weak current] in
-                            guard let self, let current else { return }
-                            self.startSegment(current)
+                    guard !trimmed.isEmpty else { return }
+                    current.partial = trimmed
+                    self.publishPartial(current)
+                }
+            },
+            completion: { [weak self, weak current] result in
+                guard let self, let current else { return }
+                DispatchQueue.main.async {
+                    guard self.session === current else { return }
+                    switch result {
+                    case .success(let text):
+                        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !trimmed.isEmpty { current.chunks.append(trimmed) }
+                        current.partial = ""
+                        if current.stopping { self.complete(current) }
+                        else { self.startSegment(current) }
+                    case .failure(let error):
+                        if current.stopping {
+                            self.promotePartial(current)
+                            self.complete(current)
+                        } else if error == .emptyTranscript || error == .recognitionFailed {
+                            self.promotePartial(current)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self, weak current] in
+                                guard let self, let current else { return }
+                                self.startSegment(current)
+                            }
+                        } else {
+                            self.fail(current, error: Self.errorCode(error))
                         }
-                    } else {
-                        self.fail(current, error: Self.errorCode(error))
                     }
                 }
             }
-        }
+        )
+    }
+
+    private func publishPartial(_ current: Session) {
+        guard session === current, !current.stopping else { return }
+        let text = (current.chunks + [current.partial])
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        respond(id: current.id, values: ["event": "partial", "text": text], frame: current.frame)
+    }
+
+    private func promotePartial(_ current: Session) {
+        let text = current.partial.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !text.isEmpty { current.chunks.append(text) }
+        current.partial = ""
     }
 
     private func stopSession(stopRequestID: String, frame: WKFrameInfo) {
@@ -134,6 +168,7 @@ final class FamilyPilotSpeechWebBridgeV1: NSObject, WKScriptMessageHandler {
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self, weak current] in
             guard let self, let current, self.session === current else { return }
             self.speech.cancel()
+            self.promotePartial(current)
             if current.chunks.isEmpty { self.fail(current, error: "empty_transcript") }
             else { self.complete(current) }
         }

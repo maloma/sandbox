@@ -7,9 +7,9 @@
   const provider=Object.freeze({
     mode:'on_device',
     async isAvailable(){if(typeof host.isAvailable!=='function')return false;try{return(await host.isAvailable())===true}catch{return false}},
-    async recognize(){
+    async recognize(onPartial){
       if(typeof host.recognize!=='function')return failure('on_device_speech_unavailable');
-      let result;try{result=await host.recognize()}catch{return failure('speech_recognition_failed')}
+      let result;try{result=await host.recognize(text=>{if(typeof onPartial==='function')onPartial(text)})}catch{return failure('speech_recognition_failed')}
       if(!result||result.ok!==true||typeof result.text!=='string'||!result.text.trim())return failure(result?.error||'speech_recognition_failed');
       return Object.freeze({ok:true,text:result.text});
     },
