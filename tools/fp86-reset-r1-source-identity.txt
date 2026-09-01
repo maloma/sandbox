@@ -1,0 +1,3 @@
+FP86_ENTRY_UX_RESET_R1
+HEAD_BRANCH=fp86-entry-ux-reset-r1
+BASE_BRANCH=fp86-entry-ux-reset-r1-base
