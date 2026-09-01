@@ -31,6 +31,7 @@ class FamilyPilotSpeechWebBridgeV1(
         val id: String,
         val replyProxy: JavaScriptReplyProxy,
         val chunks: MutableList<String> = mutableListOf(),
+        var partial: String = "",
         var stopping: Boolean = false,
     )
 
@@ -89,22 +90,52 @@ class FamilyPilotSpeechWebBridgeV1(
 
     private fun startSegment(current: Session) {
         if (session !== current || current.stopping) return
-        speech.recognize { result ->
-            mainHandler.post {
-                if (session !== current) return@post
-                when (result) {
-                    is FamilyPilotOnDeviceSpeechV1.Result.Success -> {
-                        if (result.text.isNotBlank()) current.chunks.add(result.text.trim())
-                        if (current.stopping) complete(current) else startSegment(current)
-                    }
-                    is FamilyPilotOnDeviceSpeechV1.Result.Failure -> {
-                        if (current.stopping) complete(current)
-                        else if (isTransient(result.reason)) mainHandler.postDelayed({ startSegment(current) }, 120)
-                        else fail(current, result.reason)
+        current.partial = ""
+        speech.recognize(
+            callback = { result ->
+                mainHandler.post {
+                    if (session !== current) return@post
+                    when (result) {
+                        is FamilyPilotOnDeviceSpeechV1.Result.Success -> {
+                            if (result.text.isNotBlank()) current.chunks.add(result.text.trim())
+                            current.partial = ""
+                            if (current.stopping) complete(current) else startSegment(current)
+                        }
+                        is FamilyPilotOnDeviceSpeechV1.Result.Failure -> {
+                            if (current.stopping) {
+                                promotePartial(current)
+                                complete(current)
+                            } else if (isTransient(result.reason)) {
+                                promotePartial(current)
+                                mainHandler.postDelayed({ startSegment(current) }, 120)
+                            } else fail(current, result.reason)
+                        }
                     }
                 }
-            }
-        }
+            },
+            onPartial = { text ->
+                mainHandler.post {
+                    if (session !== current || current.stopping) return@post
+                    val trimmed = text.trim()
+                    if (trimmed.isNotEmpty()) {
+                        current.partial = trimmed
+                        publishPartial(current)
+                    }
+                }
+            },
+        )
+    }
+
+    private fun publishPartial(current: Session) {
+        if (session !== current || current.stopping) return
+        val text = (current.chunks + listOf(current.partial)).filter { it.isNotBlank() }.joinToString(" ").trim()
+        if (text.isNotEmpty()) reply(current.replyProxy, current.id, mapOf("event" to "partial", "text" to text))
+    }
+
+    private fun promotePartial(current: Session) {
+        val text = current.partial.trim()
+        if (text.isNotEmpty()) current.chunks.add(text)
+        current.partial = ""
     }
 
     private fun stopSession(id: String, replyProxy: JavaScriptReplyProxy) {
@@ -116,6 +147,7 @@ class FamilyPilotSpeechWebBridgeV1(
         mainHandler.postDelayed({
             if (session === current) {
                 speech.cancel()
+                promotePartial(current)
                 if (current.chunks.isNotEmpty()) complete(current) else fail(current, "empty_transcript")
             }
         }, 5000)
