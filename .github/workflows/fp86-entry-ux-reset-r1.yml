@@ -26,6 +26,7 @@ jobs:
       - run: node tools/fp86-native-app-shell-contract-smoke.cjs
       - run: node tools/fp86-physical-input-ux-smoke.cjs
       - run: node tools/fp86-entry-ux-reset-r1-smoke.cjs
+      - run: node tools/fp86-hints-off-layout-smoke.cjs
       - run: gradle -p mobile/android-app :app:assembleDebug -PvoiceLocaleTag=ru-RU
       - run: test -f mobile/android-app/app/build/outputs/apk/debug/app-debug.apk
       - name: Stage Android APK
@@ -49,6 +50,7 @@ jobs:
       - run: node tools/fp86-native-app-shell-contract-smoke.cjs
       - run: node tools/fp86-physical-input-ux-smoke.cjs
       - run: node tools/fp86-entry-ux-reset-r1-smoke.cjs
+      - run: node tools/fp86-hints-off-layout-smoke.cjs
       - run: xcodebuild -version
       - run: >-
           xcodebuild
