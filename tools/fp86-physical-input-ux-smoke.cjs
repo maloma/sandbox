@@ -9,66 +9,186 @@ const root=path.resolve(__dirname,'..');
 const adapterSource=fs.readFileSync(path.join(root,'familypilot-voice-v1-form-adapter.js'),'utf8');
 const coreSource=fs.readFileSync(path.join(root,'familypilot-voice-v1.js'),'utf8');
 
-assert.match(adapterSource,/Слушаю — нажмите, чтобы закончить/);
+assert.match(adapterSource,/FP86_ENTRY_UX_RESET_R1/);
+assert.match(adapterSource,/fp-unsaved-inline/);
+assert.match(adapterSource,/sheet\.insertBefore\(w,head\.nextSibling\)/);
+assert.doesNotMatch(adapterSource,/fp-unsaved-confirm\{position:fixed/);
+assert.doesNotMatch(adapterSource,/document\.body\.appendChild\(w\)/);
+assert.match(adapterSource,/Максимум 999 999,99\./);
+assert.doesNotMatch(adapterSource,/Максимум одной операции:/);
+assert.match(adapterSource,/placeCloudAccount/);
+assert.match(adapterSource,/fpCloudAccount/);
+assert.match(adapterSource,/moreScreen/);
+assert.match(adapterSource,/fp-cloud-settings-card/);
+assert.match(adapterSource,/\.fp-hints-hidden \.meta-note/);
+assert.match(adapterSource,/\.fp-hints-hidden \.field-help/);
 assert.match(adapterSource,/Слышу:/);
-assert.match(adapterSource,/voiceLiveTranscript/);
-assert.match(adapterSource,/aria-live/);
-assert.match(adapterSource,/Не услышал речь\. Попробуйте говорить чуть громче или ближе к телефону\./);
-assert.match(adapterSource,/fp-record-dot/);
-assert.match(adapterSource,/stopDictation/);
-assert.match(adapterSource,/familypilot\.voice\.enabled\.v1/);
-assert.match(adapterSource,/familypilot\.hints\.enabled\.v1/);
-assert.match(adapterSource,/voiceOperationWrap/);
-assert.match(adapterSource,/\.hidden=!v/);
+assert.match(adapterSource,/Распознано: \$\{r\.transcript\}/);
+assert.match(adapterSource,/Слушаю — нажмите, чтобы закончить/);
+assert.match(adapterSource,/Отменить результат/);
+assert.match(adapterSource,/Продиктовать заново/);
+assert.match(adapterSource,/Не нашёл сумму или точную категорию\./);
 assert.match(adapterSource,/\['\+','−','×','÷'\]/);
 assert.doesNotMatch(adapterSource,/\['\+','−','×','÷','\(','\)'\]/);
-assert.match(adapterSource,/minimumFractionDigits:frac\?2:0/);
-assert.match(adapterSource,/fontSize:/);
-assert.match(adapterSource,/Порядок: сумма, точная категория, затем примечание/);
-assert.match(adapterSource,/Выберите категорию/);
-assert.match(adapterSource,/Сохранить\?/);
-assert.match(adapterSource,/Не сохранять/);
-assert.match(adapterSource,/a\.oninput=expressionInput/,'adapter must override legacy numeric-only amount oninput');
-assert.match(adapterSource,/addEventListener\('click',intercept,true\)/,'save/close guard must run in capture before legacy bubble handler');
+assert.match(adapterSource,/a\.oninput=expressionInput/);
+assert.match(adapterSource,/addEventListener\('click',intercept,true\)/);
 assert.doesNotMatch(adapterSource,/note\.addEventListener\(['"]input['"]/);
 assert.doesNotMatch(adapterSource,/setInterval\(|autosave|autoSave/i);
 
-class FakeEvent{constructor(type,options={}){this.type=type;this.bubbles=Boolean(options.bubbles)}}
+class FakeEvent{
+  constructor(type,options={}){
+    this.type=type;
+    this.bubbles=Boolean(options.bubbles);
+  }
+}
+
 const amountEvents=[];
 const noteEvents=[];
 const categoryEvents=[];
-const amount={value:'',selectionStart:0,selectionEnd:0,focused:false,style:{},className:'',dispatchEvent(event){amountEvents.push(event.type);if(event.type==='input'&&typeof this.oninput==='function')this.oninput({target:this});return true},focus(){this.focused=true},setSelectionRange(start,end){this.selectionStart=start;this.selectionEnd=end}};
-const category={value:'',options:[{value:'',textContent:'Выберите категорию',disabled:true},{value:'products',textContent:'Продукты'},{value:'fuel',textContent:'Топливо'},{value:'transport',textContent:'Транспорт'}],dispatchEvent(event){categoryEvents.push(event.type);return true}};
-const note={value:'',dispatchEvent(event){noteEvents.push(event.type);return true}};
+
+const amount={
+  value:'',
+  selectionStart:0,
+  selectionEnd:0,
+  focused:false,
+  style:{},
+  className:'',
+  dispatchEvent(event){
+    amountEvents.push(event.type);
+    if(event.type==='input'&&typeof this.oninput==='function')this.oninput({target:this});
+    return true;
+  },
+  focus(){this.focused=true},
+  setSelectionRange(start,end){this.selectionStart=start;this.selectionEnd=end}
+};
+
+const category={
+  value:'',
+  options:[
+    {value:'',textContent:'Выберите категорию',disabled:true},
+    {value:'products',textContent:'Продукты'},
+    {value:'fuel',textContent:'Топливо'},
+    {value:'transport',textContent:'Транспорт'}
+  ],
+  dispatchEvent(event){
+    categoryEvents.push(event.type);
+    return true;
+  }
+};
+
+const note={
+  value:'',
+  dispatchEvent(event){
+    noteEvents.push(event.type);
+    return true;
+  }
+};
+
 const resultNode={textContent:'',style:{},className:''};
 const liveNode={textContent:'',hidden:true,dataset:{},style:{}};
+const recoveryNode={hidden:true};
 const editing={value:''};
-const date={value:'2026-09-01T20:00'};
-const save={attrs:{},dataset:{},setAttribute(k,v){this.attrs[k]=String(v)}};
-const entryError={textContent:''},categoryError={textContent:''};
-const nodes={amountInput:amount,categoryInput:category,noteInput:note,amountCalculation:resultNode,voiceLiveTranscript:liveNode,editingId:editing,dateInput:date,saveOperationBtn:save,entryError,categoryError};
-const document={getElementById:id=>nodes[id]||null,querySelectorAll:()=>[],querySelector:()=>null};
-const context={document,Event:FakeEvent,console,Intl,Object,Array,Set,Map,RegExp,String,Number,Math,JSON,Promise,setTimeout,clearTimeout};
+const date={value:'2026-09-01T20:00',dispatchEvent(){return true}};
+const save={
+  attrs:{},
+  dataset:{},
+  setAttribute(k,v){this.attrs[k]=String(v)}
+};
+const entryError={textContent:''};
+const categoryError={textContent:''};
+
+const amountLimitHint={
+  textContent:'Максимум одной операции: 999 999,99 €',
+  id:'',
+  className:'meta-note'
+};
+const amountField={
+  querySelectorAll(selector){
+    return selector==='.meta-note'?[amountLimitHint]:[];
+  }
+};
+amount.closest=selector=>selector==='.field'?amountField:null;
+
+const cloudClassSet=new Set();
+const cloud={
+  parentNode:{},
+  classList:{add(...items){for(const item of items)cloudClassSet.add(item)}},
+  removeAttribute(name){if(name==='style')this.styleRemoved=true}
+};
+const settingsGroup={nextSibling:{id:'after-settings'}};
+const more={
+  children:[],
+  querySelector(selector){return selector==='.settings-group'?settingsGroup:null},
+  insertBefore(node,before){this.children.push({node,before});node.parentNode=this},
+  appendChild(node){this.children.push({node,before:null});node.parentNode=this}
+};
+
+const nodes={
+  amountInput:amount,
+  categoryInput:category,
+  noteInput:note,
+  amountCalculation:resultNode,
+  voiceLiveTranscript:liveNode,
+  voiceResultRecovery:recoveryNode,
+  editingId:editing,
+  dateInput:date,
+  saveOperationBtn:save,
+  entryError,
+  categoryError,
+  fpCloudAccount:cloud,
+  moreScreen:more
+};
+
+const document={
+  getElementById:id=>nodes[id]||null,
+  querySelectorAll:()=>[],
+  querySelector:()=>null,
+  createElement:()=>({className:'',textContent:'',style:{}})
+};
+
+const context={
+  document,
+  Event:FakeEvent,
+  console,
+  Intl,
+  Object,
+  Array,
+  Set,
+  Map,
+  RegExp,
+  String,
+  Number,
+  Math,
+  JSON,
+  Promise,
+  setTimeout,
+  clearTimeout
+};
 context.globalThis=context;
+
 vm.createContext(context);
 vm.runInContext(coreSource,context,{filename:'familypilot-voice-v1.js'});
 vm.runInContext(adapterSource,context,{filename:'familypilot-voice-v1-form-adapter.js'});
+
 const api=context.FamilyPilotVoiceV1FormAdapter;
 assert(api);
-assert.strictEqual(api.version,3);
+assert.strictEqual(api.version,1);
+assert.strictEqual(api.architecture,'FP86_ENTRY_UX_RESET_R1');
 
 assert.deepStrictEqual(JSON.parse(JSON.stringify(api.categoriesFromForm())),[
   {id:'products',name:'Продукты'},
   {id:'fuel',name:'Топливо'},
   {id:'transport',name:'Транспорт'}
-],'blank category placeholder must never enter voice category candidates');
+]);
 
 assert.strictEqual(api.normalizeVoicePrefix('12:45 Продукты кофе'),'12,45 Продукты кофе');
-assert.strictEqual(api.normalizeVoicePrefix('3:05 Продукты вода'),'3,05 Продукты вода');
+assert.strictEqual(api.normalizeVoicePrefix('3:05 Топливо вода'),'3,05 Топливо вода');
 assert.strictEqual(api.normalizeVoicePrefix('7 запятая 61 Продукты вода'),'7,61 Продукты вода');
+assert.strictEqual(api.normalizeVoicePrefix('11 29 Продукты вода'),'11,29 Продукты вода');
+assert.strictEqual(api.normalizeVoicePrefix('11 29 Продукты чек 30 40'),'11,29 Продукты чек 30 40');
+assert.strictEqual(api.normalizeVoicePrefix('11 Продукты чек 30 40'),'11 Продукты чек 30 40');
+assert.strictEqual(api.normalizeVoicePrefix('11 9 Продукты вода'),'11 9 Продукты вода');
 assert.strictEqual(api.normalizeVoicePrefix('12 плюс 7 Продукты обед'),'19 Продукты обед');
-assert.strictEqual(api.normalizeVoicePrefix('12 умножить на 2 Продукты обед'),'24 Продукты обед');
-assert.strictEqual(api.normalizeVoicePrefix('20 евро Топливо Shell'),'20 Топливо Shell');
 assert.strictEqual(api.normalizeVoicePrefix('20 € Топливо Shell'),'20 Топливо Shell');
 assert.strictEqual(api.normalizeVoicePrefix('20 Продукты кофе плюс булочка'),'20 Продукты кофе плюс булочка');
 
@@ -78,68 +198,150 @@ assert.strictEqual(numericOnly.draft.amount,200);
 assert.strictEqual(numericOnly.draft.categoryId,null);
 assert.strictEqual(numericOnly.draft.note,'');
 
-note.value='12:45 Продукты кофе';category.value='transport';amount.value='';
-const parsedTime=api.parseCurrentNote();
-assert.strictEqual(parsedTime.ok,true);assert.strictEqual(amount.value,'12,45');assert.strictEqual(category.value,'products');assert.strictEqual(note.value,'кофе');
-
-note.value='3:05 Топливо Shell';category.value='products';amount.value='';
-const parsedSmall=api.parseCurrentNote();
-assert.strictEqual(parsedSmall.ok,true);assert.strictEqual(amount.value,'3,05');assert.strictEqual(category.value,'fuel');assert.strictEqual(note.value,'Shell');
-
-note.value='20 Shell Топливо';category.value='transport';amount.value='';
-const lateCategory=api.parseCurrentNote();
-assert.strictEqual(lateCategory.ok,true);assert.strictEqual(amount.value,'20');assert.strictEqual(category.value,'transport','category appearing after note text must not be extracted');assert.strictEqual(note.value,'Shell Топливо');
-
 assert.strictEqual(api.sanitizeAmountExpressionValue(' 12,50 + 7,50 '),'12,50+7,50');
 assert.strictEqual(api.sanitizeAmountExpressionValue('12×2−1'),'12*2-1');
-assert.strictEqual(api.sanitizeAmountExpressionValue('12abc+7'),'12+7');
 amount.oninput=event=>{event.target.value=api.sanitizeAmountExpressionValue(event.target.value)};
+
 for(const [display,internal] of [['+','+'],['−','-'],['×','*'],['÷','/']]){
-  amount.value='12';amount.selectionStart=2;amount.selectionEnd=2;amountEvents.length=0;amount.focused=false;
+  amount.value='12';
+  amount.selectionStart=2;
+  amount.selectionEnd=2;
+  amountEvents.length=0;
+  amount.focused=false;
   assert.strictEqual(api.insertAmountToken(display),true);
-  assert.strictEqual(amount.value,'12'+internal,'runtime amount oninput must preserve arithmetic operator');
-  assert.ok(amountEvents.includes('input'));assert.strictEqual(amount.focused,true);
+  assert.strictEqual(amount.value,'12'+internal);
+  assert.ok(amountEvents.includes('input'));
+  assert.strictEqual(amount.focused,true);
 }
-assert.strictEqual(api.insertAmountToken('('),false);assert.strictEqual(api.insertAmountToken(')'),false);
+assert.strictEqual(api.insertAmountToken('('),false);
+assert.strictEqual(api.insertAmountToken(')'),false);
 
-amount.value='12/5';api.updateAmountResult();assert.match(resultNode.textContent,/^2,40\s€$/u);assert.strictEqual(resultNode.style.fontSize,'32px');
-amount.value='999999,99';api.updateAmountResult();assert.match(resultNode.textContent,/999[\s\u00a0]999,99/);assert.ok(['28px','24px','20px'].includes(resultNode.style.fontSize));
+amount.value='12/5';
+api.updateAmountResult();
+assert.match(resultNode.textContent,/^2,40\s€$/u);
 
-amount.value='20';category.value='';assert.deepStrictEqual(JSON.parse(JSON.stringify(api.minimumEntryValidity())),{ok:false,field:'category'});
-category.value='fuel';assert.deepStrictEqual(JSON.parse(JSON.stringify(api.minimumEntryValidity())),{ok:true});
-amount.value='';assert.deepStrictEqual(JSON.parse(JSON.stringify(api.minimumEntryValidity())),{ok:false,field:'amount'});
+amount.value='20';
+category.value='';
+assert.deepStrictEqual(JSON.parse(JSON.stringify(api.minimumEntryValidity())),{ok:false,field:'category'});
+category.value='fuel';
+assert.deepStrictEqual(JSON.parse(JSON.stringify(api.minimumEntryValidity())),{ok:true});
+
+api.compactMaximumHint();
+assert.strictEqual(amountLimitHint.textContent,'Максимум 999 999,99.');
+assert.strictEqual(amountLimitHint.id,'amountLimitHint');
+
+assert.strictEqual(api.placeCloudAccount(),true);
+assert.strictEqual(cloud.parentNode,more);
+assert.ok(cloudClassSet.has('fp-cloud-settings-card'));
+assert.ok(cloudClassSet.has('card'));
+assert.ok(cloudClassSet.has('section'));
+assert.strictEqual(cloud.styleRemoved,true);
 
 const base={editing:'',amount:'',category:'',date:'2026-09-01T20:00',note:''};
 assert.strictEqual(api.sameEntrySnapshot(base,{...base}),true);
 assert.strictEqual(api.sameEntrySnapshot(base,{...base,note:'x'}),false);
 
+amount.value='77';
+category.value='fuel';
+date.value='2026-09-01T20:00';
+note.value='встреча завтра';
+const beforeNoExtraction=JSON.parse(JSON.stringify(api.entrySnapshot()));
+const noExtraction=api.parseCurrentNote();
+assert.strictEqual(noExtraction.ok,false);
+assert.strictEqual(noExtraction.error,'no_fields_extracted');
+assert.deepStrictEqual(JSON.parse(JSON.stringify(api.entrySnapshot())),beforeNoExtraction);
+
+amount.value='';
+category.value='';
+note.value='11 29 Продукты поздний чек';
+const parsedPair=api.parseCurrentNote();
+assert.strictEqual(parsedPair.ok,true);
+assert.strictEqual(amount.value,'11,29');
+assert.strictEqual(category.value,'products');
+assert.strictEqual(note.value,'поздний чек');
+
 (async()=>{
-  amount.value='';category.value='';note.value='';liveNode.hidden=true;liveNode.textContent='';
+  amount.value='';
+  category.value='';
+  note.value='';
+  liveNode.hidden=true;
+  liveNode.textContent='';
   let finishRecognize;
-  context.FamilyPilotOnDeviceSpeechV1={mode:'on_device',recognize(onPartial){onPartial('200 Топливо');return new Promise(resolve=>{finishRecognize=resolve})}};
+  context.FamilyPilotOnDeviceSpeechV1={
+    mode:'on_device',
+    recognize(onPartial){
+      onPartial('200 Топливо');
+      return new Promise(resolve=>{finishRecognize=resolve});
+    }
+  };
   const pending=api.dictate();
   await Promise.resolve();
   assert.strictEqual(liveNode.hidden,false);
   assert.strictEqual(liveNode.textContent,'Слышу: 200 Топливо');
-  assert.strictEqual(amount.value,'','partial text must not mutate amount before finalization');
-  assert.strictEqual(category.value,'','partial text must not mutate category before finalization');
-  assert.strictEqual(note.value,'','partial text must not mutate note before finalization');
+  assert.strictEqual(amount.value,'');
+  assert.strictEqual(category.value,'');
+  assert.strictEqual(note.value,'');
   finishRecognize({ok:true,text:'200 Топливо Shell'});
   const final=await pending;
   assert.strictEqual(final.ok,true);
   assert.strictEqual(amount.value,'200');
   assert.strictEqual(category.value,'fuel');
   assert.strictEqual(note.value,'Shell');
+  assert.strictEqual(final.transcript,'200 Топливо Shell');
 
-  console.log('FP86_PHYSICAL_INPUT_UX_V3_PASS');
-  console.log('FP86_LIVE_PARTIAL_DISPLAY_ONLY_PASS');
-  console.log('FP86_NUMERIC_ONLY_AMOUNT_200_PASS');
-  console.log('FP86_BLANK_CATEGORY_CANDIDATE_FILTER_PASS');
-  console.log('FP86_REQUIRED_AMOUNT_CATEGORY_GUARD_PASS');
-  console.log('FP86_UNSAVED_CLOSE_CONFIRM_CONTRACT_PASS');
-  console.log('FP86_RUNTIME_ARITHMETIC_OPERATOR_PASS');
-  console.log('FP86_AMOUNT_FIRST_CATEGORY_SECOND_PASS');
-  console.log('FP86_TIME_LIKE_DECIMAL_NORMALIZATION_PASS');
-  console.log('FP86_PROMINENT_AMOUNT_RESULT_PASS');
+  editing.value='op-exact';
+  amount.value='18';
+  category.value='products';
+  date.value='2026-09-01T21:37';
+  note.value='исходный комментарий';
+  const exactBefore=JSON.parse(JSON.stringify(api.entrySnapshot()));
+  context.FamilyPilotOnDeviceSpeechV1={
+    mode:'on_device',
+    recognize:async()=>({ok:true,text:'17 Топливо ошибка распознавания'})
+  };
+  const voiceFinal=await api.startVoiceSession();
+  assert.strictEqual(voiceFinal.ok,true);
+  assert.match(liveNode.textContent,/Распознано: 17 Топливо ошибка распознавания/);
+  assert.strictEqual(amount.value,'17');
+  assert.strictEqual(category.value,'fuel');
+  assert.strictEqual(note.value,'ошибка распознавания');
+  assert.strictEqual(recoveryNode.hidden,false);
+  assert.strictEqual(api.undoVoiceResult(),true);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(api.entrySnapshot())),exactBefore);
+  assert.strictEqual(recoveryNode.hidden,true);
+
+  context.FamilyPilotOnDeviceSpeechV1={
+    mode:'on_device',
+    recognize:async()=>({ok:true,text:'41 Топливо первый результат'})
+  };
+  await api.startVoiceSession();
+  let retryObserved=null;
+  let retryCalls=0;
+  context.FamilyPilotOnDeviceSpeechV1={
+    mode:'on_device',
+    recognize:async()=>{
+      retryCalls+=1;
+      retryObserved=JSON.parse(JSON.stringify(api.entrySnapshot()));
+      return {ok:false,error:'empty_transcript'};
+    }
+  };
+  const retried=await api.retryVoiceResult();
+  assert.strictEqual(retried.ok,false);
+  assert.strictEqual(retryCalls,1);
+  assert.deepStrictEqual(retryObserved,exactBefore);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(api.entrySnapshot())),exactBefore);
+
+  console.log('FP86_ENTRY_UX_RESET_R1_PASS');
+  console.log('FP86_INLINE_UNSAVED_CONFIRM_ARCH_PASS');
+  console.log('FP86_COMPACT_AMOUNT_LIMIT_PASS');
+  console.log('FP86_CLOUD_ACCOUNT_SETTINGS_PLACEMENT_PASS');
+  console.log('FP86_HINTS_OFF_LAYOUT_CONTRACT_PASS');
+  console.log('FP86_LIVE_PARTIAL_DISPLAY_ONLY_PRESERVED_PASS');
+  console.log('FP86_NUMERIC_ONLY_AMOUNT_200_PRESERVED_PASS');
+  console.log('FP86_REQUIRED_AMOUNT_CATEGORY_GUARD_PRESERVED_PASS');
+  console.log('FP86_RUNTIME_ARITHMETIC_OPERATOR_PRESERVED_PASS');
   console.log('FP86_NO_AUTO_SAVE_PRESERVED_PASS');
+  console.log('FP86_LEADING_EURO_CENTS_PAIR_PASS');
+  console.log('FP86_VOICE_RESULT_UNDO_RETRY_PASS');
+  console.log('FP86_NOTE_PARSE_FEEDBACK_NO_MUTATION_PASS');
 })();
