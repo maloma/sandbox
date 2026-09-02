@@ -16,6 +16,7 @@ const HP='familypilot.hints.enabled.v1';
 let recording=false;
 let stopping=false;
 let entryBaseline=null;
+let voiceRecovery=null;
 let allowDiscardOnce=false;
 
 const pref=(k,d=true)=>{
@@ -82,7 +83,8 @@ function calc(raw){
 }
 
 function normalize(text){
-  const v=String(text||'').trim();
+  const raw=String(text||'').trim();
+  const v=raw.replace(/^(\d+)\s+(\d{2})(?=\s|$)/u,'$1,$2');
   const num='(?:\\d+\\s+(?:запятая|точка)\\s+\\d{1,2}|\\d+:\\d{1,2}|\\d+(?:[.,]\\d+)?|[.,]\\d+)';
   const op='(?:[+\\-−×*÷/]|плюс|минус|(?:умножить|помножить)\\s+на|(?:разделить|делить)\\s+на)';
   const q=v.match(new RegExp(`^\\s*(${num}(?:\\s*${op}\\s*${num})*)`,'iu'));
@@ -166,7 +168,12 @@ function parseNote(){
   const n=$('noteInput');
   if(!n)return Object.freeze({ok:false,error:'voice_form_unavailable'});
   const t=String(n.value||'').trim();
-  return t?applyText(t):Object.freeze({ok:false,error:'note_empty'});
+  if(!t)return Object.freeze({ok:false,error:'note_empty'});
+  const r=structured(t);
+  if(!r?.ok)return r;
+  const extracted=(r.consumed||[]).filter(x=>x.kind==='amount'||x.kind==='category');
+  if(!extracted.length)return Object.freeze({ok:false,error:'no_fields_extracted'});
+  return apply(r);
 }
 
 function insert(o){
@@ -199,6 +206,52 @@ function setLive(text,state='partial'){
   n.textContent=t;
 }
 
+function showVoiceRecovery(show){
+  const n=$('voiceResultRecovery');
+  if(n)n.hidden=!show;
+}
+
+function clearVoiceRecovery(){
+  voiceRecovery=null;
+  showVoiceRecovery(false);
+}
+
+function restoreSnapshot(value){
+  if(!value)return false;
+  const editing=$('editingId'),amount=$('amountInput'),category=$('categoryInput'),date=$('dateInput'),note=$('noteInput');
+  if(!editing||!amount||!category||!date||!note)return false;
+  editing.value=value.editing;
+  amount.value=value.amount;
+  category.value=value.category;
+  date.value=value.date;
+  note.value=value.note;
+  input(amount);
+  category.dispatchEvent(new Event('change',{bubbles:true}));
+  input(date);
+  input(note);
+  amountResult();
+  syncSaveState();
+  return true;
+}
+
+function undoVoiceResult(){
+  if(recording||!voiceRecovery)return false;
+  const before=voiceRecovery;
+  clearVoiceRecovery();
+  if(!restoreSnapshot(before))return false;
+  setLive('Результат отменён. Черновик восстановлен.','final');
+  return true;
+}
+
+async function retryVoiceResult(){
+  if(recording||!voiceRecovery)return Object.freeze({ok:false,error:'voice_recovery_unavailable'});
+  const before=voiceRecovery;
+  clearVoiceRecovery();
+  if(!restoreSnapshot(before))return Object.freeze({ok:false,error:'voice_form_unavailable'});
+  setLive('Черновик восстановлен. Начинаю новую запись…','listening');
+  return session();
+}
+
 async function dictate(onPartial){
   const x=p();
   if(!x||x.mode!=='on_device'||typeof x.recognize!=='function'){
@@ -216,9 +269,13 @@ async function dictate(onPartial){
   }catch{
     return Object.freeze({ok:false,error:'speech_recognition_failed'});
   }
-  return r?.ok&&typeof r.text==='string'
-    ? applyText(r.text)
-    : Object.freeze({ok:false,error:r?.error||'speech_recognition_failed'});
+  if(!r?.ok||typeof r.text!=='string'){
+    return Object.freeze({ok:false,error:r?.error||'speech_recognition_failed'});
+  }
+  const applied=applyText(r.text);
+  return applied?.ok
+    ? Object.freeze({ok:true,draft:applied.draft,transcript:r.text})
+    : applied;
 }
 
 function voiceButton(){
@@ -263,6 +320,8 @@ async function session(){
   const e=$('entryError');
   if(e)e.textContent='';
   root.document.activeElement?.blur?.();
+  const before=snapshot();
+  clearVoiceRecovery();
   recording=true;
   stopping=false;
   setLive('Слушаю…','listening');
@@ -272,8 +331,11 @@ async function session(){
   stopping=false;
   voiceButton();
   if(r.ok){
-    setLive('Распознано. Проверьте поля перед сохранением.','final');
+    voiceRecovery=before;
+    showVoiceRecovery(true);
+    setLive(`Распознано: ${r.transcript}. Проверьте поля перед сохранением.`,'final');
   }else{
+    clearVoiceRecovery();
     const quiet=r.error==='empty_transcript'||String(r.error||'').startsWith('speech_recognition_failed');
     const msg=quiet
       ? 'Не услышал речь. Попробуйте говорить чуть громче или ближе к телефону.'
@@ -310,6 +372,8 @@ function style(){
 .fp-voice-live{margin-top:8px;padding:9px 11px;border-radius:12px;background:var(--card2);border:1px solid var(--line);font-size:13px;line-height:1.35}
 .fp-voice-live[data-state="partial"]{border-color:color-mix(in srgb,var(--green) 50%,var(--line))}
 .fp-voice-live[data-state="error"]{color:var(--red)}
+.fp-voice-recovery{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.fp-voice-recovery[hidden]{display:none!important}
 #saveOperationBtn[aria-disabled="true"]{opacity:.62}
 .fp-hints-hidden .meta-note,.fp-hints-hidden .field-help,.fp-hints-hidden .settings-subtitle,.fp-hints-hidden .manager-help,.fp-hints-hidden .obligation-help{display:none!important}
 .fp-unsaved-inline{margin:12px 0 2px;padding:13px;border:1px solid color-mix(in srgb,var(--blue) 42%,var(--line));border-radius:16px;background:color-mix(in srgb,var(--blue) 8%,var(--card));box-shadow:var(--shadow)}
@@ -394,6 +458,7 @@ function noteAction(n){
   if($('parseOperationNoteBtn'))return;
   const w=root.document.createElement('div');
   const b=root.document.createElement('button');
+  const result=root.document.createElement('div');
   w.id='parseOperationNoteWrap';
   w.style.marginTop='8px';
   b.type='button';
@@ -401,13 +466,25 @@ function noteAction(n){
   b.className='btn secondary';
   b.textContent='Разобрать текст';
   b.style.width='100%';
+  result.id='parseOperationNoteResult';
+  result.className='field-help';
+  result.hidden=true;
+  result.setAttribute('aria-live','polite');
   b.addEventListener('click',()=>{
     const e=$('entryError');
     if(e)e.textContent='';
     const r=parseNote();
-    if(!r.ok&&r.error!=='note_empty'&&e)e.textContent='Не удалось разобрать текст.';
+    result.hidden=false;
+    result.dataset.state=r.ok?'success':'error';
+    result.textContent=r.ok
+      ? 'Готово: найденные поля заполнены. Проверьте и сохраните черновик вручную.'
+      : r.error==='no_fields_extracted'
+        ? 'Не нашёл сумму или точную категорию.'
+        : r.error==='note_empty'
+          ? 'Введите текст для разбора.'
+          : 'Не удалось разобрать текст.';
   });
-  w.append(b,help('Порядок: сумма, точная категория, затем примечание. Для копеек можно сказать «7 запятая 61».'));
+  w.append(b,result,help('Порядок: сумма, точная категория, затем примечание. Для копеек можно сказать «7 запятая 61» или «7 61».'));
   n.insertAdjacentElement('afterend',w);
 }
 
@@ -416,6 +493,9 @@ async function voice(sheet,ok){
   const w=root.document.createElement('div');
   const b=root.document.createElement('button');
   const live=root.document.createElement('div');
+  const recovery=root.document.createElement('div');
+  const undo=root.document.createElement('button');
+  const retry=root.document.createElement('button');
   const anchor=$('voiceOperationAnchor');
   w.id='voiceOperationWrap';
   Object.assign(w.style,{marginTop:'18px',marginBottom:'12px'});
@@ -429,10 +509,25 @@ async function voice(sheet,ok){
   live.className='fp-voice-live';
   live.hidden=true;
   live.setAttribute('aria-live','polite');
+  recovery.id='voiceResultRecovery';
+  recovery.className='fp-voice-recovery';
+  recovery.hidden=true;
+  undo.id='undoVoiceResultBtn';
+  undo.type='button';
+  undo.className='btn secondary';
+  undo.textContent='Отменить результат';
+  retry.id='retryVoiceResultBtn';
+  retry.type='button';
+  retry.className='btn secondary';
+  retry.textContent='Продиктовать заново';
+  undo.addEventListener('click',undoVoiceResult);
+  retry.addEventListener('click',()=>retryVoiceResult());
+  recovery.append(undo,retry);
   if(ok)b.addEventListener('click',()=>session());
   w.append(
     b,
     live,
+    recovery,
     help(ok
       ? 'Говорите по порядку: сумма → точная категория → примечание. Текст, который телефон слышит, появится здесь; поля заполнятся только после остановки.'
       : 'Локальное распознавание для выбранного языка недоступно. Используйте ручной ввод.')
@@ -661,7 +756,13 @@ function askSave(){
 function entryOpen(){
   ensureBlankCategory();
   entryBaseline=snapshot();
+  clearVoiceRecovery();
   setLive('');
+  const parseResult=$('parseOperationNoteResult');
+  if(parseResult){
+    parseResult.hidden=true;
+    parseResult.textContent='';
+  }
   hideConfirm();
   if($('entryError'))$('entryError').textContent='';
   if($('categoryError'))$('categoryError').textContent='';
@@ -718,6 +819,7 @@ function entryLifecycle(){
       entryOpen();
     }else{
       entryBaseline=null;
+      clearVoiceRecovery();
       hideConfirm();
       setLive('');
     }
@@ -768,7 +870,11 @@ return Object.freeze({
   updateAmountResult:amountResult,
   insertAmountToken:insert,
   dictate,
+  startVoiceSession:session,
   stopDictation:stop,
+  restoreEntrySnapshot:restoreSnapshot,
+  undoVoiceResult,
+  retryVoiceResult,
   available,
   entrySnapshot:snapshot,
   sameEntrySnapshot:sameSnapshot,

@@ -47,6 +47,7 @@ tasks.named("preBuild").configure {
 }
 
 dependencies {
+    implementation("androidx.activity:activity:1.10.1")
     implementation("androidx.core:core-ktx:1.19.0")
     implementation("androidx.webkit:webkit:1.17.0")
 }

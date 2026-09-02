@@ -23,7 +23,11 @@ assert.match(adapterSource,/fp-cloud-settings-card/);
 assert.match(adapterSource,/\.fp-hints-hidden \.meta-note/);
 assert.match(adapterSource,/\.fp-hints-hidden \.field-help/);
 assert.match(adapterSource,/Слышу:/);
+assert.match(adapterSource,/Распознано: \$\{r\.transcript\}/);
 assert.match(adapterSource,/Слушаю — нажмите, чтобы закончить/);
+assert.match(adapterSource,/Отменить результат/);
+assert.match(adapterSource,/Продиктовать заново/);
+assert.match(adapterSource,/Не нашёл сумму или точную категорию\./);
 assert.match(adapterSource,/\['\+','−','×','÷'\]/);
 assert.doesNotMatch(adapterSource,/\['\+','−','×','÷','\(','\)'\]/);
 assert.match(adapterSource,/a\.oninput=expressionInput/);
@@ -82,8 +86,9 @@ const note={
 
 const resultNode={textContent:'',style:{},className:''};
 const liveNode={textContent:'',hidden:true,dataset:{},style:{}};
+const recoveryNode={hidden:true};
 const editing={value:''};
-const date={value:'2026-09-01T20:00'};
+const date={value:'2026-09-01T20:00',dispatchEvent(){return true}};
 const save={
   attrs:{},
   dataset:{},
@@ -124,6 +129,7 @@ const nodes={
   noteInput:note,
   amountCalculation:resultNode,
   voiceLiveTranscript:liveNode,
+  voiceResultRecovery:recoveryNode,
   editingId:editing,
   dateInput:date,
   saveOperationBtn:save,
@@ -178,6 +184,10 @@ assert.deepStrictEqual(JSON.parse(JSON.stringify(api.categoriesFromForm())),[
 assert.strictEqual(api.normalizeVoicePrefix('12:45 Продукты кофе'),'12,45 Продукты кофе');
 assert.strictEqual(api.normalizeVoicePrefix('3:05 Топливо вода'),'3,05 Топливо вода');
 assert.strictEqual(api.normalizeVoicePrefix('7 запятая 61 Продукты вода'),'7,61 Продукты вода');
+assert.strictEqual(api.normalizeVoicePrefix('11 29 Продукты вода'),'11,29 Продукты вода');
+assert.strictEqual(api.normalizeVoicePrefix('11 29 Продукты чек 30 40'),'11,29 Продукты чек 30 40');
+assert.strictEqual(api.normalizeVoicePrefix('11 Продукты чек 30 40'),'11 Продукты чек 30 40');
+assert.strictEqual(api.normalizeVoicePrefix('11 9 Продукты вода'),'11 9 Продукты вода');
 assert.strictEqual(api.normalizeVoicePrefix('12 плюс 7 Продукты обед'),'19 Продукты обед');
 assert.strictEqual(api.normalizeVoicePrefix('20 € Топливо Shell'),'20 Топливо Shell');
 assert.strictEqual(api.normalizeVoicePrefix('20 Продукты кофе плюс булочка'),'20 Продукты кофе плюс булочка');
@@ -231,6 +241,25 @@ const base={editing:'',amount:'',category:'',date:'2026-09-01T20:00',note:''};
 assert.strictEqual(api.sameEntrySnapshot(base,{...base}),true);
 assert.strictEqual(api.sameEntrySnapshot(base,{...base,note:'x'}),false);
 
+amount.value='77';
+category.value='fuel';
+date.value='2026-09-01T20:00';
+note.value='встреча завтра';
+const beforeNoExtraction=JSON.parse(JSON.stringify(api.entrySnapshot()));
+const noExtraction=api.parseCurrentNote();
+assert.strictEqual(noExtraction.ok,false);
+assert.strictEqual(noExtraction.error,'no_fields_extracted');
+assert.deepStrictEqual(JSON.parse(JSON.stringify(api.entrySnapshot())),beforeNoExtraction);
+
+amount.value='';
+category.value='';
+note.value='11 29 Продукты поздний чек';
+const parsedPair=api.parseCurrentNote();
+assert.strictEqual(parsedPair.ok,true);
+assert.strictEqual(amount.value,'11,29');
+assert.strictEqual(category.value,'products');
+assert.strictEqual(note.value,'поздний чек');
+
 (async()=>{
   amount.value='';
   category.value='';
@@ -258,6 +287,49 @@ assert.strictEqual(api.sameEntrySnapshot(base,{...base,note:'x'}),false);
   assert.strictEqual(amount.value,'200');
   assert.strictEqual(category.value,'fuel');
   assert.strictEqual(note.value,'Shell');
+  assert.strictEqual(final.transcript,'200 Топливо Shell');
+
+  editing.value='op-exact';
+  amount.value='18';
+  category.value='products';
+  date.value='2026-09-01T21:37';
+  note.value='исходный комментарий';
+  const exactBefore=JSON.parse(JSON.stringify(api.entrySnapshot()));
+  context.FamilyPilotOnDeviceSpeechV1={
+    mode:'on_device',
+    recognize:async()=>({ok:true,text:'17 Топливо ошибка распознавания'})
+  };
+  const voiceFinal=await api.startVoiceSession();
+  assert.strictEqual(voiceFinal.ok,true);
+  assert.match(liveNode.textContent,/Распознано: 17 Топливо ошибка распознавания/);
+  assert.strictEqual(amount.value,'17');
+  assert.strictEqual(category.value,'fuel');
+  assert.strictEqual(note.value,'ошибка распознавания');
+  assert.strictEqual(recoveryNode.hidden,false);
+  assert.strictEqual(api.undoVoiceResult(),true);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(api.entrySnapshot())),exactBefore);
+  assert.strictEqual(recoveryNode.hidden,true);
+
+  context.FamilyPilotOnDeviceSpeechV1={
+    mode:'on_device',
+    recognize:async()=>({ok:true,text:'41 Топливо первый результат'})
+  };
+  await api.startVoiceSession();
+  let retryObserved=null;
+  let retryCalls=0;
+  context.FamilyPilotOnDeviceSpeechV1={
+    mode:'on_device',
+    recognize:async()=>{
+      retryCalls+=1;
+      retryObserved=JSON.parse(JSON.stringify(api.entrySnapshot()));
+      return {ok:false,error:'empty_transcript'};
+    }
+  };
+  const retried=await api.retryVoiceResult();
+  assert.strictEqual(retried.ok,false);
+  assert.strictEqual(retryCalls,1);
+  assert.deepStrictEqual(retryObserved,exactBefore);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(api.entrySnapshot())),exactBefore);
 
   console.log('FP86_ENTRY_UX_RESET_R1_PASS');
   console.log('FP86_INLINE_UNSAVED_CONFIRM_ARCH_PASS');
@@ -269,4 +341,7 @@ assert.strictEqual(api.sameEntrySnapshot(base,{...base,note:'x'}),false);
   console.log('FP86_REQUIRED_AMOUNT_CATEGORY_GUARD_PRESERVED_PASS');
   console.log('FP86_RUNTIME_ARITHMETIC_OPERATOR_PRESERVED_PASS');
   console.log('FP86_NO_AUTO_SAVE_PRESERVED_PASS');
+  console.log('FP86_LEADING_EURO_CENTS_PAIR_PASS');
+  console.log('FP86_VOICE_RESULT_UNDO_RETRY_PASS');
+  console.log('FP86_NOTE_PARSE_FEEDBACK_NO_MUTATION_PASS');
 })();
