@@ -1,41 +1,28 @@
 # FP86_ENTRY_UX_RESET_R1
 
-Status: `RESET_IMPLEMENTATION_CANDIDATE / PRODUCER_VALIDATION_PENDING`
+Status: `APP_VOICE_REMOVAL_CANDIDATE / PRODUCER_VALIDATION_PENDING`
 
-## Why this is a reset
+## Current product boundary
 
-The prior V1/V2/V3 correction chain is frozen after two failed physical correction attempts before V3. This candidate is not V4 and does not extend that patch chain.
+FamilyPilot-owned operation voice is removed. Amount and Category are manual, Comment is an ordinary editable text field, and Save remains explicit. OS/keyboard dictation may enter Comment only as ordinary IME text; FamilyPilot does not recognize, parse, normalize, or route that text into financial fields.
 
-V3 commit `1b2d71778360c8961a6e746ece10777e25247e20` is used only as the byte source for unaffected lower-level implementation that remains supported by evidence. The reset changes the failed entry-UX ownership/presentation route under a new identifier.
+The earlier V1/V2/V3 voice correction chain is historical provenance only. It is not extended by this candidate.
 
-## Reimplementation scope
+## Retained entry UX
 
-`REIMPLEMENTATION_REQUIRED`:
-- unsaved-close confirmation presentation/lifecycle;
-- amount maximum helper layout;
-- cloud/account block placement relative to primary operation screen and fixed docks;
-- explicit hints-on / hints-off layout contract.
+- NEW starts with a blank Category; EDIT preserves the existing Category.
+- Amount accepts a manual arithmetic expression and validates the computed result.
+- The Amount hierarchy is result first, then `+ − × ÷`, then the editable `Расчёт` row.
+- Save uses the computed valid result, not the expression string.
+- Dirty-close `Сохранить?`, orientation/config-change preservation, receipt/file chooser, account placement, maximum hint, and hints on/off remain owned by the non-voice `familypilot-entry-ux-reset-r1.js` adapter.
 
-`PRESERVED_PENDING_VERIFICATION`:
-- on-device/native-only speech provider boundary;
-- live partial transcript remains display-only before Stop;
-- final amount → exact-category → note parsing;
-- numeric-only `200` → Amount;
-- explicit Stop/finalization;
-- arithmetic calculation/operator semantics;
-- blank category for new operation and amount+category save guard;
-- visible editable draft and no auto-save.
+## Removed integration
 
-## Reset architecture
-
-- unsaved-change confirmation is embedded inside the active entry sheet immediately below its header; no body-level fixed confirmation overlay is used;
-- amount result remains prominent and the maximum hint is compact: `Максимум 999 999,99.`;
-- hints-disabled mode removes hint/help rows without leaving an empty reserved row;
-- account/cloud readiness is moved into the intentional `Ещё` screen/settings flow instead of remaining free-standing below the app content;
-- fixed operation and bottom navigation docks no longer own/cover the cloud-account block.
+- operation voice controls, live/recovery controls, settings, and text parsing;
+- voice-to-fields parser and bootstrap;
+- Android/iOS recognizer, bridge, permissions, speech declarations, and speech frameworks;
+- obsolete voice-only tests and workflows.
 
 ## Acceptance boundary
 
-Producer validation must cover exact source identity, reset regression smoke, Android build and iOS build. Fresh independent review follows producer PASS. Physical Android validation is required after independent PASS, including both hints enabled and disabled.
-
-No merge, deploy, release/store publication or closure of FamilyPilot #86 / Error Ledger #751, #906, #907, #913 is authorized by this candidate alone.
+Producer validation covers deterministic entry tests, a real Android debug build, and the current workflow's Android/iOS builds. Fresh independent review follows producer PASS. No merge, deploy, release, issue closure, or Error Ledger closure is authorized.

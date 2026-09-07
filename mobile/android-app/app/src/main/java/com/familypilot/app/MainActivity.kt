@@ -1,9 +1,7 @@
 package com.familypilot.app
 
-import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.webkit.ValueCallback
@@ -15,21 +13,15 @@ import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.webkit.WebViewAssetLoader
-import com.familypilot.voice.FamilyPilotOnDeviceSpeechV1
-import com.familypilot.voice.FamilyPilotSpeechWebBridgeV1
-import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     companion object {
-        private const val MIC_PERMISSION_REQUEST = 8601
         private const val APP_ORIGIN = "https://appassets.androidplatform.net"
         private const val APP_URL = "$APP_ORIGIN/assets/index.html"
         private val FILE_MIME_TYPES = arrayOf("image/*", "application/pdf")
     }
 
-    private var pendingMicPermission: ((Boolean) -> Unit)? = null
     private var pendingFileChooser: ValueCallback<Array<Uri>>? = null
-    private var speechBridge: FamilyPilotSpeechWebBridgeV1? = null
     private lateinit var webView: WebView
     private val fileChooserLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val callback = pendingFileChooser
@@ -93,37 +85,7 @@ class MainActivity : ComponentActivity() {
         }
         setContentView(webView)
 
-        val localeTag = BuildConfig.FAMILY_PILOT_VOICE_LOCALE.trim()
-        if (localeTag.isNotEmpty()) {
-            val speech = FamilyPilotOnDeviceSpeechV1(this, Locale.forLanguageTag(localeTag))
-            val bridge = FamilyPilotSpeechWebBridgeV1(
-                webView = webView,
-                speech = speech,
-                allowedOriginRules = setOf(APP_ORIGIN),
-                requestMicrophonePermission = { callback -> requestMicrophone(callback) },
-            )
-            speechBridge = bridge
-            bridge.install { webView.loadUrl(APP_URL) }
-        } else {
-            webView.loadUrl(APP_URL)
-        }
-    }
-
-    private fun requestMicrophone(callback: (Boolean) -> Unit) {
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            callback(true)
-            return
-        }
-        pendingMicPermission = callback
-        requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MIC_PERMISSION_REQUEST)
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode != MIC_PERMISSION_REQUEST) return
-        val callback = pendingMicPermission
-        pendingMicPermission = null
-        callback?.invoke(grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED)
+        webView.loadUrl(APP_URL)
     }
 
     private fun isAcceptedReceiptUri(uri: Uri): Boolean {
@@ -133,11 +95,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        pendingMicPermission = null
         pendingFileChooser?.onReceiveValue(null)
         pendingFileChooser = null
-        speechBridge?.destroy()
-        speechBridge = null
         if (::webView.isInitialized) webView.destroy()
         super.onDestroy()
     }

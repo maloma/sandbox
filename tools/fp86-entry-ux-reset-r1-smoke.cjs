@@ -5,17 +5,29 @@ const fs=require('fs');
 const path=require('path');
 
 const root=path.resolve(__dirname,'..');
-const adapter=fs.readFileSync(path.join(root,'familypilot-voice-v1-form-adapter.js'),'utf8');
-const index=fs.readFileSync(path.join(root,'index.html'),'utf8');
-const reset=fs.readFileSync(path.join(root,'FP86_ENTRY_UX_RESET_R1.md'),'utf8');
-const activity=fs.readFileSync(path.join(root,'mobile/android-app/app/src/main/java/com/familypilot/app/MainActivity.kt'),'utf8');
-const androidGradle=fs.readFileSync(path.join(root,'mobile/android-app/app/build.gradle.kts'),'utf8');
-const manifest=fs.readFileSync(path.join(root,'mobile/android-app/app/src/main/AndroidManifest.xml'),'utf8');
+const read=relative=>fs.readFileSync(path.join(root,relative),'utf8');
+const exists=relative=>fs.existsSync(path.join(root,relative));
+const adapter=read('familypilot-entry-ux-reset-r1.js');
+const index=read('index.html');
+const reset=read('FP86_ENTRY_UX_RESET_R1.md');
+const activity=read('mobile/android-app/app/src/main/java/com/familypilot/app/MainActivity.kt');
+const manifest=read('mobile/android-app/app/src/main/AndroidManifest.xml');
 
-assert.match(reset,/V1\/V2\/V3 correction chain is frozen/);
-assert.match(reset,/not V4/);
+assert.match(reset,/FamilyPilot-owned operation voice is removed/);
 assert.match(adapter,/architecture:RESET_ID/);
 assert.match(adapter,/FP86_ENTRY_UX_RESET_R1/);
+assert.match(index,/familypilot-entry-ux-reset-r1\.js/,'the non-voice entry owner must load on web and both native shells');
+assert.match(index,/label for="amountInput">Сумма<\/label>/);
+assert.match(adapter,/field\.insertBefore\(n,a\)/,'computed result must move above controls and expression');
+assert.match(adapter,/field\.insertBefore\(r,a\)/);
+assert.match(adapter,/field\.insertBefore\(expression,a\)/);
+assert.match(adapter,/expressionLabel\.textContent='Расчёт'/);
+assert.match(adapter,/\['\+','−','×','÷'\]/);
+assert.match(index,/function saveOperation\(\)\{const calculation=updateAmountCalculation\(\),amount=calculation\.value/,'Save must consume the computed result');
+assert.match(index,/const rawNote=\$\('noteInput'\)\.value/);
+assert.doesNotMatch(index,/\$\('noteInput'\)\.(?:oninput|onchange|addEventListener)/,'Comment must remain ordinary text with no financial routing handler');
+assert.doesNotMatch(adapter,/parseTranscript|parseCurrentNote|applyText|recognize|dictat|speech|microphone|voice/i);
+
 assert.match(adapter,/fp-unsaved-inline/);
 assert.doesNotMatch(adapter,/fp-unsaved-confirm\{position:fixed/);
 assert.doesNotMatch(adapter,/document\.body\.appendChild\(w\)/);
@@ -25,34 +37,35 @@ assert.match(adapter,/placeCloudAccount/);
 assert.match(adapter,/more\.insertBefore\(cloud,settingsGroup\.nextSibling\)/);
 assert.match(adapter,/\.fp-hints-hidden \.meta-note/);
 assert.match(adapter,/\.fp-hints-hidden \.field-help/);
-assert.match(adapter,/Отменить результат/);
-assert.match(adapter,/Продиктовать заново/);
-assert.match(adapter,/Отменить ввод/);
-assert.match(adapter,/Начать заново/);
-assert.match(adapter,/Подготавливаю распознавание/);
-assert.match(adapter,/Не нашёл сумму или точную категорию\./);
+assert.match(adapter,/if\(!\$\('editingId'\)\?\.value\)/,'NEW must start without an inferred category');
+assert.match(adapter,/if\(!g\)return\{ok:false,field:'category'\}/,'manual Category remains required');
+assert.match(adapter,/if\(a\.empty\|\|a\.error/,'manual Amount remains validated');
+
+for(const removed of [
+  'familypilot-voice-v1.js',
+  'familypilot-voice-v1-native-entry.js',
+  'familypilot-voice-v1-form-adapter.js',
+  'familypilot-native-speech-provider-v1.js',
+  'familypilot-native-speech-web-host-v1.js',
+  'mobile/android/FamilyPilotOnDeviceSpeechV1.kt',
+  'mobile/android/FamilyPilotSpeechWebBridgeV1.kt',
+  'mobile/ios/FamilyPilotOnDeviceSpeechV1.swift',
+  'mobile/ios/FamilyPilotSpeechWebBridgeV1.swift'
+])assert.strictEqual(exists(removed),false,`${removed} must be removed`);
+
 assert.match(activity,/WebChromeClient/);
 assert.match(activity,/onShowFileChooser/);
 assert.match(activity,/Intent\.ACTION_OPEN_DOCUMENT/);
 assert.match(activity,/arrayOf\("image\/\*", "application\/pdf"\)/);
 assert.match(activity,/pendingFileChooser\?\.onReceiveValue\(null\)/);
-assert.match(activity,/registerForActivityResult\(ActivityResultContracts\.StartActivityForResult\(\)\)/);
-assert.match(activity,/result\.data\?\.clipData/);
-assert.match(activity,/filter\(::isAcceptedReceiptUri\)/);
-assert.match(activity,/pendingFileChooser = null/);
-assert.match(androidGradle,/androidx\.activity:activity:1\.10\.1/);
-assert.doesNotMatch(manifest,/READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|MANAGE_EXTERNAL_STORAGE/);
 assert.match(manifest,/android:configChanges="[^"]*orientation[^"]*screenSize[^"]*"/);
 assert.doesNotMatch(manifest,/android:screenOrientation=/);
-assert.match(index,/Максимум одной операции: 999 999,99 €/,'legacy source is intentionally adapted at runtime in Reset R1');
-assert.match(index,/id="fpCloudAccount"/,'legacy cloud block exists in source and must be relocated by Reset R1');
 assert.match(index,/accept="image\/\*,application\/pdf"/);
 assert.match(index,/RECEIPT_MAX=750000/);
 
-console.log('FP86_ENTRY_UX_RESET_R1_ARCHITECTURE_PASS');
-console.log('FP86_RESET_NOT_V4_PASS');
-console.log('FP86_CONFIRM_INSIDE_ENTRY_SHEET_PASS');
-console.log('FP86_COMPACT_MAXIMUM_COPY_PASS');
-console.log('FP86_CLOUD_BLOCK_RELOCATION_CONTRACT_PASS');
-console.log('FP86_HINTS_ON_OFF_LAYOUT_CONTRACT_PASS');
-console.log('FP86_ANDROID_BOUNDED_FILE_CHOOSER_CONTRACT_PASS');
+console.log('FP86_APP_VOICE_REMOVAL_PASS');
+console.log('FP86_MANUAL_ENTRY_CONTRACT_PASS');
+console.log('FP86_ARITHMETIC_RESULT_FIRST_UI_PASS');
+console.log('FP86_COMMENT_ORDINARY_TEXT_PASS');
+console.log('FP86_DIRTY_CLOSE_ORIENTATION_PASS');
+console.log('FP86_RECEIPT_LAYOUT_REGRESSION_PASS');

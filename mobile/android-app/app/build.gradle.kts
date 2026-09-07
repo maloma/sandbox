@@ -4,7 +4,6 @@ plugins {
     id("com.android.application")
 }
 
-val voiceLocaleTag = providers.gradleProperty("voiceLocaleTag").orElse("")
 val repoRoot = rootProject.projectDir.parentFile.parentFile
 val generatedWebAssets = layout.buildDirectory.dir("generated/familypilotWebAssets")
 
@@ -26,14 +25,8 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
-        buildConfigField("String", "FAMILY_PILOT_VOICE_LOCALE", "\"${voiceLocaleTag.get()}\"")
     }
 
-    buildFeatures {
-        buildConfig = true
-    }
-
-    sourceSets["main"].kotlin.srcDir("../../android")
     sourceSets["main"].assets.srcDir(generatedWebAssets.get().asFile)
 
     compileOptions {
