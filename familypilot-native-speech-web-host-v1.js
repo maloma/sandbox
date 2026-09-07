@@ -26,7 +26,7 @@
 
   root.__FP_NATIVE_SPEECH_BRIDGE_V1_DELIVER__=function(payload){
     const value=normalizePayload(payload),key=String(value.id||''),entry=pending.get(key);
-    if(value.event==='partial'){
+    if(value.event==='partial'||value.event==='ready'){
       if(!entry)return false;
       if(typeof entry.onEvent==='function')entry.onEvent(value);
       return true;
@@ -53,14 +53,16 @@
 
   root.FamilyPilotNativeSpeechHostV1=Object.freeze({
     async isAvailable(){const result=await request('isAvailable');return result?.available===true},
-    async recognize(onPartial){
+    async recognize(onPartial,onReady){
       const result=await request('recognize',null,payload=>{
         if(payload?.event==='partial'&&typeof payload.text==='string'&&typeof onPartial==='function')onPartial(payload.text);
+        if(payload?.event==='ready'&&typeof onReady==='function')onReady();
       });
       if(result?.ok===true&&typeof result.text==='string'&&result.text.trim())return Object.freeze({ok:true,text:result.text});
       return Object.freeze({ok:false,error:typeof result?.error==='string'?result.error:'speech_recognition_failed'});
     },
-    async stop(){const result=await request('stop',10000);return result?.ok===true}
+    async stop(){const result=await request('stop',10000);return result?.ok===true},
+    async cancel(){const result=await request('cancel',10000);return result?.ok===true}
   });
   root.__FP_NATIVE_SPEECH_WEB_HOST_V1_READY__=true;
 })(typeof globalThis!=='undefined'?globalThis:this);

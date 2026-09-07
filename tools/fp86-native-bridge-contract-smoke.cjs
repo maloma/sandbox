@@ -25,6 +25,9 @@ assert.match(android,/"stop"\s*->\s*stopSession/);
 assert.match(android,/speech\.stopListening\(\)/);
 assert.match(android,/chunks\.joinToString\(" "\)/);
 assert.match(android,/"event"\s+to\s+"partial"/);
+assert.match(android,/"event"\s+to\s+"ready"/);
+assert.match(android,/"cancel"\s*->\s*cancelSession/);
+assert.match(android,/fun destroy\(\)/);
 assert.match(android,/publishPartial\(current\)/);
 assert.match(android,/promotePartial\(current\)/);
 assert.match(androidSpeech,/EXTRA_PARTIAL_RESULTS,\s*true/);
@@ -44,6 +47,8 @@ assert.match(ios,/case "stop":/);
 assert.match(ios,/speech\.stopListening\(\)/);
 assert.match(ios,/chunks\.joined\(separator: " "\)/);
 assert.match(ios,/"event": "partial"/);
+assert.match(ios,/"event": "ready"/);
+assert.match(ios,/case "cancel":/);
 assert.match(ios,/publishPartial\(current\)/);
 assert.match(ios,/promotePartial\(current\)/);
 assert.match(iosSpeech,/shouldReportPartialResults\s*=\s*true/);
@@ -58,9 +63,11 @@ assert.match(ios,/Deliberately no fallback to the current frame/);
 
 assert.match(host,/request\('recognize',null/,'active recording request must not use the old short timeout');
 assert.match(host,/value\.event==='partial'/);
+assert.match(host,/value\.event==='ready'/);
 assert.match(host,/entry\.onEvent/);
-assert.match(host,/async recognize\(onPartial\)/);
+assert.match(host,/async recognize\(onPartial,onReady\)/);
 assert.match(host,/async stop\(\)/);
+assert.match(host,/async cancel\(\)/);
 assert.match(host,/request\('stop',10000\)/);
 assert.doesNotMatch(host,/webkitSpeechRecognition|SpeechRecognition/);
 
@@ -88,9 +95,15 @@ assert.doesNotMatch(entry,/SpeechRecognition|webkitSpeechRecognition/);
 
   const partial=[];
   let recognizeResolved=false;
-  const recognizePromise=context.FamilyPilotNativeSpeechHostV1.recognize(text=>partial.push(text)).then(v=>{recognizeResolved=true;return v});
+  let readyCount=0;
+  const recognizePromise=context.FamilyPilotNativeSpeechHostV1.recognize(text=>partial.push(text),()=>{readyCount+=1}).then(v=>{recognizeResolved=true;return v});
   const recognizeRequest=posted.at(-1);
   assert.equal(recognizeRequest.action,'recognize');
+
+  context.FamilyPilotNativeSpeechAndroidBridgeV1.onmessage({data:JSON.stringify({id:recognizeRequest.id,event:'ready'})});
+  await Promise.resolve();
+  assert.equal(readyCount,1);
+  assert.equal(recognizeResolved,false,'ready event must not finalize the recognition promise');
 
   context.FamilyPilotNativeSpeechAndroidBridgeV1.onmessage({data:JSON.stringify({id:recognizeRequest.id,event:'partial',text:'20 Топ'})});
   await Promise.resolve();
@@ -108,6 +121,18 @@ assert.doesNotMatch(entry,/SpeechRecognition|webkitSpeechRecognition/);
   const recognized=await recognizePromise;
   assert.deepStrictEqual(JSON.parse(JSON.stringify(recognized)),{ok:true,text:'20 Топливо Shell'});
 
+  const cancelRecognizePromise=context.FamilyPilotNativeSpeechHostV1.recognize(()=>{},()=>{});
+  const cancelRecognizeRequest=posted.at(-1);
+  const cancelPromise=context.FamilyPilotNativeSpeechHostV1.cancel();
+  const cancelRequest=posted.at(-1);
+  assert.equal(cancelRequest.action,'cancel');
+  context.FamilyPilotNativeSpeechAndroidBridgeV1.onmessage({data:JSON.stringify({id:cancelRequest.id,ok:true,cancelled:true})});
+  assert.equal(await cancelPromise,true);
+  context.FamilyPilotNativeSpeechAndroidBridgeV1.onmessage({data:JSON.stringify({id:cancelRecognizeRequest.id,ok:false,error:'recognition_cancelled'})});
+  const cancelled=await cancelRecognizePromise;
+  assert.equal(cancelled.ok,false);
+  assert.equal(cancelled.error,'recognition_cancelled');
+
   const noNative={setTimeout,clearTimeout,Date,Promise,JSON,Object};
   noNative.globalThis=noNative;
   vm.createContext(noNative);
@@ -117,6 +142,8 @@ assert.doesNotMatch(entry,/SpeechRecognition|webkitSpeechRecognition/);
   console.log('FP86_NATIVE_BRIDGE_CONTRACT_PASS');
   console.log('FP86_LIVE_PARTIAL_EVENT_PASS');
   console.log('FP86_PARTIAL_DOES_NOT_FINALIZE_PASS');
+  console.log('FP86_NATIVE_READY_EVENT_PASS');
+  console.log('FP86_NATIVE_ACTIVE_CANCEL_PASS');
   console.log('FP86_BUTTON_CONTROLLED_VOICE_SESSION_PASS');
   console.log('FP86_ANDROID_CONTINUOUS_SEGMENT_SESSION_PASS');
   console.log('FP86_IOS_CONTINUOUS_SEGMENT_SESSION_PASS');

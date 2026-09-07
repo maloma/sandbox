@@ -25,6 +25,9 @@ assert.match(adapterSource,/\.fp-hints-hidden \.field-help/);
 assert.match(adapterSource,/Слышу:/);
 assert.match(adapterSource,/Распознано: \$\{r\.transcript\}/);
 assert.match(adapterSource,/Слушаю — нажмите, чтобы закончить/);
+assert.match(adapterSource,/Подготавливаю распознавание/);
+assert.match(adapterSource,/Отменить ввод/);
+assert.match(adapterSource,/Начать заново/);
 assert.match(adapterSource,/Отменить результат/);
 assert.match(adapterSource,/Продиктовать заново/);
 assert.match(adapterSource,/Не нашёл сумму или точную категорию\./);
@@ -331,6 +334,63 @@ assert.strictEqual(note.value,'поздний чек');
   assert.deepStrictEqual(retryObserved,exactBefore);
   assert.deepStrictEqual(JSON.parse(JSON.stringify(api.entrySnapshot())),exactBefore);
 
+  amount.value='31';
+  category.value='products';
+  date.value='2026-09-01T22:15';
+  note.value='черновик до активной записи';
+  const activeBefore=JSON.parse(JSON.stringify(api.entrySnapshot()));
+  let readyActive;
+  let finishActive;
+  let cancelCalls=0;
+  context.FamilyPilotOnDeviceSpeechV1={
+    mode:'on_device',
+    recognize(_onPartial,onReady){
+      readyActive=onReady;
+      return new Promise(resolve=>{finishActive=resolve});
+    },
+    cancel:async()=>{
+      cancelCalls+=1;
+      finishActive({ok:false,error:'recognition_cancelled'});
+      return true;
+    }
+  };
+  const activeSession=api.startVoiceSession();
+  await Promise.resolve();
+  assert.match(liveNode.textContent,/Подготавливаю распознавание/);
+  assert.doesNotMatch(liveNode.textContent,/Слушаю|Говорите/);
+  readyActive();
+  assert.match(liveNode.textContent,/Говорите/);
+  assert.strictEqual(await api.cancelActiveVoiceSession(),true);
+  const activeCancelled=await activeSession;
+  assert.strictEqual(activeCancelled.error,'recognition_cancelled');
+  assert.strictEqual(cancelCalls,1);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(api.entrySnapshot())),activeBefore);
+
+  let recognizeCalls=0;
+  let finishFirst;
+  context.FamilyPilotOnDeviceSpeechV1={
+    mode:'on_device',
+    recognize(_onPartial,onReady){
+      recognizeCalls+=1;
+      onReady();
+      if(recognizeCalls===1)return new Promise(resolve=>{finishFirst=resolve});
+      return Promise.resolve({ok:true,text:'52 Топливо после перезапуска'});
+    },
+    cancel:async()=>{
+      finishFirst({ok:false,error:'recognition_cancelled'});
+      return true;
+    }
+  };
+  const restartedSession=api.startVoiceSession();
+  await Promise.resolve();
+  assert.strictEqual(await api.restartActiveVoiceSession(),true);
+  const restarted=await restartedSession;
+  assert.strictEqual(restarted.ok,true);
+  assert.strictEqual(recognizeCalls,2);
+  assert.strictEqual(amount.value,'52');
+  assert.strictEqual(category.value,'fuel');
+  assert.strictEqual(note.value,'после перезапуска');
+
   console.log('FP86_ENTRY_UX_RESET_R1_PASS');
   console.log('FP86_INLINE_UNSAVED_CONFIRM_ARCH_PASS');
   console.log('FP86_COMPACT_AMOUNT_LIMIT_PASS');
@@ -343,5 +403,8 @@ assert.strictEqual(note.value,'поздний чек');
   console.log('FP86_NO_AUTO_SAVE_PRESERVED_PASS');
   console.log('FP86_LEADING_EURO_CENTS_PAIR_PASS');
   console.log('FP86_VOICE_RESULT_UNDO_RETRY_PASS');
+  console.log('FP86_PRE_READY_PREPARATION_STATE_PASS');
+  console.log('FP86_ACTIVE_CANCEL_RESTORES_DRAFT_PASS');
+  console.log('FP86_ACTIVE_RESTART_PASS');
   console.log('FP86_NOTE_PARSE_FEEDBACK_NO_MUTATION_PASS');
 })();

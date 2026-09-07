@@ -35,7 +35,9 @@ class FamilyPilotOnDeviceSpeechV1(
     private var recognizer: SpeechRecognizer? = null
     private var callback: ((Result) -> Unit)? = null
     private var partialCallback: ((String) -> Unit)? = null
+    private var readyCallback: (() -> Unit)? = null
     private var finished = false
+    private var destroyed = false
 
     fun checkAvailability(callback: (Availability) -> Unit) {
         mainHandler.post { checkAvailabilityOnMain(callback) }
@@ -70,8 +72,13 @@ class FamilyPilotOnDeviceSpeechV1(
         }
     }
 
-    fun recognize(callback: (Result) -> Unit, onPartial: (String) -> Unit = {}) {
+    fun recognize(
+        callback: (Result) -> Unit,
+        onPartial: (String) -> Unit = {},
+        onReady: () -> Unit = {},
+    ) {
         mainHandler.post {
+            if (destroyed) { callback(Result.Failure("host_destroyed")); return@post }
             if (this.callback != null) { callback(Result.Failure("recognition_busy")); return@post }
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) { callback(Result.Failure("on_device_speech_unavailable")); return@post }
             if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { callback(Result.Failure("microphone_permission_denied")); return@post }
@@ -79,10 +86,12 @@ class FamilyPilotOnDeviceSpeechV1(
 
             this.callback = callback
             this.partialCallback = onPartial
+            this.readyCallback = onReady
             finished = false
             val speechRecognizer = try { SpeechRecognizer.createOnDeviceSpeechRecognizer(context) } catch (_: RuntimeException) {
                 this.callback = null
                 this.partialCallback = null
+                this.readyCallback = null
                 callback(Result.Failure("on_device_speech_unavailable"))
                 return@post
             }
@@ -96,6 +105,24 @@ class FamilyPilotOnDeviceSpeechV1(
     fun stopListening() { mainHandler.post { recognizer?.stopListening() } }
 
     fun cancel() { mainHandler.post { finishOnMain(Result.Failure("recognition_cancelled"), cancel = true) } }
+
+    /** Release the recognizer when its visible host is permanently destroyed. */
+    fun destroy() {
+        val teardown = {
+            destroyed = true
+            val current = recognizer
+            recognizer = null
+            val done = callback
+            callback = null
+            partialCallback = null
+            readyCallback = null
+            finished = true
+            current?.cancel()
+            current?.destroy()
+            done?.invoke(Result.Failure("host_destroyed"))
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) teardown() else mainHandler.post { teardown() }
+    }
 
     private fun intent(): Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -113,7 +140,12 @@ class FamilyPilotOnDeviceSpeechV1(
             if (text.isEmpty()) finish(Result.Failure("empty_transcript")) else finish(Result.Success(text))
         }
         override fun onError(error: Int) { finish(Result.Failure("speech_recognition_failed:$error")) }
-        override fun onReadyForSpeech(params: Bundle?) = Unit
+        override fun onReadyForSpeech(params: Bundle?) {
+            if (finished || callback == null) return
+            val ready = readyCallback
+            readyCallback = null
+            ready?.invoke()
+        }
         override fun onBeginningOfSpeech() = Unit
         override fun onRmsChanged(rmsdB: Float) = Unit
         override fun onBufferReceived(buffer: ByteArray?) = Unit
@@ -139,6 +171,7 @@ class FamilyPilotOnDeviceSpeechV1(
         val done = callback
         callback = null
         partialCallback = null
+        readyCallback = null
         done?.invoke(result)
     }
 

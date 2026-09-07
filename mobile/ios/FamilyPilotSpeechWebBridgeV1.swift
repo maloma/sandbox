@@ -24,6 +24,7 @@ final class FamilyPilotSpeechWebBridgeV1: NSObject, WKScriptMessageHandler {
         var chunks: [String] = []
         var partial = ""
         var stopping = false
+        var ready = false
 
         init(id: String, frame: WKFrameInfo) {
             self.id = id
@@ -81,6 +82,8 @@ final class FamilyPilotSpeechWebBridgeV1: NSObject, WKScriptMessageHandler {
             beginSession(id: id, frame: frame)
         case "stop":
             stopSession(stopRequestID: id, frame: frame)
+        case "cancel":
+            cancelSession(cancelRequestID: id, frame: frame)
         default:
             respond(id: id, values: ["ok": false, "error": "native_speech_bridge_unknown_action"], frame: frame)
         }
@@ -108,6 +111,14 @@ final class FamilyPilotSpeechWebBridgeV1: NSObject, WKScriptMessageHandler {
                     guard !trimmed.isEmpty else { return }
                     current.partial = trimmed
                     self.publishPartial(current)
+                }
+            },
+            onReady: { [weak self, weak current] in
+                guard let self, let current else { return }
+                DispatchQueue.main.async {
+                    guard self.session === current, !current.stopping, !current.ready else { return }
+                    current.ready = true
+                    self.respond(id: current.id, values: ["event": "ready"], frame: current.frame)
                 }
             },
             completion: { [weak self, weak current] result in
@@ -172,6 +183,17 @@ final class FamilyPilotSpeechWebBridgeV1: NSObject, WKScriptMessageHandler {
             if current.chunks.isEmpty { self.fail(current, error: "empty_transcript") }
             else { self.complete(current) }
         }
+    }
+
+    private func cancelSession(cancelRequestID: String, frame: WKFrameInfo) {
+        guard let current = session else {
+            respond(id: cancelRequestID, values: ["ok": false, "error": "recognition_not_active"], frame: frame)
+            return
+        }
+        session = nil
+        speech.cancel()
+        respond(id: current.id, values: ["ok": false, "error": "recognition_cancelled"], frame: current.frame)
+        respond(id: cancelRequestID, values: ["ok": true, "cancelled": true], frame: frame)
     }
 
     private func complete(_ current: Session) {

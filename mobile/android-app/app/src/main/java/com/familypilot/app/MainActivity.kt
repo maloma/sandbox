@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
 
     private var pendingMicPermission: ((Boolean) -> Unit)? = null
     private var pendingFileChooser: ValueCallback<Array<Uri>>? = null
+    private var speechBridge: FamilyPilotSpeechWebBridgeV1? = null
     private lateinit var webView: WebView
     private val fileChooserLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val callback = pendingFileChooser
@@ -101,6 +102,7 @@ class MainActivity : ComponentActivity() {
                 allowedOriginRules = setOf(APP_ORIGIN),
                 requestMicrophonePermission = { callback -> requestMicrophone(callback) },
             )
+            speechBridge = bridge
             bridge.install { webView.loadUrl(APP_URL) }
         } else {
             webView.loadUrl(APP_URL)
@@ -134,7 +136,9 @@ class MainActivity : ComponentActivity() {
         pendingMicPermission = null
         pendingFileChooser?.onReceiveValue(null)
         pendingFileChooser = null
-        webView.destroy()
+        speechBridge?.destroy()
+        speechBridge = null
+        if (::webView.isInitialized) webView.destroy()
         super.onDestroy()
     }
 }

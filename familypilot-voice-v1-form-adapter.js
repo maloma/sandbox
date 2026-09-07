@@ -15,6 +15,10 @@ const HP='familypilot.hints.enabled.v1';
 
 let recording=false;
 let stopping=false;
+let recognitionReady=false;
+let voiceAction=null;
+let voiceGeneration=0;
+let activeVoiceBaseline=null;
 let entryBaseline=null;
 let voiceRecovery=null;
 let allowDiscardOnce=false;
@@ -248,11 +252,11 @@ async function retryVoiceResult(){
   const before=voiceRecovery;
   clearVoiceRecovery();
   if(!restoreSnapshot(before))return Object.freeze({ok:false,error:'voice_form_unavailable'});
-  setLive('Черновик восстановлен. Начинаю новую запись…','listening');
+  setLive('Черновик восстановлен. Подготавливаю новую запись…','preparing');
   return session();
 }
 
-async function dictate(onPartial){
+async function dictate(onPartial,onReady,isCurrent=()=>true){
   const x=p();
   if(!x||x.mode!=='on_device'||typeof x.recognize!=='function'){
     return Object.freeze({ok:false,error:'on_device_speech_unavailable'});
@@ -260,11 +264,15 @@ async function dictate(onPartial){
   let r;
   try{
     r=await x.recognize(text=>{
+      if(!isCurrent())return;
       const t=String(text||'').trim();
       if(t){
         setLive(`Слышу: ${t}`,'partial');
         if(typeof onPartial==='function')onPartial(t);
       }
+    },()=>{
+      if(!isCurrent())return;
+      if(typeof onReady==='function')onReady();
     });
   }catch{
     return Object.freeze({ok:false,error:'speech_recognition_failed'});
@@ -272,6 +280,7 @@ async function dictate(onPartial){
   if(!r?.ok||typeof r.text!=='string'){
     return Object.freeze({ok:false,error:r?.error||'speech_recognition_failed'});
   }
+  if(!isCurrent())return Object.freeze({ok:false,error:'recognition_cancelled'});
   const applied=applyText(r.text);
   return applied?.ok
     ? Object.freeze({ok:true,draft:applied.draft,transcript:r.text})
@@ -281,11 +290,17 @@ async function dictate(onPartial){
 function voiceButton(){
   const b=$('voiceOperationBtn');
   if(!b)return;
-  b.classList.toggle('fp-recording',recording&&!stopping);
-  if(recording&&!stopping){
+  const active=recording&&!stopping;
+  b.classList.toggle('fp-recording',active&&recognitionReady);
+  showActiveVoiceControls(active);
+  if(active&&recognitionReady){
     b.disabled=false;
     b.innerHTML='<span class="fp-record-dot"></span>Слушаю — нажмите, чтобы закончить';
     b.setAttribute('aria-label','Идёт запись. Нажмите, чтобы закончить и разобрать операцию.');
+  }else if(active){
+    b.disabled=true;
+    b.textContent='Подготавливаю распознавание…';
+    b.setAttribute('aria-label','Телефон подготавливает локальное распознавание речи.');
   }else if(recording){
     b.disabled=true;
     b.textContent='Обрабатываю…';
@@ -315,20 +330,87 @@ async function stop(){
   }
 }
 
+function showActiveVoiceControls(show){
+  const n=$('voiceActiveControls');
+  if(n)n.hidden=!show;
+}
+
+async function requestActiveVoiceAction(action){
+  const x=p();
+  if(!recording||stopping||!x||typeof x.cancel!=='function')return false;
+  voiceAction=action;
+  voiceGeneration+=1;
+  recognitionReady=false;
+  setLive(action==='restart'?'Отменяю текущую запись и начинаю заново…':'Отменяю голосовой ввод…','preparing');
+  voiceButton();
+  try{
+    const ok=(await x.cancel())===true;
+    if(!ok&&voiceAction===action){
+      voiceAction=null;
+      setLive('Не удалось отменить активное распознавание.','error');
+    }
+    return ok;
+  }catch{
+    if(voiceAction===action)voiceAction=null;
+    setLive('Не удалось отменить активное распознавание.','error');
+    return false;
+  }
+}
+
+const cancelActiveVoiceSession=()=>requestActiveVoiceAction('cancel');
+const restartActiveVoiceSession=()=>requestActiveVoiceAction('restart');
+
 async function session(){
   if(recording)return stop();
   const e=$('entryError');
   if(e)e.textContent='';
   root.document.activeElement?.blur?.();
-  const before=snapshot();
+  let before=snapshot();
+  activeVoiceBaseline=before;
   clearVoiceRecovery();
   recording=true;
   stopping=false;
-  setLive('Слушаю…','listening');
-  voiceButton();
-  const r=await dictate();
+  voiceAction=null;
+  let r;
+  while(true){
+    recognitionReady=false;
+    const generation=++voiceGeneration;
+    setLive('Подготавливаю распознавание…','preparing');
+    voiceButton();
+    r=await dictate(undefined,()=>{
+      if(generation!==voiceGeneration||voiceAction)return;
+      recognitionReady=true;
+      setLive('Говорите…','listening');
+      voiceButton();
+    },()=>generation===voiceGeneration&&!voiceAction);
+    if(voiceAction==='restart'){
+      voiceAction=null;
+      const current=snapshot();
+      if(sameSnapshot(current,activeVoiceBaseline))restoreSnapshot(activeVoiceBaseline);
+      else{
+        activeVoiceBaseline=current;
+        before=current;
+      }
+      setLive('Черновик сохранён. Подготавливаю новую запись…','preparing');
+      continue;
+    }
+    if(voiceAction==='cancel'){
+      voiceAction=null;
+      recording=false;
+      stopping=false;
+      recognitionReady=false;
+      activeVoiceBaseline=null;
+      voiceButton();
+      clearVoiceRecovery();
+      setLive('Голосовой ввод отменён. Черновик сохранён без изменений.','final');
+      return Object.freeze({ok:false,error:'recognition_cancelled'});
+    }
+    break;
+  }
   recording=false;
   stopping=false;
+  recognitionReady=false;
+  activeVoiceBaseline=null;
   voiceButton();
   if(r.ok){
     voiceRecovery=before;
@@ -374,6 +456,8 @@ function style(){
 .fp-voice-live[data-state="error"]{color:var(--red)}
 .fp-voice-recovery{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
 .fp-voice-recovery[hidden]{display:none!important}
+.fp-voice-active{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.fp-voice-active[hidden]{display:none!important}
 #saveOperationBtn[aria-disabled="true"]{opacity:.62}
 .fp-hints-hidden .meta-note,.fp-hints-hidden .field-help,.fp-hints-hidden .settings-subtitle,.fp-hints-hidden .manager-help,.fp-hints-hidden .obligation-help{display:none!important}
 .fp-unsaved-inline{margin:12px 0 2px;padding:13px;border:1px solid color-mix(in srgb,var(--blue) 42%,var(--line));border-radius:16px;background:color-mix(in srgb,var(--blue) 8%,var(--card));box-shadow:var(--shadow)}
@@ -494,6 +578,9 @@ async function voice(sheet,ok){
   const b=root.document.createElement('button');
   const live=root.document.createElement('div');
   const recovery=root.document.createElement('div');
+  const active=root.document.createElement('div');
+  const cancel=root.document.createElement('button');
+  const restart=root.document.createElement('button');
   const undo=root.document.createElement('button');
   const retry=root.document.createElement('button');
   const anchor=$('voiceOperationAnchor');
@@ -509,6 +596,20 @@ async function voice(sheet,ok){
   live.className='fp-voice-live';
   live.hidden=true;
   live.setAttribute('aria-live','polite');
+  active.id='voiceActiveControls';
+  active.className='fp-voice-active';
+  active.hidden=true;
+  cancel.id='cancelActiveVoiceBtn';
+  cancel.type='button';
+  cancel.className='btn secondary';
+  cancel.textContent='Отменить ввод';
+  restart.id='restartActiveVoiceBtn';
+  restart.type='button';
+  restart.className='btn secondary';
+  restart.textContent='Начать заново';
+  cancel.addEventListener('click',()=>cancelActiveVoiceSession());
+  restart.addEventListener('click',()=>restartActiveVoiceSession());
+  active.append(cancel,restart);
   recovery.id='voiceResultRecovery';
   recovery.className='fp-voice-recovery';
   recovery.hidden=true;
@@ -527,6 +628,7 @@ async function voice(sheet,ok){
   w.append(
     b,
     live,
+    active,
     recovery,
     help(ok
       ? 'Говорите по порядку: сумма → точная категория → примечание. Текст, который телефон слышит, появится здесь; поля заполнятся только после остановки.'
@@ -872,6 +974,8 @@ return Object.freeze({
   dictate,
   startVoiceSession:session,
   stopDictation:stop,
+  cancelActiveVoiceSession,
+  restartActiveVoiceSession,
   restoreEntrySnapshot:restoreSnapshot,
   undoVoiceResult,
   retryVoiceResult,

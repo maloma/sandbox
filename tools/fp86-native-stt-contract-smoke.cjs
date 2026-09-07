@@ -42,7 +42,7 @@ assert.match(downloadBlock[0],/createOnDeviceSpeechRecognizer/);
 assert.match(downloadBlock[0],/triggerModelDownload/);
 assert.match(downloadBlock[0],/temporary\.destroy\(\)/);
 
-const recognizeBlock=android.match(/fun recognize\(callback:[\s\S]*?fun cancel/);
+const recognizeBlock=android.match(/fun recognize\([\s\S]*?fun cancel/);
 assert.ok(recognizeBlock);
 assert.match(recognizeBlock[0],/mainHandler\.post\s*\{/,'recognize must marshal to mainHandler');
 const cancelBlock=android.match(/fun cancel\(\)[\s\S]*?private fun intent/);
@@ -50,6 +50,13 @@ assert.ok(cancelBlock);
 assert.match(cancelBlock[0],/mainHandler\.post\s*\{/,'cancel must marshal to mainHandler');
 assert.match(android,/Looper\.myLooper\(\)\s*==\s*Looper\.getMainLooper\(\)/,'finish path must enforce main-thread cleanup');
 assert.match(android,/private fun finishOnMain/);
+assert.match(android,/readyCallback/,'Android recognizer must expose a native-ready callback');
+assert.match(android,/override fun onReadyForSpeech\(params: Bundle\?\)[\s\S]*ready\?\.invoke\(\)/,'Android ready must come from RecognitionListener.onReadyForSpeech');
+assert.match(android,/fun destroy\(\)/,'Android recognizer must expose deterministic host teardown');
+assert.match(android,/current\?\.cancel\(\)/);
+assert.match(android,/current\?\.destroy\(\)/);
+
+assert.match(ios,/onReady:/,'shared ready contract must remain buildable on iOS');
 
 const context={
   FamilyPilotNativeSpeechHostV1:{
@@ -81,5 +88,7 @@ assert.equal(context.__FP_NATIVE_SPEECH_PROVIDER_V1_READY__,true);
   console.log('FP86_IOS_ON_DEVICE_ONLY_PASS');
   console.log('FP86_ANDROID_ON_DEVICE_ONLY_PASS');
   console.log('FP86_ANDROID_MAIN_THREAD_BOUNDARY_PASS');
+  console.log('FP86_NATIVE_READY_SIGNAL_PASS');
+  console.log('FP86_ACTIVE_SPEECH_LIFECYCLE_TEARDOWN_PASS');
   console.log('FP86_NO_CLOUD_FALLBACK_PASS');
 })();

@@ -33,6 +33,7 @@ class FamilyPilotSpeechWebBridgeV1(
         val chunks: MutableList<String> = mutableListOf(),
         var partial: String = "",
         var stopping: Boolean = false,
+        var ready: Boolean = false,
     )
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -70,22 +71,24 @@ class FamilyPilotSpeechWebBridgeV1(
             }
             "recognize" -> beginSession(id, replyProxy)
             "stop" -> stopSession(id, replyProxy)
+            "cancel" -> cancelSession(id, replyProxy)
             else -> reply(replyProxy, id, mapOf("ok" to false, "error" to "native_speech_bridge_unknown_action"))
         }
     }
 
     private fun beginSession(id: String, replyProxy: JavaScriptReplyProxy) {
         if (session != null) { reply(replyProxy, id, mapOf("ok" to false, "error" to "recognition_busy")); return }
-        val hasPermission = ContextCompat.checkSelfPermission(webView.context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        if (hasPermission) { startSession(id, replyProxy); return }
-        mainHandler.post { requestMicrophonePermission { granted -> if (granted) startSession(id, replyProxy) else reply(replyProxy, id, mapOf("ok" to false, "error" to "microphone_permission_denied")) } }
-    }
-
-    private fun startSession(id: String, replyProxy: JavaScriptReplyProxy) {
-        if (session != null) { reply(replyProxy, id, mapOf("ok" to false, "error" to "recognition_busy")); return }
         val current = Session(id, replyProxy)
         session = current
-        startSegment(current)
+        val hasPermission = ContextCompat.checkSelfPermission(webView.context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission) { startSegment(current); return }
+        mainHandler.post {
+            requestMicrophonePermission { granted ->
+                if (session === current) {
+                    if (granted) startSegment(current) else fail(current, "microphone_permission_denied")
+                }
+            }
+        }
     }
 
     private fun startSegment(current: Session) {
@@ -123,6 +126,13 @@ class FamilyPilotSpeechWebBridgeV1(
                     }
                 }
             },
+            onReady = {
+                mainHandler.post {
+                    if (session !== current || current.stopping || current.ready) return@post
+                    current.ready = true
+                    reply(current.replyProxy, current.id, mapOf("event" to "ready"))
+                }
+            },
         )
     }
 
@@ -151,6 +161,23 @@ class FamilyPilotSpeechWebBridgeV1(
                 if (current.chunks.isNotEmpty()) complete(current) else fail(current, "empty_transcript")
             }
         }, 5000)
+    }
+
+    private fun cancelSession(id: String, replyProxy: JavaScriptReplyProxy) {
+        val current = session
+        if (current == null) { reply(replyProxy, id, mapOf("ok" to false, "error" to "recognition_not_active")); return }
+        session = null
+        speech.cancel()
+        reply(current.replyProxy, current.id, mapOf("ok" to false, "error" to "recognition_cancelled"))
+        reply(replyProxy, id, mapOf("ok" to true, "cancelled" to true))
+    }
+
+    /** The Activity owns this bridge and calls destroy before its WebView is released. */
+    fun destroy() {
+        mainHandler.removeCallbacksAndMessages(null)
+        session = null
+        installed = false
+        speech.destroy()
     }
 
     private fun complete(current: Session) {

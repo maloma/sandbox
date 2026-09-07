@@ -29,6 +29,11 @@ assert.match(activity,/BuildConfig\.FAMILY_PILOT_VOICE_LOCALE/);
 assert.doesNotMatch(activity,/SpeechRecognizer\.createSpeechRecognizer/);
 assert.match(manifest,/android\.permission\.RECORD_AUDIO/);
 assert.match(manifest,/usesCleartextTraffic="false"/);
+assert.match(manifest,/android:configChanges="[^"]*orientation[^"]*screenSize[^"]*"/,'ordinary orientation must preserve the Activity/WebView session');
+assert.doesNotMatch(manifest,/android:screenOrientation=/,'orientation must not be locked');
+assert.match(activity,/private var speechBridge: FamilyPilotSpeechWebBridgeV1\? = null/);
+assert.match(activity,/speechBridge\?\.destroy\(\)/,'host destruction must tear down active native speech');
+assert.match(activity,/if \(::webView\.isInitialized\) webView\.destroy\(\)/);
 
 assert.match(iosVC,/familypilot:\/\/app\/index\.html/);
 assert.match(iosVC,/allowedSchemes:\s*\["familypilot"\]/);
@@ -55,3 +60,6 @@ console.log('FP86_ANDROID_AGP9_KOTLIN_SOURCE_PASS');
 console.log('FP86_ANDROID_LOCAL_ASSET_ORIGIN_PASS');
 console.log('FP86_IOS_LOCAL_SCHEME_ORIGIN_PASS');
 console.log('FP86_EXPLICIT_BUILD_LOCALE_PASS');
+console.log('FP86_ORIENTATION_DRAFT_PRESERVATION_PASS');
+console.log('FP86_NO_ORIENTATION_LOCK_PASS');
+console.log('FP86_ACTIVITY_SPEECH_TEARDOWN_PASS');

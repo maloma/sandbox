@@ -25,6 +25,7 @@ final class FamilyPilotOnDeviceSpeechV1 {
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var completion: Completion?
     private var partialHandler: ((String) -> Void)?
+    private var readyHandler: (() -> Void)?
     private var recognizing = false
 
     init(localeIdentifier: String) {
@@ -38,6 +39,7 @@ final class FamilyPilotOnDeviceSpeechV1 {
 
     func recognize(
         onPartial: @escaping (String) -> Void = { _ in },
+        onReady: @escaping () -> Void = {},
         completion: @escaping Completion
     ) {
         DispatchQueue.main.async {
@@ -48,6 +50,7 @@ final class FamilyPilotOnDeviceSpeechV1 {
             self.recognizing = true
             self.completion = completion
             self.partialHandler = onPartial
+            self.readyHandler = onReady
             self.authorizeAndStart()
         }
     }
@@ -71,12 +74,14 @@ final class FamilyPilotOnDeviceSpeechV1 {
     private func authorizeAndStart() {
         authorizeSpeech { [weak self] speechAllowed in
             guard let self else { return }
+            guard self.recognizing else { return }
             guard speechAllowed else {
                 self.finish(.failure(.speechPermissionDenied))
                 return
             }
             self.authorizeMicrophone { [weak self] microphoneAllowed in
                 guard let self else { return }
+                guard self.recognizing else { return }
                 guard microphoneAllowed else {
                     self.finish(.failure(.microphonePermissionDenied))
                     return
@@ -123,6 +128,7 @@ final class FamilyPilotOnDeviceSpeechV1 {
     }
 
     private func startOnDeviceRecognition() {
+        guard recognizing else { return }
         guard let recognizer = SFSpeechRecognizer(locale: locale),
               recognizer.supportsOnDeviceRecognition else {
             finish(.failure(.onDeviceRecognitionUnavailable))
@@ -171,6 +177,9 @@ final class FamilyPilotOnDeviceSpeechV1 {
                 self.finish(.failure(.recognitionFailed))
             }
         }
+        let ready = readyHandler
+        readyHandler = nil
+        ready?()
     }
 
     private func finish(_ result: Result<String, VoiceError>, cancelTask: Bool = false) {
@@ -187,6 +196,7 @@ final class FamilyPilotOnDeviceSpeechV1 {
             let callback = self.completion
             self.completion = nil
             self.partialHandler = nil
+            self.readyHandler = nil
             callback?(result)
         }
     }
