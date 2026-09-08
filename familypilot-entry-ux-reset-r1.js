@@ -12,10 +12,22 @@ if(root&&root.document){
 const RESET_ID='FP86_ENTRY_UX_RESET_R1';
 const $=id=>root?.document?.getElementById(id)||null;
 const OPS=Object.freeze({'+':'+','−':'-','-':'-','×':'*','*':'*','÷':'/','/':'/'});
+const KEYPAD=Object.freeze([
+  Object.freeze(['7','8','9','+']),
+  Object.freeze(['4','5','6','−']),
+  Object.freeze(['1','2','3','×']),
+  Object.freeze(['.','0','⌫','÷'])
+]);
+const KEY_LABELS=Object.freeze({
+  '0':'Ноль','1':'Один','2':'Два','3':'Три','4':'Четыре',
+  '5':'Пять','6':'Шесть','7':'Семь','8':'Восемь','9':'Девять',
+  '.':'Десятичная точка','+':'Плюс','−':'Минус','×':'Умножить','÷':'Разделить','⌫':'Удалить последний символ'
+});
 const HP='familypilot.hints.enabled.v1';
 
 let entryBaseline=null;
 let allowDiscardOnce=false;
+let amountState={expression:'',preloaded:false};
 
 const pref=(k,d=true)=>{
   try{
@@ -74,13 +86,13 @@ function calc(raw){
 function amountResult(){
   const a=$('amountInput'),n=$('amountCalculation');
   if(!a||!n)return;
-  const r=calc(a.value);
-  const frac=!r.error&&!r.empty&&Math.abs(r.value-Math.round(r.value))>1e-9;
+  const r=keypadResult(a.value);
+  const frac=!r.error&&r.displayValue!==null&&Math.abs(r.displayValue-Math.round(r.displayValue))>1e-9;
   const text=r.empty
     ? '0 €'
-    : r.error
+    : r.displayValue===null
       ? '—'
-      : new Intl.NumberFormat('ru-RU',{minimumFractionDigits:frac?2:0,maximumFractionDigits:2}).format(r.value)+' €';
+      : new Intl.NumberFormat('ru-RU',{minimumFractionDigits:frac?2:0,maximumFractionDigits:2}).format(r.displayValue)+' €';
   n.textContent=text;
   n.className='fp-amount-result';
   Object.assign(n.style,{
@@ -94,19 +106,74 @@ function amountResult(){
   });
 }
 
-function insert(o){
-  const a=$('amountInput'),t=OPS[o];
-  if(!a||!t)return false;
-  const v=String(a.value||'');
-  const s=Number.isInteger(a.selectionStart)?a.selectionStart:v.length;
-  const e=Number.isInteger(a.selectionEnd)?a.selectionEnd:s;
-  a.value=v.slice(0,s)+t+v.slice(e);
+function canonicalExpression(value){
+  return sanitizeExpressionValue(value).replace(/,/g,'.');
+}
+
+function reduceKeypadState(state,key){
+  const current={
+    expression:canonicalExpression(state?.expression),
+    preloaded:!!state?.preloaded
+  };
+  const normalized=OPS[key]||key;
+  if(key==='⌫'){
+    return{expression:current.expression.slice(0,-1),preloaded:false};
+  }
+  if(/^[0-9]$/u.test(key)){
+    return{expression:canonicalExpression((current.preloaded?'':current.expression)+key),preloaded:false};
+  }
+  if(key==='.'){
+    let expression=current.preloaded?'':current.expression;
+    const operand=expression.match(/[^+\-*/]*$/u)?.[0]||'';
+    if(operand.includes('.'))return{expression,preloaded:false};
+    if(!operand)expression+='0';
+    return{expression:canonicalExpression(expression+'.'),preloaded:false};
+  }
+  if(Object.values(OPS).includes(normalized)){
+    if(!current.expression)return current;
+    const expression=/[+\-*/]$/u.test(current.expression)
+      ? current.expression.slice(0,-1)+normalized
+      : current.expression+normalized;
+    return{expression,preloaded:false};
+  }
+  return current;
+}
+
+function keypadResult(value){
+  const expression=canonicalExpression(value);
+  if(!expression)return{empty:true,displayValue:0,validForSave:false};
+  const complete=calc(expression);
+  if(!complete.error&&!complete.empty){
+    return{value:complete.value,displayValue:complete.value,validForSave:true};
+  }
+  if(/[+\-*/]$/u.test(expression)){
+    const prior=calc(expression.slice(0,-1));
+    if(!prior.error&&!prior.empty){
+      return{incomplete:true,displayValue:prior.value,validForSave:false};
+    }
+  }
+  return{error:'invalid',displayValue:null,validForSave:false};
+}
+
+function setAmountExpression(state){
+  const a=$('amountInput');
+  amountState={expression:canonicalExpression(state?.expression),preloaded:!!state?.preloaded};
+  if(!a)return false;
+  a.value=amountState.expression;
   input(a);
   amountResult();
   syncSaveState();
-  a.focus?.();
-  try{a.setSelectionRange?.(s+t.length,s+t.length)}catch{}
   return true;
+}
+
+function pressAmountKey(key){
+  if(!KEYPAD.flat().includes(key))return false;
+  return setAmountExpression(reduceKeypadState(amountState,key));
+}
+
+function insert(o){
+  const label=Object.entries(OPS).find(([visible,normalized])=>visible.length===1&&normalized===OPS[o]&&KEYPAD.flat().includes(visible))?.[0]||o;
+  return pressAmountKey(label);
 }
 
 function restoreSnapshot(value){
@@ -118,6 +185,8 @@ function restoreSnapshot(value){
   category.value=value.category;
   date.value=value.date;
   note.value=value.note;
+  amountState={expression:canonicalExpression(value.amount),preloaded:false};
+  amount.value=amountState.expression;
   input(amount);
   category.dispatchEvent(new Event('change',{bubbles:true}));
   input(date);
@@ -140,9 +209,10 @@ function style(){
 .fp-unsaved-inline p{margin:5px 0 11px;color:var(--muted);font-size:12px}
 .fp-unsaved-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 #amountLimitHint{display:block;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fp-amount-expression{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:10px;margin-top:9px}
-.fp-amount-expression-label{color:var(--muted);font-size:12px;font-weight:800}
-.fp-amount-expression #amountInput{min-width:0}
+.fp-amount-keypad{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
+.fp-amount-key{min-height:48px;padding:9px 4px;font-size:20px;font-weight:900}
+.fp-amount-key[data-amount-kind="operator"]{color:var(--blue)}
+.fp-amount-storage[hidden]{display:none!important}
 #fpCloudAccount.fp-cloud-settings-card{max-width:none!important;margin:10px 0!important;padding:14px!important;border-color:var(--line)!important;border-radius:20px!important;background:var(--card)!important;color:var(--ink)!important}
 #fpCloudAccount.fp-cloud-settings-card #fpCloudStatus{color:var(--muted)!important}
 `;
@@ -162,49 +232,44 @@ function sanitizeExpressionValue(value){
 function expressionInput(event){
   const a=event?.target;
   if(!a)return;
-  a.value=sanitizeExpressionValue(a.value);
+  a.value=canonicalExpression(a.value);
 }
 
 function arithmetic(a){
-  if($('amountOperatorControls'))return;
+  if($('amountKeypad'))return;
   a.oninput=expressionInput;
   const field=a.closest?.('.field');
   const n=$('amountCalculation');
   if(!field||!n)return;
-  const expression=root.document.createElement('div');
-  const expressionLabel=root.document.createElement('label');
-  const r=root.document.createElement('div');
-  expression.id='amountExpressionRow';
-  expression.className='fp-amount-expression';
-  expressionLabel.id='amountExpressionLabel';
-  expressionLabel.className='fp-amount-expression-label';
-  expressionLabel.textContent='Расчёт';
-  expressionLabel.setAttribute('for','amountInput');
+  const keypad=root.document.createElement('div');
+  const amountLabel=field.querySelector?.('label[for="amountInput"]');
+  if(amountLabel&&!amountLabel.id)amountLabel.id='amountKeypadLabel';
   n.setAttribute('role','status');
   n.setAttribute('aria-live','polite');
-  r.id='amountOperatorControls';
-  r.setAttribute('aria-label','Арифметические действия');
-  Object.assign(r.style,{
-    display:'grid',
-    gridTemplateColumns:'repeat(4,minmax(0,1fr))',
-    gap:'7px',
-    marginTop:'9px'
-  });
-  for(const l of ['+','−','×','÷']){
+  keypad.id='amountKeypad';
+  keypad.className='fp-amount-keypad';
+  keypad.setAttribute('role','group');
+  if(amountLabel)keypad.setAttribute('aria-labelledby',amountLabel.id);
+  else keypad.setAttribute('aria-label','Калькулятор суммы');
+  for(const key of KEYPAD.flat()){
     const b=root.document.createElement('button');
     b.type='button';
-    b.className='btn secondary';
-    b.textContent=l;
-    b.dataset.amountOperator=OPS[l];
-    b.setAttribute('aria-label',`Вставить ${l}`);
-    Object.assign(b.style,{minHeight:'44px',padding:'8px 4px'});
-    b.addEventListener('click',()=>insert(l));
-    r.appendChild(b);
+    b.className='btn secondary fp-amount-key';
+    b.textContent=key;
+    b.dataset.amountKey=key;
+    b.dataset.amountKind=OPS[key]?'operator':key==='⌫'?'backspace':key==='.'?'decimal':'digit';
+    b.setAttribute('aria-label',KEY_LABELS[key]);
+    b.addEventListener('click',()=>pressAmountKey(key));
+    keypad.appendChild(b);
   }
   field.insertBefore(n,a);
-  field.insertBefore(r,a);
-  field.insertBefore(expression,a);
-  expression.append(expressionLabel,a);
+  field.insertBefore(keypad,a);
+  a.readOnly=true;
+  a.tabIndex=-1;
+  a.hidden=true;
+  a.classList.add('fp-amount-storage');
+  a.setAttribute('inputmode','none');
+  a.setAttribute('aria-hidden','true');
   a.setAttribute('aria-describedby','amountCalculation amountLimitHint');
   a.addEventListener('input',()=>{
     amountResult();
@@ -436,6 +501,10 @@ function askSave(){
 }
 
 function entryOpen(){
+  const amount=$('amountInput');
+  const expression=$('editingId')?.value?canonicalExpression(amount?.value):'';
+  amountState={expression,preloaded:!!expression};
+  if(amount)amount.value=expression;
   ensureBlankCategory();
   entryBaseline=snapshot();
   hideConfirm();
@@ -524,8 +593,12 @@ function install(){
 return Object.freeze({
   version:1,
   architecture:RESET_ID,
+  keypadLayout:KEYPAD,
   calculateExpression:calc,
+  keypadExpressionResult:keypadResult,
+  reduceKeypadState,
   updateAmountResult:amountResult,
+  pressAmountKey,
   insertAmountToken:insert,
   restoreEntrySnapshot:restoreSnapshot,
   entrySnapshot:snapshot,

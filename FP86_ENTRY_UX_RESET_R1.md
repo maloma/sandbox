@@ -11,8 +11,11 @@ The earlier V1/V2/V3 voice correction chain is historical provenance only. It is
 ## Retained entry UX
 
 - NEW starts with a blank Category; EDIT preserves the existing Category.
-- Amount accepts a manual arithmetic expression and validates the computed result.
-- The Amount hierarchy is result first, then `+ − × ÷`, then the editable `Расчёт` row.
+- Amount is entered manually through a dedicated in-app calculator keypad; the Amount field does not open the Android/iOS system keyboard.
+- The Amount hierarchy is result first, followed by the integrated 4×4 keypad: `7 8 9 +`, `4 5 6 −`, `1 2 3 ×`, `. 0 ⌫ ÷`. There is no separate visible/editable `Расчёт` row and no `=` key.
+- Digits and one decimal point per operand build the internal expression. Operators retain normal arithmetic precedence, a repeated trailing operator replaces the previous one, and backspace removes the last character.
+- The result strip updates live. A trailing operator keeps the last valid computed result visible while the incomplete expression remains invalid for Save.
+- NEW starts with an empty expression and a zero result. EDIT initially shows its stored amount: a first digit/decimal replaces it, an operator continues from it, and backspace edits it.
 - Save uses the computed valid result, not the expression string.
 - Dirty-close `Сохранить?`, orientation/config-change preservation, receipt/file chooser, account placement, maximum hint, and hints on/off remain owned by the non-voice `familypilot-entry-ux-reset-r1.js` adapter.
 
