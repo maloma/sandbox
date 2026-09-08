@@ -1,6 +1,6 @@
 # FP86_ENTRY_UX_RESET_R1
 
-Status: `PHYSICAL_ANDROID_CORRECTION_R1 / PRODUCER_VALIDATION_PENDING`
+Status: `PHYSICAL_ANDROID_CORRECTION_R2 / PRODUCER_VALIDATION_PENDING`
 
 ## Current product boundary
 
@@ -19,13 +19,16 @@ The earlier V1/V2/V3 voice correction chain is historical provenance only. It is
 - Save uses the computed valid result, not the expression string.
 - Dirty-close `Сохранить?`, orientation/config-change preservation, receipt/file chooser, account placement, maximum hint, and hints on/off remain owned by the non-voice `familypilot-entry-ux-reset-r1.js` adapter.
 - Every explicit NEW/EDIT transition resets only the entry sheet to the top after layout; an already-open orientation/config preservation cycle does not reset it.
+- Operator keys keep the accepted 4×4 order and at least 48 px tap targets, with a larger, stronger operator-specific treatment so `+`, `−`, `×`, and `÷` remain distinct on a phone.
 
-## Physical Android correction R1
+## Physical Android correction R2
 
-- The Android Activity now forwards pause/resume to the existing `WebView`, pauses/resumes its timers, and requests layout/invalidation plus a bounded web resume event. It never reloads the page, so the live DOM, modal, and unsaved draft remain intact.
+- The Android Activity forwards pause/resume to the existing `WebView`, pauses/resumes its timers, and performs a bounded layout/invalidation plus `postVisualStateCallback` refresh on resume and regained window focus. The Activity and WebView use the same dark shell background, preventing the native window from exposing a white transition. It never reloads the page, so the live DOM, modal, and unsaved draft remain intact.
 - Android system Back uses `OnBackPressedDispatcher` and asks the web contract to unwind the top FamilyPilot modal/overlay or active in-app screen. Entry close still travels through the existing dirty-close `Сохранить?` guard; an unhandled Back falls through to Android normally.
-- The existing image/PDF document chooser is preserved and now also offers direct camera capture through a cache-only `FileProvider` URI. Cancellation/stale capture cleanup is bounded and no broad storage or camera permission is declared.
-- Operation detail shows receipt name/type/size, explicit attach/replace, preview/open, and confirmed removal actions. Images open in the in-app preview; Android PDF open is restricted to a validated local `application/pdf` data payload no larger than 750 KB, with an in-app fallback elsewhere.
+- The existing JPEG/PNG/WebP/PDF document chooser and cache-only `FileProvider` camera capture remain available. A non-empty app-owned `EXTRA_OUTPUT` file is authoritative even when a camera also returns result data; cancellation and stale cleanup remain bounded and no broad storage or camera permission is declared.
+- Each operation has an ordered `receipts` collection of up to eight stable attachment references. Binary blobs live in a dedicated IndexedDB object store, not the main localStorage state. Existing singular base64 `receipt` data remains readable and migrates lazily only after its blob is safely stored; migration failure retains the legacy data.
+- JPEG, PNG, and WebP inputs require matching MIME and magic bytes, are decoded with orientation, scaled to a maximum 2200 px long edge, and encoded as a bounded readable JPEG. PDF requires matching `%PDF-` content and retains the 750 KB limit. Display names are Unicode-normalized, stripped of controls, bidi/zero-width controls and path separators, length-bounded, and rendered only with `textContent`.
+- Operation detail renders every page with its own open and confirmed remove action. The image viewer provides fit-to-screen, zoom in/out/reset and scrolling/panning while zoomed. Android PDF open remains restricted to a validated local `application/pdf` payload with the in-app fallback preserved.
 
 ## Removed integration
 

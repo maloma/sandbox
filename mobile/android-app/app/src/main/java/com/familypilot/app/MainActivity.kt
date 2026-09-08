@@ -3,6 +3,7 @@ package com.familypilot.app
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Intent
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
@@ -31,9 +32,11 @@ class MainActivity : ComponentActivity() {
             "(function(){try{var c=window.FamilyPilotNativeContract;return !!(c&&c.handleBack&&c.handleBack());}catch(e){return false;}})()"
         private const val WEB_RESUME_SCRIPT =
             "window.dispatchEvent(new Event('familypilot:native-resume'));"
+        private const val WEB_VISUAL_REFRESH_SCRIPT =
+            "window.dispatchEvent(new Event('familypilot:native-visual-refresh'));"
         private const val WEB_RECEIPT_FALLBACK_SCRIPT =
             "window.FamilyPilotAndroid=undefined;window.openReceiptPreview?.();"
-        private val FILE_MIME_TYPES = arrayOf("image/*", "application/pdf")
+        private val FILE_MIME_TYPES = arrayOf("image/jpeg", "image/png", "image/webp", "application/pdf")
     }
 
     private var pendingFileChooser: ValueCallback<Array<Uri>>? = null
@@ -58,8 +61,13 @@ class MainActivity : ComponentActivity() {
             for (index in 0 until clip.itemCount) selected.add(clip.getItemAt(index).uri)
         }
         result.data?.data?.let(selected::add)
-        val captured = selected.isEmpty() && cameraUri != null && cameraFile?.length()?.let { it > 0L } == true
-        if (captured) selected.add(cameraUri)
+        val captured = cameraUri != null && cameraFile?.length()?.let { it > 0L } == true
+        if (captured) {
+            // EXTRA_OUTPUT is app-owned and authoritative. Some camera apps also return a
+            // thumbnail/data Uri; accepting that instead used to discard the real capture.
+            selected.clear()
+            selected.add(cameraUri)
+        }
         else cameraFile?.delete()
         val accepted = selected.distinct().filter(::isAcceptedReceiptUri)
         callback?.onReceiveValue(accepted.takeIf { it.isNotEmpty() }?.toTypedArray())
@@ -92,6 +100,7 @@ class MainActivity : ComponentActivity() {
             .build()
 
         webView = WebView(this).apply {
+            setBackgroundColor(Color.rgb(7, 24, 36))
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.allowFileAccess = false
@@ -169,7 +178,7 @@ class MainActivity : ComponentActivity() {
     private fun isAcceptedReceiptUri(uri: Uri): Boolean {
         if (uri.scheme != "content") return false
         val mime = contentResolver.getType(uri)
-        return mime?.startsWith("image/") == true || mime == "application/pdf"
+        return mime != null && FILE_MIME_TYPES.contains(mime)
     }
 
     private inner class ReceiptOpenBridge {
@@ -183,7 +192,10 @@ class MainActivity : ComponentActivity() {
             } catch (_: IllegalArgumentException) {
                 return false
             }
-            if (bytes.isEmpty() || bytes.size > MAX_RECEIPT_BYTES) return false
+            if (bytes.size < 5 || bytes.size > MAX_RECEIPT_BYTES) return false
+            if (bytes[0] != 0x25.toByte() || bytes[1] != 0x50.toByte() ||
+                bytes[2] != 0x44.toByte() || bytes[3] != 0x46.toByte() || bytes[4] != 0x2D.toByte()
+            ) return false
             val directory = File(cacheDir, "receipt-previews").apply { mkdirs() }
             val file = File.createTempFile("receipt-preview-", ".pdf", directory).apply { writeBytes(bytes) }
             val uri = FileProvider.getUriForFile(this@MainActivity, "$packageName.fileprovider", file)
@@ -217,10 +229,25 @@ class MainActivity : ComponentActivity() {
         if (!::webView.isInitialized) return
         webView.onResume()
         webView.resumeTimers()
+        requestVisualRefresh(WEB_RESUME_SCRIPT)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && ::webView.isInitialized) requestVisualRefresh(WEB_VISUAL_REFRESH_SCRIPT)
+    }
+
+    private fun requestVisualRefresh(eventScript: String) {
         webView.post {
             webView.requestLayout()
             webView.invalidate()
-            webView.evaluateJavascript(WEB_RESUME_SCRIPT, null)
+            webView.postVisualStateCallback(System.nanoTime()) {
+                webView.post {
+                    webView.requestLayout()
+                    webView.invalidate()
+                    webView.evaluateJavascript(eventScript, null)
+                }
+            }
         }
     }
 

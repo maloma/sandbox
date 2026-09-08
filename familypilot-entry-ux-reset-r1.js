@@ -24,11 +24,90 @@ const KEY_LABELS=Object.freeze({
   '.':'Десятичная точка','+':'Плюс','−':'Минус','×':'Умножить','÷':'Разделить','⌫':'Удалить последний символ'
 });
 const HP='familypilot.hints.enabled.v1';
+const RECEIPT_LIMIT=8;
+const RECEIPT_MIME_TYPES=Object.freeze(['image/jpeg','image/png','image/webp','application/pdf']);
 
 let entryBaseline=null;
 let allowDiscardOnce=false;
 let amountState={expression:'',preloaded:false};
 let entryWasOpen=false;
+
+function sanitizeReceiptName(value){
+  const normalized=String(value||'').normalize?.('NFKC')||String(value||'');
+  const clean=normalized
+    .replace(/[\u0000-\u001f\u007f-\u009f]/gu,'')
+    .replace(/[\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/gu,'')
+    .replace(/[\\/]+/gu,'_')
+    .replace(/\s+/gu,' ')
+    .trim();
+  return[...(clean||'Чек')].slice(0,120).join('');
+}
+
+function receiptMagicType(value){
+  const bytes=value instanceof Uint8Array
+    ?value
+    :value instanceof ArrayBuffer
+      ?new Uint8Array(value)
+      :new Uint8Array(Array.isArray(value)?value:[]);
+  if(bytes.length>=3&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff)return'image/jpeg';
+  if(bytes.length>=8&&[0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a].every((v,i)=>bytes[i]===v))return'image/png';
+  if(bytes.length>=12&&String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP')return'image/webp';
+  if(bytes.length>=5&&String.fromCharCode(...bytes.slice(0,5))==='%PDF-')return'application/pdf';
+  return null;
+}
+
+function validateReceiptType(declaredType,bytes){
+  const declared=String(declaredType||'').toLowerCase();
+  const detected=receiptMagicType(bytes);
+  return{ok:RECEIPT_MIME_TYPES.includes(declared)&&declared===detected,type:detected};
+}
+
+function decodeLegacyReceipt(receipt,decodeBase64=root?.atob?.bind(root)){
+  const type=String(receipt?.type||'').toLowerCase();
+  const prefix=`data:${type};base64,`,data=String(receipt?.data||'');
+  if(!RECEIPT_MIME_TYPES.includes(type)||!data.startsWith(prefix)||typeof decodeBase64!=='function')return{ok:false,error:'invalid_data_url'};
+  try{
+    const raw=decodeBase64(data.slice(prefix.length)),bytes=new Uint8Array(raw.length);
+    for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+    const validation=validateReceiptType(type,bytes);
+    return validation.ok?{ok:true,type,bytes,size:bytes.length}:{ok:false,error:'signature_mismatch',detectedType:validation.type};
+  }catch{return{ok:false,error:'invalid_base64'}}
+}
+
+function normalizeReceiptMetadata(item){
+  if(!item||typeof item!=='object')return null;
+  const type=String(item.type||'').toLowerCase();
+  if(!RECEIPT_MIME_TYPES.includes(type))return null;
+  const id=String(item.id||'').trim(),storageKey=String(item.storageKey||'').trim();
+  if(!id||!storageKey)return null;
+  return{
+    id,
+    storageKey,
+    name:sanitizeReceiptName(item.name),
+    type,
+    size:Math.max(0,Number(item.size)||0),
+    width:Math.max(0,Number(item.width)||0),
+    height:Math.max(0,Number(item.height)||0),
+    addedAt:Number(item.addedAt)||0
+  };
+}
+
+function appendReceiptMetadata(current,additions,limit=RECEIPT_LIMIT){
+  const result=[];
+  const seen=new Set();
+  for(const raw of[...(Array.isArray(current)?current:[]),...(Array.isArray(additions)?additions:[])]){
+    const item=normalizeReceiptMetadata(raw);
+    if(!item||seen.has(item.id)||result.length>=limit)continue;
+    seen.add(item.id);
+    result.push(item);
+  }
+  const requested=(Array.isArray(current)?current.length:0)+(Array.isArray(additions)?additions.length:0);
+  return{receipts:result,overflow:Math.max(0,requested-result.length),limit};
+}
+
+function removeReceiptMetadata(current,id){
+  return(Array.isArray(current)?current:[]).filter(item=>String(item?.id)!==String(id));
+}
 
 const pref=(k,d=true)=>{
   try{
@@ -223,8 +302,8 @@ function style(){
 .fp-unsaved-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 #amountLimitHint{display:block;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fp-amount-keypad{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
-.fp-amount-key{min-height:48px;padding:9px 4px;font-size:20px;font-weight:900}
-.fp-amount-key[data-amount-kind="operator"]{color:var(--blue)}
+.fp-amount-key{min-height:52px;padding:9px 4px;font-size:21px;font-weight:900}
+.fp-amount-key[data-amount-kind="operator"]{color:var(--blue);background:color-mix(in srgb,var(--blue) 12%,var(--card));border-color:color-mix(in srgb,var(--blue) 38%,var(--line));font-size:31px;font-weight:950;line-height:1}
 .fp-amount-expression{display:block;min-height:20px;margin-top:6px;color:var(--muted);font-size:13px;font-weight:800;text-align:right;overflow-wrap:anywhere}
 .fp-amount-storage[hidden]{display:none!important}
 #fpCloudAccount.fp-cloud-settings-card{max-width:none!important;margin:10px 0!important;padding:14px!important;border-color:var(--line)!important;border-radius:20px!important;background:var(--card)!important;color:var(--ink)!important}
@@ -697,6 +776,15 @@ return Object.freeze({
   isEntryDirty:dirty,
   minimumEntryValidity:minimum,
   sanitizeAmountExpressionValue:sanitizeExpressionValue,
+  receiptAttachmentLimit:RECEIPT_LIMIT,
+  receiptMimeTypes:RECEIPT_MIME_TYPES,
+  sanitizeReceiptName,
+  receiptMagicType,
+  validateReceiptType,
+  decodeLegacyReceipt,
+  normalizeReceiptMetadata,
+  appendReceiptMetadata,
+  removeReceiptMetadata,
   prepareEntryForOpen:entryOpen,
   entryOpenTransition,
   resetEntryScrollForOpen:scheduleEntryScrollReset,
