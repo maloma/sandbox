@@ -28,6 +28,7 @@ const HP='familypilot.hints.enabled.v1';
 let entryBaseline=null;
 let allowDiscardOnce=false;
 let amountState={expression:'',preloaded:false};
+let entryWasOpen=false;
 
 const pref=(k,d=true)=>{
   try{
@@ -84,7 +85,7 @@ function calc(raw){
 }
 
 function amountResult(){
-  const a=$('amountInput'),n=$('amountCalculation');
+  const a=$('amountInput'),n=$('amountCalculation'),e=$('fpAmountExpression');
   if(!a||!n)return;
   const r=keypadResult(a.value);
   const frac=!r.error&&r.displayValue!==null&&Math.abs(r.displayValue-Math.round(r.displayValue))>1e-9;
@@ -104,6 +105,18 @@ function amountResult(){
     color:r.error?'var(--red)':'var(--ink)',
     fontSize:text.replace(/\s/gu,'').length<=8?'32px':text.replace(/\s/gu,'').length<=11?'28px':text.replace(/\s/gu,'').length<=15?'24px':'20px'
   });
+  if(e){
+    e.textContent=displayExpression(a.value)||'0';
+    e.setAttribute('aria-label',`Текущее выражение: ${e.textContent}`);
+  }
+}
+
+function displayExpression(value){
+  return canonicalExpression(value)
+    .replace(/-/g,'−')
+    .replace(/\*/g,'×')
+    .replace(/\//g,'÷')
+    .replace(/\./g,',');
 }
 
 function canonicalExpression(value){
@@ -212,6 +225,7 @@ function style(){
 .fp-amount-keypad{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
 .fp-amount-key{min-height:48px;padding:9px 4px;font-size:20px;font-weight:900}
 .fp-amount-key[data-amount-kind="operator"]{color:var(--blue)}
+.fp-amount-expression{display:block;min-height:20px;margin-top:6px;color:var(--muted);font-size:13px;font-weight:800;text-align:right;overflow-wrap:anywhere}
 .fp-amount-storage[hidden]{display:none!important}
 #fpCloudAccount.fp-cloud-settings-card{max-width:none!important;margin:10px 0!important;padding:14px!important;border-color:var(--line)!important;border-radius:20px!important;background:var(--card)!important;color:var(--ink)!important}
 #fpCloudAccount.fp-cloud-settings-card #fpCloudStatus{color:var(--muted)!important}
@@ -241,11 +255,16 @@ function arithmetic(a){
   const field=a.closest?.('.field');
   const n=$('amountCalculation');
   if(!field||!n)return;
+  const expression=root.document.createElement('output');
   const keypad=root.document.createElement('div');
   const amountLabel=field.querySelector?.('label[for="amountInput"]');
   if(amountLabel&&!amountLabel.id)amountLabel.id='amountKeypadLabel';
   n.setAttribute('role','status');
   n.setAttribute('aria-live','polite');
+  expression.id='fpAmountExpression';
+  expression.className='fp-amount-expression';
+  expression.setAttribute('aria-live','polite');
+  expression.setAttribute('aria-label','Текущее выражение: 0');
   keypad.id='amountKeypad';
   keypad.className='fp-amount-keypad';
   keypad.setAttribute('role','group');
@@ -263,6 +282,7 @@ function arithmetic(a){
     keypad.appendChild(b);
   }
   field.insertBefore(n,a);
+  field.insertBefore(expression,a);
   field.insertBefore(keypad,a);
   a.readOnly=true;
   a.tabIndex=-1;
@@ -270,7 +290,7 @@ function arithmetic(a){
   a.classList.add('fp-amount-storage');
   a.setAttribute('inputmode','none');
   a.setAttribute('aria-hidden','true');
-  a.setAttribute('aria-describedby','amountCalculation amountLimitHint');
+  a.setAttribute('aria-describedby','amountCalculation fpAmountExpression amountLimitHint');
   a.addEventListener('input',()=>{
     amountResult();
     syncSaveState();
@@ -511,6 +531,63 @@ function entryOpen(){
   if($('entryError'))$('entryError').textContent='';
   if($('categoryError'))$('categoryError').textContent='';
   syncSaveState();
+  scheduleEntryScrollReset();
+}
+
+function entryOpenTransition(wasOpen,isOpen){
+  return Object.freeze({opened:!!isOpen&&!wasOpen,closed:!isOpen&&!!wasOpen});
+}
+
+function scheduleEntryScrollReset(){
+  const m=$('entryModal');
+  const sheet=m?.querySelector?.('.entry-sheet')||m?.querySelector?.('.sheet');
+  if(!m||!sheet)return false;
+  const frame=root.requestAnimationFrame?.bind(root)||((callback)=>root.setTimeout?.(callback,0));
+  frame(()=>frame(()=>{
+    if(m.classList.contains('open'))sheet.scrollTop=0;
+  }));
+  return true;
+}
+
+function handleNativeBack(){
+  const confirm=$('fpUnsavedConfirm');
+  if(confirm&&!confirm.hidden){
+    hideConfirm();
+    return true;
+  }
+  const layers=[...root.document.querySelectorAll?.('.overlay.open,.modal.open')||[]];
+  const layer=layers.at(-1);
+  if(layer){
+    const closer=layer.querySelector?.('[data-close]');
+    if(closer){
+      closer.click();
+      return true;
+    }
+    layer.click?.();
+    return true;
+  }
+  const active=[...root.document.querySelectorAll?.('.screen.active')||[]].at(-1);
+  if(active&&active.id!=='homeScreen'){
+    const back=active.querySelector?.('.back,[data-back]');
+    if(back){
+      back.click();
+      return true;
+    }
+    const home=root.document.querySelector?.('[data-screen="home"]');
+    if(home){
+      home.click();
+      return true;
+    }
+  }
+  return false;
+}
+
+function installNativeContract(){
+  root.FamilyPilotNativeContract=Object.freeze({version:1,handleBack:handleNativeBack});
+  root.addEventListener?.('familypilot:native-resume',()=>{
+    root.document.documentElement?.getBoundingClientRect?.();
+    root.requestAnimationFrame?.(()=>root.document.body?.getBoundingClientRect?.());
+  });
 }
 
 function intercept(event){
@@ -551,14 +628,18 @@ function entryLifecycle(){
     syncSaveState();
   });
   const o=root.MutationObserver?new root.MutationObserver(()=>{
-    if(m.classList.contains('open')){
+    const isOpen=m.classList.contains('open');
+    const transition=entryOpenTransition(entryWasOpen,isOpen);
+    entryWasOpen=isOpen;
+    if(transition.opened){
       entryOpen();
-    }else{
+    }else if(transition.closed){
       entryBaseline=null;
       hideConfirm();
     }
   }):null;
   o?.observe(m,{attributes:true,attributeFilter:['class']});
+  entryWasOpen=m.classList.contains('open');
 }
 
 function openSync(){
@@ -583,6 +664,7 @@ function install(){
   openSync();
   settings();
   entryLifecycle();
+  installNativeContract();
   prefs();
 
   root.__FP_ENTRY_UX_RESET_R1_READY__=true;
@@ -595,6 +677,7 @@ return Object.freeze({
   architecture:RESET_ID,
   keypadLayout:KEYPAD,
   calculateExpression:calc,
+  displayAmountExpression:displayExpression,
   keypadExpressionResult:keypadResult,
   reduceKeypadState,
   updateAmountResult:amountResult,
@@ -607,6 +690,9 @@ return Object.freeze({
   minimumEntryValidity:minimum,
   sanitizeAmountExpressionValue:sanitizeExpressionValue,
   prepareEntryForOpen:entryOpen,
+  entryOpenTransition,
+  resetEntryScrollForOpen:scheduleEntryScrollReset,
+  handleNativeBack,
   compactMaximumHint,
   placeCloudAccount,
   install

@@ -20,6 +20,9 @@ assert.match(adapter,/FP86_ENTRY_UX_RESET_R1/);
 assert.match(index,/familypilot-entry-ux-reset-r1\.js/,'the non-voice entry owner must load on web and both native shells');
 assert.match(index,/label for="amountInput">Сумма<\/label>/);
 assert.match(adapter,/field\.insertBefore\(n,a\)/,'computed result must remain above the keypad');
+assert.match(adapter,/expression\.id='fpAmountExpression'/,'the current expression must be visibly rendered as a separate read-only output');
+assert.match(adapter,/field\.insertBefore\(expression,a\)/);
+assert.match(adapter,/e\.textContent=displayExpression\(a\.value\)\|\|'0'/);
 assert.match(adapter,/field\.insertBefore\(keypad,a\)/);
 assert.doesNotMatch(adapter,/amountExpressionRow|amountExpressionLabel|textContent='Расчёт'/);
 assert.deepStrictEqual(api.keypadLayout.map(row=>[...row]),[
@@ -71,6 +74,40 @@ assert.deepStrictEqual(api.reduceKeypadState({expression:'42',preloaded:true},'�
 assert.deepStrictEqual(api.keypadExpressionResult('12+'),{incomplete:true,displayValue:12,validForSave:false});
 assert.deepStrictEqual(api.keypadExpressionResult('12+8'),{value:20,displayValue:20,validForSave:true});
 assert.deepStrictEqual(api.keypadExpressionResult(''),{empty:true,displayValue:0,validForSave:false});
+assert.strictEqual(api.displayAmountExpression('12.5-3*2/4'),'12,5−3×2÷4');
+assert.deepStrictEqual(api.entryOpenTransition(false,true),{opened:true,closed:false});
+assert.deepStrictEqual(api.entryOpenTransition(true,true),{opened:false,closed:false},'an already-open modal/config preservation cycle must not reset itself');
+assert.deepStrictEqual(api.entryOpenTransition(true,false),{opened:false,closed:true});
+assert.deepStrictEqual(api.entryOpenTransition(false,true),{opened:true,closed:false},'a repeated explicit open must be recognized again');
+
+const originalDocument=global.document;
+const originalAnimationFrame=global.requestAnimationFrame;
+try{
+  const sheet={scrollTop:284};
+  const entryModal={classList:{contains:value=>value==='open'},querySelector:()=>sheet};
+  global.requestAnimationFrame=callback=>{callback();return 1};
+  global.document={
+    getElementById:id=>id==='entryModal'?entryModal:null,
+    querySelectorAll:()=>[],
+    querySelector:()=>null
+  };
+  assert.strictEqual(api.resetEntryScrollForOpen(),true);
+  assert.strictEqual(sheet.scrollTop,0);
+  sheet.scrollTop=173;
+  assert.strictEqual(api.resetEntryScrollForOpen(),true);
+  assert.strictEqual(sheet.scrollTop,0,'every repeated NEW/EDIT open must start at the top');
+
+  let closeClicks=0;
+  const layer={querySelector:()=>({click:()=>{closeClicks+=1}})};
+  global.document={getElementById:()=>null,querySelectorAll:selector=>selector.includes('overlay')?[layer]:[]};
+  assert.strictEqual(api.handleNativeBack(),true);
+  assert.strictEqual(closeClicks,1,'a handled modal Back must close its top web layer');
+  global.document={getElementById:()=>null,querySelectorAll:()=>[],querySelector:()=>null};
+  assert.strictEqual(api.handleNativeBack(),false,'Back must fall through only when no FamilyPilot layer/history is handled');
+}finally{
+  if(originalDocument===undefined)delete global.document;else global.document=originalDocument;
+  if(originalAnimationFrame===undefined)delete global.requestAnimationFrame;else global.requestAnimationFrame=originalAnimationFrame;
+}
 
 for(const removed of [
   'familypilot-voice-v1.js',
@@ -89,10 +126,21 @@ assert.match(activity,/onShowFileChooser/);
 assert.match(activity,/Intent\.ACTION_OPEN_DOCUMENT/);
 assert.match(activity,/arrayOf\("image\/\*", "application\/pdf"\)/);
 assert.match(activity,/pendingFileChooser\?\.onReceiveValue\(null\)/);
+assert.match(activity,/MediaStore\.ACTION_IMAGE_CAPTURE/);
+assert.match(activity,/FileProvider\.getUriForFile/);
 assert.match(manifest,/android:configChanges="[^"]*orientation[^"]*screenSize[^"]*"/);
 assert.doesNotMatch(manifest,/android:screenOrientation=/);
 assert.match(index,/accept="image\/\*,application\/pdf"/);
 assert.match(index,/RECEIPT_MAX=750000/);
+assert.match(index,/id="detailReceiptOpenBtn"/);
+assert.match(index,/id="detailReceiptRemoveBtn"/);
+assert.match(index,/id="receiptPreviewImage"/);
+assert.match(index,/function openReceiptPreview\(\)/);
+assert.match(index,/operation\.receipt=null/,'receipt removal must be an explicit user action');
+assert.match(index,/size:file\.size/,'stored receipt identity must retain its size');
+assert.match(adapter,/FamilyPilotNativeContract=Object\.freeze\(\{version:1,handleBack:handleNativeBack\}\)/);
+assert.match(adapter,/if\(dirty\(\)\)[\s\S]*askSave\(\)/,'native Back must reuse the dirty-close Save confirmation path through the close click');
+assert.match(adapter,/scheduleEntryScrollReset\(\)/);
 
 console.log('FP86_APP_VOICE_REMOVAL_PASS');
 console.log('FP86_MANUAL_ENTRY_CONTRACT_PASS');
@@ -104,3 +152,7 @@ console.log('FP86_SAVE_COMPUTED_RESULT_CONTRACT_PASS');
 console.log('FP86_COMMENT_ORDINARY_TEXT_PASS');
 console.log('FP86_DIRTY_CLOSE_ORIENTATION_PASS');
 console.log('FP86_RECEIPT_LAYOUT_REGRESSION_PASS');
+console.log('FP86_VISIBLE_READ_ONLY_EXPRESSION_PASS');
+console.log('FP86_ANDROID_WEB_BACK_HANDLED_UNHANDLED_PASS');
+console.log('FP86_RECEIPT_CAPTURE_PREVIEW_REMOVE_PASS');
+console.log('FP86_ENTRY_OPEN_SCROLL_RESET_PASS');
