@@ -42,7 +42,8 @@ assert.doesNotMatch(styles,/#(?:fff|ffffff)\b/i,'the native launch/resume surfac
 assert.match(activity,/setBackgroundColor\(Color\.rgb\(7, 24, 36\)\)/);
 assert.match(activity,/override fun onWindowFocusChanged\(hasFocus: Boolean\)[\s\S]*hasFocus[\s\S]*requestVisualRefresh/);
 assert.match(activity,/onWindowFocusChanged\(hasFocus: Boolean\)[\s\S]*requestVisualRefresh\(WEB_VISUAL_REFRESH_SCRIPT\)/);
-assert.match(activity,/postVisualStateCallback\(System\.nanoTime\(\)\)[\s\S]*requestLayout\(\)[\s\S]*invalidate\(\)[\s\S]*evaluateJavascript\(eventScript/);
+assert.doesNotMatch(activity,/postVisualStateCallback\(System\.nanoTime\(\)\)\s*\{/,'the invalid Kotlin lambda callback form must stay rejected');
+assert.match(activity,/postVisualStateCallback\(System\.nanoTime\(\),\s*object\s*:\s*WebView\.VisualStateCallback\(\)\s*\{[\s\S]*override fun onComplete\(requestId: Long\)[\s\S]*requestLayout\(\)[\s\S]*invalidate\(\)[\s\S]*evaluateJavascript\(eventScript/,'visual-state refresh must use the Android SDK callback contract');
 assert.match(activity,/OnBackPressedCallback/);
 assert.match(activity,/FamilyPilotNativeContract/);
 assert.match(activity,/evaluateJavascript\(WEB_BACK_SCRIPT\)/);

@@ -181,6 +181,7 @@ assert.match(index,/size:blob\.size/,'stored receipt identity must retain its no
 assert.match(index,/indexedDB\.open\(RECEIPT_DB,1\)/,'receipt binary payloads must use the dedicated IndexedDB store');
 assert.match(index,/createObjectStore\(RECEIPT_STORE,\{keyPath:'key'\}\)/);
 assert.match(index,/receipts:\[\]/,'new operations must use the ordered multi-attachment model');
+assert.doesNotMatch(index,/o\.receipts=Array\.isArray\(o\.receipts\)\?o\.receipts:\[\]/,'normalization must not add receipt metadata to persisted legacy operations');
 assert.match(index,/migrateLegacyReceipt/,'legacy singular receipt data must migrate lazily');
 assert.match(index,/operation\.receipt=null/,'legacy data may be cleared only after its blob and metadata are persisted');
 assert.match(index,/RECEIPT_LIMIT=8/);
@@ -191,6 +192,30 @@ assert.match(index,/file\.size>RECEIPT_MAX/,'PDF must retain the bounded 750 KB 
 assert.match(index,/name\.textContent=item\.name/,'attachment names must remain inert text');
 assert.match(index,/receiptZoom=Math\.max\(1,Math\.min\(4,next\)\)/);
 assert.match(index,/overflow:auto/,'zoomed receipt pages must remain pannable');
+
+const normalizeStart=index.indexOf('function normalizeState(){');
+const normalizeEnd=index.indexOf('}}normalizeState();',normalizeStart);
+assert(normalizeStart>=0&&normalizeEnd>=normalizeStart,'the production state normalizer must remain extractable for the persistence regression fixture');
+const productionNormalize=index.slice(normalizeStart,normalizeEnd+2);
+const runProductionNormalize=initial=>new Function('initial',`let state=JSON.parse(JSON.stringify(initial));const walletsSeed=()=>[];const categorySeed=()=>[];const normalizeRevisionHistory=value=>Array.isArray(value)?value:[];const now=()=>0;${productionNormalize};normalizeState();return state;`)(initial);
+const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+const stateFingerprint=value=>JSON.stringify(canonical(value));
+const financialProjection=value=>value.operations.map(({id,kind,amount,categoryId,walletId,note,occurredAt,createdByMemberId,createdAt,lastEditedByMemberId,lastEditedAt,status,deletedAt,deletedByMemberId,trashExpiresAt,trashRetentionProvenance})=>({id,kind,amount,categoryId,walletId,note,occurredAt,createdByMemberId,createdAt,lastEditedByMemberId,lastEditedAt,status,deletedAt,deletedByMemberId,trashExpiresAt,trashRetentionProvenance}));
+const legacyReceiptFixture={schemaVersion:2,household:{id:'household-test',baseCurrency:'EUR',openingCapital:0},currentMemberId:'member-anna',activeWalletId:'wallet-household-main',config:{trashRetentionEnabled:true,trashRetentionDays:45,allowFutureActualOperations:false,quickCategoryIds:{expense:[],income:[]}},wallets:[],categories:[],operations:[{id:'op-no-receipt-key',kind:'expense',amount:47.5,categoryId:'cat-food',walletId:'wallet-household-main',note:'legacy operation',occurredAt:1000,createdByMemberId:'member-anna',createdAt:900,lastEditedByMemberId:'member-anna',lastEditedAt:900,revisions:[],status:'active',deletedAt:null,deletedByMemberId:null,trashExpiresAt:null,trashRetentionProvenance:null,receipt:null,links:{},transferGroupId:null}]};
+const legacyBefore=stateFingerprint(legacyReceiptFixture);
+const normalizedLegacy=runProductionNormalize(legacyReceiptFixture);
+const reloadedLegacy=runProductionNormalize(JSON.parse(JSON.stringify(normalizedLegacy)));
+assert.strictEqual(Object.hasOwn(normalizedLegacy.operations[0],'receipts'),false,'real normalization must retain the legacy operation shape without a receipts key');
+assert.strictEqual(Object.hasOwn(reloadedLegacy.operations[0],'receipts'),false,'normalize/save/reload must not synthesize a receipts key');
+assert.strictEqual(stateFingerprint(normalizedLegacy),legacyBefore,'normalization must not change the persisted legacy operation fingerprint');
+assert.strictEqual(stateFingerprint(reloadedLegacy),legacyBefore,'legacy fingerprint must remain stable after the real serialize/reload normalization path');
+const attachedFixture=JSON.parse(JSON.stringify(reloadedLegacy));
+const financialBeforeAttachment=financialProjection(attachedFixture);
+attachedFixture.operations[0].receipts=api.appendReceiptMetadata(attachedFixture.operations[0].receipts,[{id:'id-91',storageKey:'key-91',name:'page-91.jpg',type:'image/jpeg',size:91,addedAt:91}]).receipts;
+const reloadedAttached=runProductionNormalize(JSON.parse(JSON.stringify(attachedFixture)));
+assert.strictEqual(Object.hasOwn(reloadedAttached.operations[0],'receipts'),true,'real attachment metadata mutation must intentionally create the receipts collection');
+assert.deepStrictEqual(reloadedAttached.operations[0].receipts.map(item=>item.id),['id-91'],'intentional attachment metadata must survive reload intact');
+assert.deepStrictEqual(financialProjection(reloadedAttached),financialBeforeAttachment,'receipt metadata mutation must not alter operation financial values');
 
 assert.strictEqual(api.receiptAttachmentLimit,8);
 assert.deepStrictEqual([...api.receiptMimeTypes],['image/jpeg','image/png','image/webp','application/pdf']);
@@ -245,4 +270,6 @@ console.log('FP86_RECEIPT_CAPTURE_PREVIEW_REMOVE_PASS');
 console.log('FP86_RECEIPT_MULTI_ATTACHMENT_MODEL_PASS');
 console.log('FP86_RECEIPT_MAGIC_AND_FILENAME_HARDENING_PASS');
 console.log('FP86_RECEIPT_INDEXEDDB_NORMALIZATION_VIEWER_PASS');
+console.log('FP86_RECEIPT_FINGERPRINT_LAZY_NORMALIZATION_PASS');
+console.log('FP86_RECEIPT_METADATA_INTENTIONAL_STABLE_PASS');
 console.log('FP86_ENTRY_OPEN_SCROLL_RESET_PASS');

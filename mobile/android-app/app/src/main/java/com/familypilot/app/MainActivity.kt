@@ -241,13 +241,15 @@ class MainActivity : ComponentActivity() {
         webView.post {
             webView.requestLayout()
             webView.invalidate()
-            webView.postVisualStateCallback(System.nanoTime()) {
-                webView.post {
-                    webView.requestLayout()
-                    webView.invalidate()
-                    webView.evaluateJavascript(eventScript, null)
+            webView.postVisualStateCallback(System.nanoTime(), object : WebView.VisualStateCallback() {
+                override fun onComplete(requestId: Long) {
+                    webView.post {
+                        webView.requestLayout()
+                        webView.invalidate()
+                        webView.evaluateJavascript(eventScript, null)
+                    }
                 }
-            }
+            })
         }
     }
 
