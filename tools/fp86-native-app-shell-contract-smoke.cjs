@@ -50,6 +50,11 @@ assert.match(receiptPaths,/path="receipt-previews\/"/);
 assert.doesNotMatch(manifest,/READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|READ_MEDIA_IMAGES|CAMERA/,'bounded camera capture must not add broad media/camera permission');
 assert.match(activity,/@JavascriptInterface[\s\S]*fun openReceipt/);
 assert.match(activity,/bytes\.size > MAX_RECEIPT_BYTES/,'native receipt opening must independently retain the 750 KB bound');
+assert.match(activity,/setDataAndType\(uri, mime\)/,'PDF viewing must remain restricted to the validated PDF payload');
+assert.match(activity,/Intent\.FLAG_GRANT_READ_URI_PERMISSION/,'PDF viewing must grant only bounded read access to the FileProvider URI');
+assert.match(activity,/startActivity\(Intent\.createChooser\(viewIntent, "Открыть чек"\)\)/,'PDF viewing must attempt the ACTION_VIEW launch directly');
+assert.match(activity,/try \{[\s\S]*startActivity\(Intent\.createChooser\(viewIntent, "Открыть чек"\)\)[\s\S]*\} catch \(_: ActivityNotFoundException\) \{[\s\S]*file\.delete\(\)[\s\S]*WEB_RECEIPT_FALLBACK_SCRIPT/,'no-viewer PDF fallback must clean up the cache-only temporary file and reopen the local preview');
+assert.doesNotMatch(activity,/resolveActivity\(packageManager\)/,'PDF viewing must not use a package-visibility-sensitive preflight gate');
 
 assert.match(iosVC,/familypilot:\/\/app\/index\.html/);
 assert.doesNotMatch(iosVC,/Speech|speech|Voice|voice|Microphone|microphone/);

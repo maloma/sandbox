@@ -549,21 +549,29 @@ function scheduleEntryScrollReset(){
   return true;
 }
 
+function nativeLayerCloser(layer){
+  if(!layer?.id)return null;
+  if(layer.id==='operationDatePickerModal')return layer.querySelector?.('[data-operation-date-close]')||null;
+  return layer.querySelector?.(`[data-close="${layer.id}"]`)||null;
+}
+
+function dispatchNativeLayerClose(layer){
+  const closer=nativeLayerCloser(layer);
+  if(!closer||typeof closer.click!=='function')return false;
+  try{closer.click();return true}catch{return false}
+}
+
 function handleNativeBack(){
-  const confirm=$('fpUnsavedConfirm');
-  if(confirm&&!confirm.hidden){
-    hideConfirm();
-    return true;
-  }
   const layers=[...root.document.querySelectorAll?.('.overlay.open,.modal.open')||[]];
   const layer=layers.at(-1);
   if(layer){
-    const closer=layer.querySelector?.('[data-close]');
-    if(closer){
-      closer.click();
-      return true;
-    }
-    layer.click?.();
+    // The date picker is appended above the entry sheet, including its inline dirty guard.
+    // Never fall through to a lower layer when the actual top layer has no close contract.
+    return dispatchNativeLayerClose(layer);
+  }
+  const confirm=$('fpUnsavedConfirm');
+  if(confirm&&!confirm.hidden){
+    hideConfirm();
     return true;
   }
   const active=[...root.document.querySelectorAll?.('.screen.active')||[]].at(-1);

@@ -31,6 +31,8 @@ class MainActivity : ComponentActivity() {
             "(function(){try{var c=window.FamilyPilotNativeContract;return !!(c&&c.handleBack&&c.handleBack());}catch(e){return false;}})()"
         private const val WEB_RESUME_SCRIPT =
             "window.dispatchEvent(new Event('familypilot:native-resume'));"
+        private const val WEB_RECEIPT_FALLBACK_SCRIPT =
+            "window.FamilyPilotAndroid=undefined;window.openReceiptPreview?.();"
         private val FILE_MIME_TYPES = arrayOf("image/*", "application/pdf")
     }
 
@@ -189,16 +191,13 @@ class MainActivity : ComponentActivity() {
                 setDataAndType(uri, mime)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            if (viewIntent.resolveActivity(packageManager) == null) {
-                file.delete()
-                return false
-            }
             runOnUiThread {
                 try {
                     startActivity(Intent.createChooser(viewIntent, "Открыть чек"))
                     webView.postDelayed({ file.delete() }, CAPTURE_CLEANUP_DELAY_MS)
                 } catch (_: ActivityNotFoundException) {
                     file.delete()
+                    webView.evaluateJavascript(WEB_RECEIPT_FALLBACK_SCRIPT, null)
                 }
             }
             return true

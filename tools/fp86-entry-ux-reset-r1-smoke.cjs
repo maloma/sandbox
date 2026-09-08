@@ -97,11 +97,49 @@ try{
   assert.strictEqual(api.resetEntryScrollForOpen(),true);
   assert.strictEqual(sheet.scrollTop,0,'every repeated NEW/EDIT open must start at the top');
 
-  let closeClicks=0;
-  const layer={querySelector:()=>({click:()=>{closeClicks+=1}})};
-  global.document={getElementById:()=>null,querySelectorAll:selector=>selector.includes('overlay')?[layer]:[]};
+  let datePickerOpen=true,entryOpen=true,confirmHidden=true,dateCloseClicks=0,genericCloseClicks=0,dirtyGuardClicks=0;
+  const dateCloser={click:()=>{dateCloseClicks+=1;datePickerOpen=false}};
+  const entryCloser={click:()=>{dirtyGuardClicks+=1}};
+  const genericCloser={click:()=>{genericCloseClicks+=1}};
+  const datePicker={id:'operationDatePickerModal',querySelector:selector=>selector==='[data-operation-date-close]'?dateCloser:null};
+  const entryLayer={id:'entryModal',querySelector:selector=>selector==='[data-close="entryModal"]'?entryCloser:null};
+  const genericLayer={id:'receiptPreview',querySelector:selector=>selector==='[data-close="receiptPreview"]'?genericCloser:null};
+  const confirm={get hidden(){return confirmHidden},set hidden(value){confirmHidden=value}};
+  global.document={
+    getElementById:id=>id==='fpUnsavedConfirm'?confirm:null,
+    querySelectorAll:selector=>{
+      if(!selector.includes('overlay'))return [];
+      if(datePickerOpen)return[entryLayer,datePicker];
+      if(entryOpen)return[entryLayer];
+      return[];
+    },
+    querySelector:()=>null
+  };
   assert.strictEqual(api.handleNativeBack(),true);
-  assert.strictEqual(closeClicks,1,'a handled modal Back must close its top web layer');
+  assert.strictEqual(dateCloseClicks,1,'Back must use the real data-operation-date-close contract');
+  assert.strictEqual(entryOpen,true,'Back must leave the entry sheet open after closing its date picker');
+  assert.strictEqual(dirtyGuardClicks,0,'the lower entry sheet must not receive Back while the date picker is open');
+
+  datePickerOpen=true;
+  confirmHidden=false;
+  assert.strictEqual(api.handleNativeBack(),true);
+  assert.strictEqual(dateCloseClicks,2,'a date picker opened above the dirty confirmation remains the Back target');
+  assert.strictEqual(confirmHidden,false,'Back must leave the lower dirty confirmation untouched');
+  assert.strictEqual(dirtyGuardClicks,0,'Back must not dispatch the lower entry close while the picker is open');
+
+  confirmHidden=true;
+  assert.strictEqual(api.handleNativeBack(),true);
+  assert.strictEqual(dirtyGuardClicks,1,'a dirty entry without a higher layer must use its normal Save confirmation close path');
+
+  entryOpen=false;
+  global.document={getElementById:()=>null,querySelectorAll:selector=>selector.includes('overlay')?[genericLayer]:[],querySelector:()=>null};
+  assert.strictEqual(api.handleNativeBack(),true);
+  assert.strictEqual(genericCloseClicks,1,'a supported generic modal must close through its own real closer');
+
+  const uncloseableTopLayer={id:'operationDatePickerModal',querySelector:()=>null};
+  global.document={getElementById:()=>null,querySelectorAll:selector=>selector.includes('overlay')?[genericLayer,uncloseableTopLayer]:[],querySelector:()=>null};
+  assert.strictEqual(api.handleNativeBack(),false,'Back must remain unhandled rather than click a backdrop or lower layer without a valid top-layer close path');
+  assert.strictEqual(genericCloseClicks,1,'an uncloseable top layer must not dispatch its lower modal');
   global.document={getElementById:()=>null,querySelectorAll:()=>[],querySelector:()=>null};
   assert.strictEqual(api.handleNativeBack(),false,'Back must fall through only when no FamilyPilot layer/history is handled');
 }finally{
@@ -139,6 +177,9 @@ assert.match(index,/function openReceiptPreview\(\)/);
 assert.match(index,/operation\.receipt=null/,'receipt removal must be an explicit user action');
 assert.match(index,/size:file\.size/,'stored receipt identity must retain its size');
 assert.match(adapter,/FamilyPilotNativeContract=Object\.freeze\(\{version:1,handleBack:handleNativeBack\}\)/);
+assert.match(adapter,/operationDatePickerModal[\s\S]*\[data-operation-date-close\]/,'native Back must target the operation date picker through its real close contract');
+assert.match(adapter,/\[data-close="\$\{layer\.id\}"\]/,'generic modal Back must use the closer for the actual top-layer id');
+assert.doesNotMatch(adapter,/layer\.click\?\.\(\)/,'native Back must not claim handling by clicking an arbitrary backdrop');
 assert.match(adapter,/if\(dirty\(\)\)[\s\S]*askSave\(\)/,'native Back must reuse the dirty-close Save confirmation path through the close click');
 assert.match(adapter,/scheduleEntryScrollReset\(\)/);
 
