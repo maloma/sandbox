@@ -118,15 +118,73 @@ const negativeDom=assertDomMatchesT({sourceWidth:800,sourceHeight:1200,viewerWid
 const centerOriginX=negativeDom.presentation.translateX+(1-negativeDom.presentation.zoom)*negativeDom.presentation.cssWidth/2;
 assert(!close(centerOriginX,negativeDom.presentation.translateX),'a center transform origin must fail the independent oracle under zoom');
 
-const focalTransform=api.createViewerTransform({sourceWidth:1200,sourceHeight:800,viewerWidth:400,viewerHeight:500,zoom:1,panX:0,panY:0});
-const focal={x:200,y:250},focalSource=api.viewerPointToSource(focalTransform,focal);
-const adjustedStart=[{x:150-focalTransform.fitOffsetX,y:250-focalTransform.fitOffsetY},{x:250-focalTransform.fitOffsetX,y:250-focalTransform.fitOffsetY}];
-const adjustedEnd=[{x:100-focalTransform.fitOffsetX,y:250-focalTransform.fitOffsetY},{x:300-focalTransform.fitOffsetX,y:250-focalTransform.fitOffsetY}];
-const focalState=entryApi.updateReceiptPinch(entryApi.beginReceiptPinch({scale:1,x:0,y:0},adjustedStart[0],adjustedStart[1]),adjustedEnd[0],adjustedEnd[1]);
-const zoomedFocalTransform=api.createViewerTransform({sourceWidth:1200,sourceHeight:800,viewerWidth:400,viewerHeight:500,zoom:focalState.scale,panX:focalState.x,panY:focalState.y});
-const remappedFocal=api.sourcePointToViewer(zoomedFocalTransform,focalSource);
-assert(close(remappedFocal.x,focal.x)&&close(remappedFocal.y,focal.y),'pinch focal point must remain stable under T with nonzero fit offset');
-assert.match(index,/point\.x-transform\.fitOffsetX,y:point\.y-transform\.fitOffsetY/,'runtime pinch points must be expressed relative to T fitOffset');
+const pointerFunctionStart=index.indexOf('function receiptPointerPoint');
+const pointerFunctionEnd=index.indexOf('function receiptGesturePoints',pointerFunctionStart);
+const pointerFunctionSource=index.slice(pointerFunctionStart,pointerFunctionEnd);
+assert(pointerFunctionStart>=0&&pointerFunctionEnd>pointerFunctionStart);
+assert.match(pointerFunctionSource,/clientX-rect\.left-media\.clientLeft/,'pointer X must be normalized from the outer border-box to the inner client origin');
+assert.match(pointerFunctionSource,/clientY-rect\.top-media\.clientTop/,'pointer Y must be normalized from the outer border-box to the inner client origin');
+const pointerRuntime=index.slice(pointerFunctionStart,index.indexOf('async function confirmReceiptCrop',pointerFunctionStart));
+assert.strictEqual((pointerRuntime.match(/receiptPointerPoint\(event\)/g)||[]).length,5,'all gesture and crop pointer consumers must use the single normalized helper');
+assert.strictEqual((pointerRuntime.match(/clientX/g)||[]).length,1,'no second live X-coordinate path may bypass pointer normalization');
+assert.strictEqual((pointerRuntime.match(/clientY/g)||[]).length,1,'no second live Y-coordinate path may bypass pointer normalization');
+assert.match(index,/point\.x-transform\.fitOffsetX,y:point\.y-transform\.fitOffsetY/,'normalized pinch points must then be expressed relative to T fitOffset');
+
+const runBorderFocalScenario=input=>{
+  const outerRect={left:37.25,top:52.5};
+  const media={
+    clientLeft:input.borderX,
+    clientTop:input.borderY,
+    getBoundingClientRect:()=>outerRect
+  };
+  const runtimePointer=new Function('$',`"use strict";${pointerFunctionSource};return receiptPointerPoint;`)(id=>{
+    assert.strictEqual(id,'receiptPreviewMedia');
+    return media;
+  });
+  const transform=api.createViewerTransform(input);
+  assert(input.expectCenteredOffset(transform),'scenario must retain a nonzero centered fit offset');
+  const focalSource=api.viewerPointToSource(transform,input.focal);
+  const clientEvent=inner=>({
+    clientX:outerRect.left+input.borderX+inner.x,
+    clientY:outerRect.top+input.borderY+inner.y
+  });
+  const pair=distance=>[
+    clientEvent({x:input.focal.x-distance/2,y:input.focal.y}),
+    clientEvent({x:input.focal.x+distance/2,y:input.focal.y})
+  ];
+  const normalize=events=>events.map(runtimePointer);
+  const omitBorderNormalization=events=>events.map(event=>({x:event.clientX-outerRect.left,y:event.clientY-outerRect.top}));
+  const gesture=points=>points.map(point=>({x:point.x-transform.fitOffsetX,y:point.y-transform.fitOffsetY}));
+  const startEvents=pair(input.distance),endEvents=pair(input.distance*input.ratio);
+  const start=normalize(startEvents),end=normalize(endEvents);
+  assert.deepStrictEqual(start[0],{x:input.focal.x-input.distance/2,y:input.focal.y},'actual DOM pointer helper must return inner CSS coordinates');
+  const session=entryApi.beginReceiptPinch({scale:input.zoom,x:input.panX,y:input.panY},...gesture(start));
+  const state=entryApi.updateReceiptPinch(session,...gesture(end));
+  assert(close(state.scale,input.zoom*input.ratio),'pinch must apply the requested nontrivial ratio');
+  const zoomed=api.createViewerTransform({...input,zoom:state.scale,panX:state.x,panY:state.y});
+  const remapped=api.sourcePointToViewer(zoomed,focalSource);
+  assert(close(remapped.x,input.focal.x)&&close(remapped.y,input.focal.y),'border-normalized pinch must preserve the exact focal source point');
+
+  const faultyStart=gesture(omitBorderNormalization(startEvents)),faultyEnd=gesture(omitBorderNormalization(endEvents));
+  const faultySession=entryApi.beginReceiptPinch({scale:input.zoom,x:input.panX,y:input.panY},...faultyStart);
+  const faultyState=entryApi.updateReceiptPinch(faultySession,...faultyEnd);
+  const faultyTransform=api.createViewerTransform({...input,zoom:faultyState.scale,panX:faultyState.x,panY:faultyState.y});
+  const faultyRemapped=api.sourcePointToViewer(faultyTransform,focalSource);
+  assert(close(faultyRemapped.x,input.focal.x+(1-input.ratio)*input.borderX),'omitting the border origin must produce the exact expected X focal error');
+  assert(close(faultyRemapped.y,input.focal.y+(1-input.ratio)*input.borderY),'omitting the border origin must produce the exact expected Y focal error');
+  assert(!close(faultyRemapped.x,input.focal.x)&&!close(faultyRemapped.y,input.focal.y),'the unnormalized outer-border coordinate path must fail focal preservation');
+};
+
+runBorderFocalScenario({
+  sourceWidth:1200,sourceHeight:800,viewerWidth:400,viewerHeight:500,
+  zoom:1,panX:0,panY:0,borderX:1,borderY:1,ratio:2,distance:100,
+  focal:{x:200,y:250},expectCenteredOffset:transform=>transform.fitOffsetY>0
+});
+runBorderFocalScenario({
+  sourceWidth:800,sourceHeight:1200,viewerWidth:500,viewerHeight:400,
+  zoom:1.5,panX:19,panY:-23,borderX:3,borderY:5,ratio:1.6,distance:80,
+  focal:{x:250,y:190},expectCenteredOffset:transform=>transform.fitOffsetX>0
+});
 
 const dpr1=mappingCase('DPR 1',base,{x:5,y:3,width:11,height:9},{zoom:1.5,panX:-12,panY:7,dpr:1});
 const dpr2=mappingCase('DPR 2',base,{x:5,y:3,width:11,height:9},{zoom:1.5,panX:-12,panY:7,dpr:2});
@@ -400,6 +458,8 @@ transactionTests().then(()=>{
   console.log('FP86_RMTV1_ORIENTATION_DPR_SENSITIVITY_PASS');
   console.log('FP86_RMTV1_EXACT_RENDERER_PIXELS_PASS');
   console.log('FP86_RMTV1_DOM_T_AUTHORITY_ALIGNMENT_PASS');
+  console.log('FP86_RMTV1_POINTER_INNER_COORDINATE_AUTHORITY_PASS');
+  console.log('FP86_RMTV1_PINCH_FOCAL_PRESERVATION_WITH_BORDER_PASS');
   console.log('FP86_RMTV1_SHARE_EXPORT_CURRENT_CANONICAL_FAIL_CLOSED_PASS');
   console.log('FP86_RMTV1_REPLACEMENT_TRANSACTION_PASS');
   console.log('FP86_RMTV1_ROLLBACK_FAIL_CLOSED_PASS');
