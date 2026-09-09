@@ -8,6 +8,7 @@ const root=path.resolve(__dirname,'..');
 const read=relative=>fs.readFileSync(path.join(root,relative),'utf8');
 const exists=relative=>fs.existsSync(path.join(root,relative));
 const adapter=read('familypilot-entry-ux-reset-r1.js');
+const receiptTransform=read('familypilot-receipt-media-transform-v1.js');
 const index=read('index.html');
 const reset=read('FP86_ENTRY_UX_RESET_R1.md');
 const activity=read('mobile/android-app/app/src/main/java/com/familypilot/app/MainActivity.kt');
@@ -196,7 +197,8 @@ assert.match(index,/migrateLegacyReceipt/,'legacy singular receipt data must mig
 assert.match(index,/operation\.receipt=null/,'legacy data may be cleared only after its blob and metadata are persisted');
 assert.match(index,/RECEIPT_LIMIT=8/);
 assert.match(index,/RECEIPT_IMAGE_EDGE=2200/);
-assert.match(index,/createImageBitmap\(file,\{imageOrientation:'from-image'\}\)/);
+assert.match(index,/familypilot-receipt-media-transform-v1\.js/);
+assert.match(receiptTransform,/imageOrientation:'from-image'/);
 assert.match(index,/canvasBlob\(canvas,'image\/jpeg',\.86\)/);
 assert.match(index,/file\.size>RECEIPT_MAX/,'PDF must retain the bounded 750 KB limit');
 assert.match(index,/name\.textContent=item\.name/,'attachment names must remain inert text');
@@ -218,7 +220,7 @@ assert.match(index,/clearReceiptPreview\(\)[\s\S]*fitReceiptTransform/,'opening 
 assert.match(index,/id="receiptCropAction"/);
 assert.match(index,/id="receiptCropCancel"[\s\S]*id="receiptCropConfirm"/,'crop mode must expose explicit cancel and confirm');
 assert.match(index,/item\.type==='application\/pdf'/,'crop must be unavailable for PDF');
-assert.deepStrictEqual(api.normalizeReceiptCrop({x:-5,y:10,width:250,height:90},200,100),{x:0,y:10,width:200,height:90});
+assert.strictEqual(api.normalizeReceiptCrop,undefined,'the failed predecessor crop authority must be removed');
 const cropStart=index.indexOf('async function confirmReceiptCrop()');
 const cropEnd=index.indexOf('async function invokeNativeReceiptAction',cropStart);
 const cropContract=index.slice(cropStart,cropEnd);

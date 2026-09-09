@@ -150,15 +150,6 @@ function panReceiptTransform(state,deltaX,deltaY){
   return{scale,x:(Number(state?.x)||0)+(Number(deltaX)||0),y:(Number(state?.y)||0)+(Number(deltaY)||0)};
 }
 
-function normalizeReceiptCrop(rect,width,height){
-  const maxWidth=Math.max(1,Number(width)||1),maxHeight=Math.max(1,Number(height)||1);
-  const left=Math.max(0,Math.min(maxWidth-1,Number(rect?.x)||0));
-  const top=Math.max(0,Math.min(maxHeight-1,Number(rect?.y)||0));
-  const right=Math.max(left+1,Math.min(maxWidth,left+Math.max(1,Number(rect?.width)||1)));
-  const bottom=Math.max(top+1,Math.min(maxHeight,top+Math.max(1,Number(rect?.height)||1)));
-  return{x:left,y:top,width:right-left,height:bottom-top};
-}
-
 const pref=(k,d=true)=>{
   try{
     const v=root.localStorage?.getItem(k);
@@ -865,7 +856,6 @@ return Object.freeze({
   beginReceiptPinch,
   updateReceiptPinch,
   panReceiptTransform,
-  normalizeReceiptCrop,
   prepareEntryForOpen:entryOpen,
   entryOpenTransition,
   resetEntryScrollForOpen:scheduleEntryScrollReset,
