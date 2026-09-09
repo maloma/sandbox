@@ -23,6 +23,12 @@ const KEY_LABELS=Object.freeze({
   '5':'Пять','6':'Шесть','7':'Семь','8':'Восемь','9':'Девять',
   '.':'Десятичная точка','+':'Плюс','−':'Минус','×':'Умножить','÷':'Разделить','⌫':'Удалить последний символ'
 });
+const OPERATOR_VECTOR_GEOMETRY=Object.freeze({
+  '+':Object.freeze({lines:Object.freeze([[24,7,24,41],[7,24,41,24]])}),
+  '−':Object.freeze({lines:Object.freeze([[7,24,41,24]])}),
+  '×':Object.freeze({lines:Object.freeze([[10,10,38,38],[38,10,10,38]])}),
+  '÷':Object.freeze({lines:Object.freeze([[7,24,41,24]]),dots:Object.freeze([[24,9],[24,39]])})
+});
 const HP='familypilot.hints.enabled.v1';
 const RECEIPT_LIMIT=8;
 const RECEIPT_MIME_TYPES=Object.freeze(['image/jpeg','image/png','image/webp','application/pdf']);
@@ -107,6 +113,50 @@ function appendReceiptMetadata(current,additions,limit=RECEIPT_LIMIT){
 
 function removeReceiptMetadata(current,id){
   return(Array.isArray(current)?current:[]).filter(item=>String(item?.id)!==String(id));
+}
+
+function fitReceiptTransform(){
+  return{scale:1,x:0,y:0};
+}
+
+function receiptPointDistance(a,b){
+  return Math.hypot(Number(b?.x||0)-Number(a?.x||0),Number(b?.y||0)-Number(a?.y||0));
+}
+
+function receiptPointMidpoint(a,b){
+  return{x:(Number(a?.x||0)+Number(b?.x||0))/2,y:(Number(a?.y||0)+Number(b?.y||0))/2};
+}
+
+function beginReceiptPinch(state,first,second){
+  const start={scale:Math.max(1,Math.min(4,Number(state?.scale)||1)),x:Number(state?.x)||0,y:Number(state?.y)||0};
+  return{...start,distance:Math.max(1,receiptPointDistance(first,second)),midpoint:receiptPointMidpoint(first,second)};
+}
+
+function updateReceiptPinch(session,first,second){
+  if(!session)return fitReceiptTransform();
+  const midpoint=receiptPointMidpoint(first,second);
+  const scale=Math.max(1,Math.min(4,session.scale*receiptPointDistance(first,second)/Math.max(1,session.distance)));
+  const ratio=scale/session.scale;
+  return{
+    scale,
+    x:midpoint.x-(session.midpoint.x-session.x)*ratio,
+    y:midpoint.y-(session.midpoint.y-session.y)*ratio
+  };
+}
+
+function panReceiptTransform(state,deltaX,deltaY){
+  const scale=Math.max(1,Math.min(4,Number(state?.scale)||1));
+  if(scale===1)return fitReceiptTransform();
+  return{scale,x:(Number(state?.x)||0)+(Number(deltaX)||0),y:(Number(state?.y)||0)+(Number(deltaY)||0)};
+}
+
+function normalizeReceiptCrop(rect,width,height){
+  const maxWidth=Math.max(1,Number(width)||1),maxHeight=Math.max(1,Number(height)||1);
+  const left=Math.max(0,Math.min(maxWidth-1,Number(rect?.x)||0));
+  const top=Math.max(0,Math.min(maxHeight-1,Number(rect?.y)||0));
+  const right=Math.max(left+1,Math.min(maxWidth,left+Math.max(1,Number(rect?.width)||1)));
+  const bottom=Math.max(top+1,Math.min(maxHeight,top+Math.max(1,Number(rect?.height)||1)));
+  return{x:left,y:top,width:right-left,height:bottom-top};
 }
 
 const pref=(k,d=true)=>{
@@ -303,7 +353,11 @@ function style(){
 #amountLimitHint{display:block;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fp-amount-keypad{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
 .fp-amount-key{min-height:52px;padding:9px 4px;font-size:21px;font-weight:900}
-.fp-amount-key[data-amount-kind="operator"]{color:var(--blue);background:color-mix(in srgb,var(--blue) 12%,var(--card));border-color:color-mix(in srgb,var(--blue) 38%,var(--line));font-size:31px;font-weight:950;line-height:1}
+.fp-amount-key[data-amount-kind="operator"]{color:var(--blue);background:color-mix(in srgb,var(--blue) 12%,var(--card));border-color:color-mix(in srgb,var(--blue) 38%,var(--line));line-height:1}
+.fp-amount-operator-svg{display:block;width:38px;height:38px;margin:auto;overflow:visible;color:currentColor}
+.fp-amount-operator-svg line,.fp-amount-operator-svg circle{fill:none;stroke:currentColor;stroke-width:5.5;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.fp-amount-operator-svg circle{fill:currentColor;stroke:none}
+.fp-visually-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 .fp-amount-expression{display:block;min-height:20px;margin-top:6px;color:var(--muted);font-size:13px;font-weight:800;text-align:right;overflow-wrap:anywhere}
 .fp-amount-storage[hidden]{display:none!important}
 #fpCloudAccount.fp-cloud-settings-card{max-width:none!important;margin:10px 0!important;padding:14px!important;border-color:var(--line)!important;border-radius:20px!important;background:var(--card)!important;color:var(--ink)!important}
@@ -353,10 +407,31 @@ function arithmetic(a){
     const b=root.document.createElement('button');
     b.type='button';
     b.className='btn secondary fp-amount-key';
-    b.textContent=key;
+    b.value=key;
     b.dataset.amountKey=key;
     b.dataset.amountKind=OPS[key]?'operator':key==='⌫'?'backspace':key==='.'?'decimal':'digit';
     b.setAttribute('aria-label',KEY_LABELS[key]);
+    const geometry=OPERATOR_VECTOR_GEOMETRY[key];
+    if(geometry){
+      const svg=root.document.createElementNS('http://www.w3.org/2000/svg','svg');
+      svg.setAttribute('viewBox','0 0 48 48');
+      svg.setAttribute('aria-hidden','true');
+      svg.classList.add('fp-amount-operator-svg');
+      for(const [x1,y1,x2,y2] of geometry.lines){
+        const line=root.document.createElementNS('http://www.w3.org/2000/svg','line');
+        for(const [name,value] of Object.entries({x1,y1,x2,y2}))line.setAttribute(name,String(value));
+        svg.appendChild(line);
+      }
+      for(const [cx,cy] of geometry.dots||[]){
+        const dot=root.document.createElementNS('http://www.w3.org/2000/svg','circle');
+        dot.setAttribute('cx',String(cx));dot.setAttribute('cy',String(cy));dot.setAttribute('r','3.5');
+        svg.appendChild(dot);
+      }
+      const text=root.document.createElement('span');
+      text.className='fp-visually-hidden';
+      text.textContent=key;
+      b.append(svg,text);
+    }else b.textContent=key;
     b.addEventListener('click',()=>pressAmountKey(key));
     keypad.appendChild(b);
   }
@@ -785,6 +860,12 @@ return Object.freeze({
   normalizeReceiptMetadata,
   appendReceiptMetadata,
   removeReceiptMetadata,
+  operatorVectorGeometry:OPERATOR_VECTOR_GEOMETRY,
+  fitReceiptTransform,
+  beginReceiptPinch,
+  updateReceiptPinch,
+  panReceiptTransform,
+  normalizeReceiptCrop,
   prepareEntryForOpen:entryOpen,
   entryOpenTransition,
   resetEntryScrollForOpen:scheduleEntryScrollReset,
