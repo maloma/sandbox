@@ -51,6 +51,18 @@ function createViewerTransform(input){
   return Object.freeze({sourceWidth,sourceHeight,viewerWidth,viewerHeight,fitScale,fitOffsetX,fitOffsetY,zoom,panX,panY,scale});
 }
 
+function createViewerCanvasPresentation(transform){
+  if(!transform||!positiveInteger(transform.sourceWidth)||!positiveInteger(transform.sourceHeight)||!finite(transform.fitScale)||transform.fitScale<=0||!finite(transform.fitOffsetX)||!finite(transform.fitOffsetY)||!finite(transform.zoom)||transform.zoom<=0||!finite(transform.panX)||!finite(transform.panY))throw Error('viewer_transform_invalid');
+  return Object.freeze({
+    cssWidth:transform.sourceWidth*transform.fitScale,
+    cssHeight:transform.sourceHeight*transform.fitScale,
+    translateX:transform.fitOffsetX+transform.panX,
+    translateY:transform.fitOffsetY+transform.panY,
+    zoom:transform.zoom,
+    transformOrigin:'0 0'
+  });
+}
+
 function sourcePointToViewer(transform,point){
   return Object.freeze({
     x:transform.fitOffsetX+transform.panX+transform.scale*point.x,
@@ -198,6 +210,32 @@ async function bestEffortDelete(storage,key){
   try{return(await storage.delete(key))!==false}catch{return false}
 }
 
+async function resolveCanonicalReceiptForRead(options){
+  const receiptId=String(options?.receiptId||''),metadataStore=options?.metadata,storage=options?.storage,validateBlob=options?.validateBlob;
+  const fail=error=>Object.freeze({ok:false,status:'CANONICAL_AUTHORITY_UNVERIFIED',error:String(error?.message||error)});
+  if(!receiptId||typeof metadataStore?.read!=='function'||typeof storage?.get!=='function'||typeof validateBlob!=='function')return fail('canonical_read_contract_invalid');
+  try{
+    const firstState=jsonClone(await metadataStore.read());
+    if(!Array.isArray(firstState))throw Error('canonical_metadata_readback_invalid');
+    const firstMatches=firstState.filter(item=>String(item?.id||'')===receiptId);
+    if(firstMatches.length!==1)throw Error('canonical_metadata_identity_invalid');
+    const currentMetadata=firstMatches[0],currentKey=String(currentMetadata?.storageKey||'');
+    if(!currentKey||currentMetadata.legacyData)throw Error('canonical_storage_reference_invalid');
+    const firstBlob=await storage.get(currentKey);
+    if(!firstBlob||!await blobValid(validateBlob,firstBlob,currentMetadata))throw Error('canonical_blob_invalid');
+
+    const confirmedState=jsonClone(await metadataStore.read());
+    if(!metadataEqual(confirmedState,firstState))throw Error('canonical_metadata_changed_during_resolution');
+    const confirmedMatches=confirmedState.filter(item=>String(item?.id||'')===receiptId);
+    if(confirmedMatches.length!==1||!metadataEqual(confirmedMatches[0],currentMetadata))throw Error('canonical_identity_changed_during_resolution');
+    const confirmedBlob=await storage.get(currentKey);
+    if(!confirmedBlob||!await blobValid(validateBlob,confirmedBlob,currentMetadata)||!await binaryEqual(confirmedBlob,firstBlob))throw Error('canonical_blob_changed_during_resolution');
+    return Object.freeze({ok:true,status:'CURRENT_CANONICAL',metadata:Object.freeze(jsonClone(currentMetadata)),blob:confirmedBlob});
+  }catch(error){
+    return fail(error);
+  }
+}
+
 async function executeReceiptReplacement(options){
   const storage=options?.storage,metadata=options?.metadata,receiptId=String(options?.receiptId||'');
   const newMetadata=options?.newMetadata?jsonClone(options.newMetadata):null,newBlob=options?.newBlob,validateBlob=options?.validateBlob;
@@ -272,6 +310,7 @@ return Object.freeze({
   minimumCropEdge:MINIMUM_CROP_EDGE,
   validateCropSelection,
   createViewerTransform,
+  createViewerCanvasPresentation,
   sourcePointToViewer,
   viewerPointToSource,
   sourceRectToViewer,
@@ -281,6 +320,7 @@ return Object.freeze({
   renderNormalizedBitmapToCanvas,
   decodeOrientationNormalizedBitmap,
   normalizeRasterOrientation,
+  resolveCanonicalReceiptForRead,
   executeReceiptReplacement
 });
 });

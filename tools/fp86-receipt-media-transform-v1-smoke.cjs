@@ -4,6 +4,7 @@ const assert=require('assert');
 const fs=require('fs');
 const path=require('path');
 const api=require('../familypilot-receipt-media-transform-v1.js');
+const entryApi=require('../familypilot-entry-ux-reset-r1.js');
 
 const root=path.resolve(__dirname,'..');
 const read=relative=>fs.readFileSync(path.join(root,relative),'utf8');
@@ -19,6 +20,13 @@ assert.match(index,/familypilot-receipt-media-transform-v1\.js/);
 assert.doesNotMatch(index,/normalizeReceiptCrop/,'the predecessor clamp must not remain effective in the runtime');
 assert.doesNotMatch(oldEntryAuthority,/normalizeReceiptCrop/,'the predecessor clamp must not remain exported as alternate authority');
 assert.doesNotMatch(moduleSource,/devicePixelRatio|\bDPR\b/i,'device density must not enter source-coordinate geometry');
+assert.match(index,/\.receipt-preview-media canvas\{position:absolute;left:0;top:0;[^}]*transform-origin:0 0/,'the canvas must have an explicit top-left layout and transform origin');
+assert.doesNotMatch(index,/\.receipt-preview-media\{place-items:center\}/,'canvas placement must not depend on grid alignment');
+const presentationRuntime=index.slice(index.indexOf('function receiptCanvasPresentation()'),index.indexOf('function resetReceiptTransform()'));
+assert.match(presentationRuntime,/createViewerCanvasPresentation\(transform\)/,'the DOM presentation must be derived from the authoritative T');
+assert.match(presentationRuntime,/presentation\.translateX/);
+assert.match(presentationRuntime,/presentation\.translateY/);
+assert.match(presentationRuntime,/presentation\.transformOrigin/);
 
 const coordinateRaster=(width,height)=>{
   const pixels=new Uint32Array(width*height);
@@ -33,6 +41,29 @@ const expectedPixels=(raster,rect)=>{
 const close=(left,right)=>Math.abs(left-right)<1e-9;
 const assertRawRect=(actual,expected)=>{
   for(const key of ['x','y','width','height'])assert(close(actual[key],expected[key]),`${key}: expected ${expected[key]}, received ${actual[key]}`);
+};
+const domLayoutOracle=input=>{
+  const fit=Math.min(input.viewerWidth/input.sourceWidth,input.viewerHeight/input.sourceHeight);
+  const cssWidth=input.sourceWidth*fit,cssHeight=input.sourceHeight*fit;
+  const translateX=(input.viewerWidth-cssWidth)/2+input.panX;
+  const translateY=(input.viewerHeight-cssHeight)/2+input.panY;
+  return{
+    cssWidth,cssHeight,translateX,translateY,zoom:input.zoom,transformOrigin:'0 0',
+    point:point=>({x:translateX+input.zoom*fit*point.x,y:translateY+input.zoom*fit*point.y}),
+    rect:rect=>({x:translateX+input.zoom*fit*rect.x,y:translateY+input.zoom*fit*rect.y,width:input.zoom*fit*rect.width,height:input.zoom*fit*rect.height})
+  };
+};
+const assertDomMatchesT=input=>{
+  const oracle=domLayoutOracle(input);
+  const transform=api.createViewerTransform(input);
+  const presentation=api.createViewerCanvasPresentation(transform);
+  for(const key of ['cssWidth','cssHeight','translateX','translateY','zoom'])assert(close(presentation[key],oracle[key]),`${key} must match independent DOM layout semantics`);
+  assert.strictEqual(presentation.transformOrigin,'0 0');
+  for(const point of[{x:0,y:0},{x:input.sourceWidth,y:input.sourceHeight},{x:input.sourceWidth*.37,y:input.sourceHeight*.61}]){
+    const actual=api.sourcePointToViewer(transform,point),expected=oracle.point(point);
+    assert(close(actual.x,expected.x)&&close(actual.y,expected.y),'actual canvas placement must implement T');
+  }
+  return{oracle,transform,presentation};
 };
 const mappingCase=(name,raster,sourceRect,gesture,viewer={width:240,height:200})=>{
   const transform=api.createViewerTransform({
@@ -66,10 +97,44 @@ mappingCase('nontrivial zoom',base,{x:3,y:2,width:10,height:8},{zoom:1.75,panX:0
 const positivePan=mappingCase('positive pan',base,{x:2,y:4,width:8,height:8},{zoom:2,panX:17,panY:9});
 mappingCase('negative pan',base,{x:8,y:5,width:9,height:8},{zoom:2.5,panX:-31,panY:-19});
 
+const wideDom=assertDomMatchesT({sourceWidth:1200,sourceHeight:800,viewerWidth:400,viewerHeight:500,zoom:1,panX:0,panY:0});
+assert(close(wideDom.presentation.translateX,0));
+assert(close(wideDom.presentation.translateY,116.66666666666667),'1200x800 in 400x500 must retain the vertical fit offset');
+const wideRaster=coordinateRaster(1200,800),wideSourceRect={x:180,y:64,width:300,height:160};
+const wideVisible=wideDom.oracle.rect(wideSourceRect);
+assert(close(wideVisible.y,138),'the prior vertical-offset counterexample must be represented by actual DOM semantics');
+const wideRaw=api.viewerRectToRawSource(wideDom.transform,wideVisible);
+assertRawRect(wideRaw,wideSourceRect);
+const wideValidation=api.validateCropSelection({width:wideRaster.width,height:wideRaster.height},wideRaw);
+assert.strictEqual(wideValidation.ok,true);
+assert.deepStrictEqual([...api.renderValidatedRaster(wideRaster,wideValidation).pixels],expectedPixels(wideRaster,wideValidation.rect),'visible DOM selection must render the exact source pixels selected after validation');
+const topAlignedSourceY=wideVisible.y/wideDom.transform.fitScale;
+assert(close(topAlignedSourceY,414)&&!close(topAlignedSourceY,wideSourceRect.y),'a vertically top-aligned canvas must fail the independent oracle');
+
+const portraitDom=assertDomMatchesT({sourceWidth:800,sourceHeight:1200,viewerWidth:500,viewerHeight:400,zoom:1,panX:0,panY:0});
+assert(close(portraitDom.presentation.translateX,116.66666666666667),'portrait fit must retain the horizontal fit offset');
+assertDomMatchesT({sourceWidth:1200,sourceHeight:800,viewerWidth:400,viewerHeight:500,zoom:1.8,panX:23,panY:-47});
+const negativeDom=assertDomMatchesT({sourceWidth:800,sourceHeight:1200,viewerWidth:500,viewerHeight:400,zoom:2.25,panX:-61,panY:19});
+const centerOriginX=negativeDom.presentation.translateX+(1-negativeDom.presentation.zoom)*negativeDom.presentation.cssWidth/2;
+assert(!close(centerOriginX,negativeDom.presentation.translateX),'a center transform origin must fail the independent oracle under zoom');
+
+const focalTransform=api.createViewerTransform({sourceWidth:1200,sourceHeight:800,viewerWidth:400,viewerHeight:500,zoom:1,panX:0,panY:0});
+const focal={x:200,y:250},focalSource=api.viewerPointToSource(focalTransform,focal);
+const adjustedStart=[{x:150-focalTransform.fitOffsetX,y:250-focalTransform.fitOffsetY},{x:250-focalTransform.fitOffsetX,y:250-focalTransform.fitOffsetY}];
+const adjustedEnd=[{x:100-focalTransform.fitOffsetX,y:250-focalTransform.fitOffsetY},{x:300-focalTransform.fitOffsetX,y:250-focalTransform.fitOffsetY}];
+const focalState=entryApi.updateReceiptPinch(entryApi.beginReceiptPinch({scale:1,x:0,y:0},adjustedStart[0],adjustedStart[1]),adjustedEnd[0],adjustedEnd[1]);
+const zoomedFocalTransform=api.createViewerTransform({sourceWidth:1200,sourceHeight:800,viewerWidth:400,viewerHeight:500,zoom:focalState.scale,panX:focalState.x,panY:focalState.y});
+const remappedFocal=api.sourcePointToViewer(zoomedFocalTransform,focalSource);
+assert(close(remappedFocal.x,focal.x)&&close(remappedFocal.y,focal.y),'pinch focal point must remain stable under T with nonzero fit offset');
+assert.match(index,/point\.x-transform\.fitOffsetX,y:point\.y-transform\.fitOffsetY/,'runtime pinch points must be expressed relative to T fitOffset');
+
 const dpr1=mappingCase('DPR 1',base,{x:5,y:3,width:11,height:9},{zoom:1.5,panX:-12,panY:7,dpr:1});
 const dpr2=mappingCase('DPR 2',base,{x:5,y:3,width:11,height:9},{zoom:1.5,panX:-12,panY:7,dpr:2});
 assert.deepStrictEqual(dpr1.raw,dpr2.raw,'identical CSS geometry must yield identical raw source rectangles at DPR 1 and 2');
 assert.deepStrictEqual(dpr1.validation.rect,dpr2.validation.rect,'DPR must not change the validated source rectangle');
+const domDpr1=domLayoutOracle({sourceWidth:1200,sourceHeight:800,viewerWidth:400,viewerHeight:500,zoom:1.5,panX:-12,panY:7,dpr:1});
+const domDpr2=domLayoutOracle({sourceWidth:1200,sourceHeight:800,viewerWidth:400,viewerHeight:500,zoom:1.5,panX:-12,panY:7,dpr:2});
+assert.deepStrictEqual(domDpr1.rect({x:60,y:80,width:240,height:160}),domDpr2.rect({x:60,y:80,width:240,height:160}),'DPR/backing-store scale must not alter CSS canvas placement');
 
 const encoded90=coordinateRaster(14,22);
 const normalized90=api.normalizeRasterOrientation(encoded90,6);
@@ -161,6 +226,15 @@ assert(confirmSource.indexOf('validateCropSelection')<confirmSource.indexOf("doc
 assert(confirmSource.indexOf('validateCropSelection')<confirmSource.indexOf('putReceiptBlob'));
 assert.match(confirmSource,/viewerRectToRawSource\(transform,receiptCropRect\)/,'crop confirm must use only inverse(T)');
 assert.match(confirmSource,/renderValidatedCropCanvas\(receiptNormalizedBitmap,validation/,'renderer must consume the same Bnorm and exact validator result');
+const actionStart=index.indexOf('async function invokeNativeReceiptAction');
+const actionEnd=index.indexOf('async function openReceiptPdfExternal',actionStart);
+const actionSource=index.slice(actionStart,actionEnd);
+const actionResolverSource=index.slice(index.indexOf('async function resolveCurrentCanonicalReceiptForAction'),actionStart);
+assert(actionStart>=0&&actionEnd>actionStart);
+assert.match(actionSource,/resolveCurrentCanonicalReceiptForAction\(\)/,'share/export must resolve canonical authority at action time');
+assert.doesNotMatch(actionSource,/receiptPreviewBlob|receiptPreviewItem/,'share/export must not export cached preview authority');
+assert.match(actionResolverSource,/resolveCanonicalReceiptForRead/,'runtime must use the fail-closed current-canonical resolver');
+assert.doesNotMatch(actionResolverSource,/putReceiptBlob|deleteReceiptBlob|writeOperationReceiptMetadata/,'share/export resolution must not mutate canonical storage or metadata');
 
 const clone=value=>JSON.parse(JSON.stringify(value));
 const oldMetadata=[
@@ -206,6 +280,21 @@ function transactionHarness(injection={}){
   };
 }
 
+function canonicalReadHarness(metadataState,blobEntries,injection={}){
+  let reads=0,current=clone(metadataState);
+  const blobs=new Map(blobEntries),events=[];
+  return{
+    events,
+    setMetadata:value=>{current=clone(value)},
+    options:{
+      receiptId:'receipt-a',
+      metadata:{read:async()=>{reads+=1;events.push(`metadata:read:${reads}`);if(injection.readFailure)throw Error('injected_integrity_blocked_read');if(reads===2&&injection.secondMetadataState)return clone(injection.secondMetadataState);return clone(current)}},
+      storage:{get:async key=>{events.push(`get:${key}`);const value=blobs.get(key);return value&&Uint8Array.from(value)}},
+      validateBlob:async(blob,metadata)=>blob instanceof Uint8Array&&blob.length===metadata.size&&blob[0]===0xff&&blob[1]===0xd8&&blob[2]===0xff
+    }
+  };
+}
+
 const assertRestored=harness=>{
   assert.deepStrictEqual(harness.metadataState(),oldMetadata,'exact M_old and receipt order must be restored');
   assert.deepStrictEqual([...harness.blobs.get('old-key')],[...oldBytes],'K_old/B_old must remain authoritative');
@@ -225,6 +314,32 @@ async function transactionTests(){
   normalized.close();
   assert.strictEqual(closed,true);
   assert.strictEqual((moduleSource.match(/imageOrientation:'from-image'/g)||[]).length,1,'the module must have one encoded-orientation normalization point');
+
+  const currentCanonical=canonicalReadHarness(oldMetadata,[['old-key',oldBytes],['other-key',otherBytes]]);
+  const currentResult=await api.resolveCanonicalReceiptForRead(currentCanonical.options);
+  assert.strictEqual(currentResult.ok,true,'successful share/export resolution must prove current canonical bytes');
+  assert.strictEqual(currentResult.metadata.storageKey,'old-key');
+  assert.deepStrictEqual([...currentResult.blob],[...oldBytes]);
+  assert.deepStrictEqual(currentCanonical.events,['metadata:read:1','get:old-key','metadata:read:2','get:old-key']);
+
+  const postCropMetadata=[replacement,oldMetadata[1]],staleCachedPreview=oldBytes;
+  const postCrop=canonicalReadHarness(postCropMetadata,[['old-key',oldBytes],['new-key',newBytes],['other-key',otherBytes]]);
+  const postCropResult=await api.resolveCanonicalReceiptForRead(postCrop.options);
+  assert.strictEqual(postCropResult.ok,true);
+  assert.strictEqual(postCropResult.metadata.storageKey,'new-key','changed canonical reference must be resolved at action time');
+  assert.deepStrictEqual([...postCropResult.blob],[...newBytes],'share/export must use new canonical bytes after crop');
+  assert.notDeepStrictEqual([...postCropResult.blob],[...staleCachedPreview],'stale preview cache must never be exported');
+
+  const integrityBlocked=canonicalReadHarness(oldMetadata,[['old-key',oldBytes]],{readFailure:true});
+  const integrityBlockedResult=await api.resolveCanonicalReceiptForRead(integrityBlocked.options);
+  assert.strictEqual(integrityBlockedResult.ok,false,'INTEGRITY_BLOCKED authority must fail closed');
+  assert.strictEqual(integrityBlockedResult.status,'CANONICAL_AUTHORITY_UNVERIFIED');
+  assert.deepStrictEqual(integrityBlocked.events,['metadata:read:1'],'failed authority resolution must remain read-only');
+
+  const changedDuringRead=canonicalReadHarness(oldMetadata,[['old-key',oldBytes],['new-key',newBytes]],{secondMetadataState:postCropMetadata});
+  const changedDuringReadResult=await api.resolveCanonicalReceiptForRead(changedDuringRead.options);
+  assert.strictEqual(changedDuringReadResult.ok,false,'canonical key changes during resolution must fail closed');
+  assert.strictEqual(changedDuringRead.events.some(event=>event.startsWith('put:')||event.startsWith('delete:')||event.startsWith('metadata:write')),false,'share/export resolution must be read-only');
 
   const success=transactionHarness();
   const committed=await api.executeReceiptReplacement(success.options);
@@ -284,6 +399,8 @@ transactionTests().then(()=>{
   console.log('FP86_RMTV1_VALIDATOR_NO_SALVAGE_PASS');
   console.log('FP86_RMTV1_ORIENTATION_DPR_SENSITIVITY_PASS');
   console.log('FP86_RMTV1_EXACT_RENDERER_PIXELS_PASS');
+  console.log('FP86_RMTV1_DOM_T_AUTHORITY_ALIGNMENT_PASS');
+  console.log('FP86_RMTV1_SHARE_EXPORT_CURRENT_CANONICAL_FAIL_CLOSED_PASS');
   console.log('FP86_RMTV1_REPLACEMENT_TRANSACTION_PASS');
   console.log('FP86_RMTV1_ROLLBACK_FAIL_CLOSED_PASS');
   console.log('FP86_RMTV1_ROOT_SRC_MIRROR_PASS');
