@@ -158,8 +158,117 @@ assert(confirmSource.indexOf('validateCropSelection')<confirmSource.indexOf('put
 assert.match(confirmSource,/viewerRectToRawSource\(transform,receiptCropRect\)/,'crop confirm must use only inverse(T)');
 assert.match(confirmSource,/renderValidatedCropCanvas\(receiptNormalizedBitmap,validation/,'renderer must consume the same Bnorm and exact validator result');
 
-console.log('FP86_RMTV1_COORDINATE_AUTHORITY_PASS');
-console.log('FP86_RMTV1_VALIDATOR_NO_SALVAGE_PASS');
-console.log('FP86_RMTV1_ORIENTATION_DPR_SENSITIVITY_PASS');
-console.log('FP86_RMTV1_EXACT_RENDERER_PIXELS_PASS');
-console.log('FP86_RMTV1_ROOT_SRC_MIRROR_PASS');
+const clone=value=>JSON.parse(JSON.stringify(value));
+const oldMetadata=[
+  {id:'receipt-a',storageKey:'old-key',name:'page-a.jpg',type:'image/jpeg',size:6,width:24,height:16,addedAt:91},
+  {id:'receipt-b',storageKey:'other-key',name:'page-b.jpg',type:'image/jpeg',size:4,width:8,height:8,addedAt:92}
+];
+const replacement={...oldMetadata[0],storageKey:'new-key',size:7,width:12,height:9};
+const oldBytes=Uint8Array.from([0xff,0xd8,0xff,1,2,3]);
+const newBytes=Uint8Array.from([0xff,0xd8,0xff,7,8,9,10]);
+const otherBytes=Uint8Array.from([0xff,0xd8,0xff,4]);
+
+function transactionHarness(injection={}){
+  let metadataState=clone(oldMetadata),metadataReads=0,metadataWrites=0;
+  const blobs=new Map([['old-key',oldBytes],['other-key',otherBytes]]),events=[];
+  const financial={amount:47.5,categoryId:'food',walletId:'wallet',note:'unchanged'};
+  const fingerprint=JSON.stringify(financial);
+  return{
+    blobs,events,financial,fingerprint,
+    metadataState:()=>clone(metadataState),
+    options:{
+      receiptId:'receipt-a',newMetadata:replacement,newBlob:newBytes,
+      storage:{
+        get:async key=>{events.push(`get:${key}`);const value=blobs.get(key);return value&&Uint8Array.from(value)},
+        put:async(key,value)=>{events.push(`put:${key}`);blobs.set(key,Uint8Array.from(value))},
+        delete:async key=>{events.push(`delete:${key}`);if(key==='old-key'&&injection.oldDeleteFailure)return false;blobs.delete(key);return true}
+      },
+      metadata:{
+        read:async()=>{
+          metadataReads+=1;events.push(`metadata:read:${metadataReads}`);
+          if(metadataReads===2&&injection.metadataReadFailure)throw Error('injected_metadata_read_failure');
+          if(metadataReads===2&&injection.metadataReadbackMismatch)return[];
+          return clone(metadataState);
+        },
+        write:async value=>{
+          metadataWrites+=1;events.push(`metadata:write:${metadataWrites}`);
+          if(metadataWrites===2&&injection.rollbackWriteFailure)throw Error('injected_rollback_write_failure');
+          metadataState=clone(value);
+        }
+      },
+      validateBlob:async(blob,metadata)=>blob instanceof Uint8Array&&blob.length===metadata.size&&blob[0]===0xff&&blob[1]===0xd8&&blob[2]===0xff,
+      verifyInvariant:async()=>JSON.stringify(financial)===fingerprint
+    }
+  };
+}
+
+const assertRestored=harness=>{
+  assert.deepStrictEqual(harness.metadataState(),oldMetadata,'exact M_old and receipt order must be restored');
+  assert.deepStrictEqual([...harness.blobs.get('old-key')],[...oldBytes],'K_old/B_old must remain authoritative');
+  assert.strictEqual(harness.blobs.has('new-key'),false,'staged bytes must be cleaned only after verified rollback');
+  assert.strictEqual(JSON.stringify(harness.financial),harness.fingerprint,'financial fingerprint must remain unchanged');
+  const rollbackRead=harness.events.lastIndexOf('metadata:read:3');
+  const newDelete=harness.events.lastIndexOf('delete:new-key');
+  assert(rollbackRead>=0&&newDelete>rollbackRead,'new bytes cleanup must happen only after rollback readback');
+};
+
+async function transactionTests(){
+  const success=transactionHarness();
+  const committed=await api.executeReceiptReplacement(success.options);
+  assert.deepStrictEqual({ok:committed.ok,status:committed.status,state:committed.state},{ok:true,status:'COMMITTED',state:'COMMITTED'});
+  assert.deepStrictEqual(success.metadataState().map(item=>item.id),['receipt-a','receipt-b'],'success must preserve receipt order');
+  assert.strictEqual(success.metadataState()[0].id,oldMetadata[0].id,'success must preserve stable visible identity');
+  assert.strictEqual(success.metadataState()[0].name,oldMetadata[0].name);
+  assert.strictEqual(success.metadataState()[0].addedAt,oldMetadata[0].addedAt);
+  assert.strictEqual(success.blobs.has('old-key'),false,'success requires completed old deletion');
+  assert.deepStrictEqual([...success.blobs.get('new-key')],[...newBytes]);
+  assert.strictEqual(JSON.stringify(success.financial),success.fingerprint);
+
+  const afterWrite=transactionHarness({metadataReadFailure:true});
+  const afterWriteResult=await api.executeReceiptReplacement(afterWrite.options);
+  assert.strictEqual(afterWriteResult.ok,false);
+  assert.strictEqual(afterWriteResult.status,'FAILED');
+  assert.strictEqual(afterWriteResult.rolledBack,true);
+  assertRestored(afterWrite);
+
+  const badReadback=transactionHarness({metadataReadbackMismatch:true});
+  const badReadbackResult=await api.executeReceiptReplacement(badReadback.options);
+  assert.strictEqual(badReadbackResult.ok,false);
+  assert.strictEqual(badReadbackResult.status,'FAILED');
+  assertRestored(badReadback);
+
+  const oldDelete=transactionHarness({oldDeleteFailure:true});
+  const oldDeleteResult=await api.executeReceiptReplacement(oldDelete.options);
+  assert.strictEqual(oldDeleteResult.ok,false,'old delete failure must never report success');
+  assert.strictEqual(oldDeleteResult.status,'FAILED');
+  assertRestored(oldDelete);
+
+  const rollbackBlocked=transactionHarness({metadataReadFailure:true,rollbackWriteFailure:true});
+  const blockedResult=await api.executeReceiptReplacement(rollbackBlocked.options);
+  assert.strictEqual(blockedResult.status,'INTEGRITY_BLOCKED');
+  assert.strictEqual(blockedResult.ok,false);
+  assert.strictEqual(rollbackBlocked.blobs.has('old-key'),true);
+  assert.strictEqual(rollbackBlocked.blobs.has('new-key'),true,'fail-closed rollback must not delete either blob');
+  assert.strictEqual(rollbackBlocked.events.includes('delete:new-key'),false,'rollback failure prohibits staged cleanup mutation');
+
+  const changedIdentity=transactionHarness();
+  changedIdentity.options.newMetadata={...replacement,name:'renamed.jpg'};
+  const identityResult=await api.executeReceiptReplacement(changedIdentity.options);
+  assert.strictEqual(identityResult.ok,false);
+  assert.strictEqual(identityResult.state,'OLD_CANONICAL');
+  assert.deepStrictEqual(changedIdentity.metadataState(),oldMetadata);
+
+  assert.match(confirmSource,/executeReceiptReplacement/,'production confirm must enter the replacement transaction only after validation/rendering');
+  assert.match(index,/readOperationReceiptMetadata/,'production metadata switch must have durable readback');
+  assert.match(index,/validateCanonicalReceiptBlob/,'production blob staging must revalidate MIME, magic and size');
+}
+
+transactionTests().then(()=>{
+  console.log('FP86_RMTV1_COORDINATE_AUTHORITY_PASS');
+  console.log('FP86_RMTV1_VALIDATOR_NO_SALVAGE_PASS');
+  console.log('FP86_RMTV1_ORIENTATION_DPR_SENSITIVITY_PASS');
+  console.log('FP86_RMTV1_EXACT_RENDERER_PIXELS_PASS');
+  console.log('FP86_RMTV1_REPLACEMENT_TRANSACTION_PASS');
+  console.log('FP86_RMTV1_ROLLBACK_FAIL_CLOSED_PASS');
+  console.log('FP86_RMTV1_ROOT_SRC_MIRROR_PASS');
+}).catch(error=>{console.error(error);process.exitCode=1});

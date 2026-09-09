@@ -167,6 +167,105 @@ function normalizeRasterOrientation(encoded,orientation=1){
   return Object.freeze({width:outputWidth,height:outputHeight,stride,pixels:output});
 }
 
+const jsonClone=value=>JSON.parse(JSON.stringify(value));
+const canonicalJson=value=>{
+  if(Array.isArray(value))return value.map(canonicalJson);
+  if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonicalJson(value[key])]));
+  return value;
+};
+const metadataEqual=(left,right)=>JSON.stringify(canonicalJson(left))===JSON.stringify(canonicalJson(right));
+
+async function binaryBytes(value){
+  if(value instanceof Uint8Array)return value;
+  if(value instanceof ArrayBuffer)return new Uint8Array(value);
+  if(value&&typeof value.arrayBuffer==='function')return new Uint8Array(await value.arrayBuffer());
+  throw Error('receipt_blob_bytes_unavailable');
+}
+
+async function binaryEqual(left,right){
+  const a=await binaryBytes(left),b=await binaryBytes(right);
+  if(a.length!==b.length)return false;
+  for(let index=0;index<a.length;index++)if(a[index]!==b[index])return false;
+  return true;
+}
+
+async function blobValid(validateBlob,blob,metadata){
+  const result=await validateBlob(blob,metadata);
+  return result===true||result?.ok===true;
+}
+
+async function bestEffortDelete(storage,key){
+  try{return(await storage.delete(key))!==false}catch{return false}
+}
+
+async function executeReceiptReplacement(options){
+  const storage=options?.storage,metadata=options?.metadata,receiptId=String(options?.receiptId||'');
+  const newMetadata=options?.newMetadata?jsonClone(options.newMetadata):null,newBlob=options?.newBlob,validateBlob=options?.validateBlob;
+  const verifyInvariant=typeof options?.verifyInvariant==='function'?options.verifyInvariant:async()=>true;
+  if(!receiptId||!newMetadata||typeof storage?.get!=='function'||typeof storage?.put!=='function'||typeof storage?.delete!=='function'||typeof metadata?.read!=='function'||typeof metadata?.write!=='function'||typeof validateBlob!=='function'){
+    return Object.freeze({ok:false,status:'FAILED',state:'OLD_CANONICAL',error:'transaction_contract_invalid'});
+  }
+
+  let state='OLD_CANONICAL',newWriteAttempted=false,metadataWriteAttempted=false,oldMetadataState,oldMetadata,oldBlob;
+  const fail=(error,extra={})=>Object.freeze({ok:false,status:'FAILED',state,error:String(error?.message||error),...extra});
+  try{
+    oldMetadataState=jsonClone(await metadata.read());
+    if(!Array.isArray(oldMetadataState))throw Error('old_metadata_readback_invalid');
+    const oldMatches=oldMetadataState.filter(item=>String(item?.id||'')===receiptId);
+    if(oldMatches.length!==1)throw Error('old_metadata_identity_invalid');
+    oldMetadata=oldMatches[0];
+    const oldKey=String(oldMetadata?.storageKey||''),newKey=String(newMetadata?.storageKey||'');
+    if(!oldKey||!newKey||oldKey===newKey)throw Error('replacement_storage_key_invalid');
+    if(String(newMetadata.id||'')!==receiptId||newMetadata.name!==oldMetadata.name||newMetadata.addedAt!==oldMetadata.addedAt)throw Error('stable_receipt_identity_changed');
+    oldBlob=await storage.get(oldKey);
+    if(!oldBlob||!await blobValid(validateBlob,oldBlob,oldMetadata))throw Error('old_canonical_blob_invalid');
+
+    newWriteAttempted=true;
+    await storage.put(newKey,newBlob);
+    const stagedBlob=await storage.get(newKey);
+    if(!stagedBlob||!await blobValid(validateBlob,stagedBlob,newMetadata)||!await binaryEqual(stagedBlob,newBlob))throw Error('staged_blob_verification_failed');
+    state='STAGED_VERIFIED';
+
+    const expectedMetadataState=oldMetadataState.map(item=>String(item?.id||'')===receiptId?jsonClone(newMetadata):item);
+    metadataWriteAttempted=true;
+    await metadata.write(jsonClone(expectedMetadataState));
+    const switchedMetadataState=jsonClone(await metadata.read());
+    if(!metadataEqual(switchedMetadataState,expectedMetadataState))throw Error('metadata_switch_readback_mismatch');
+    const switchedMatches=switchedMetadataState.filter(item=>String(item?.id||'')===receiptId);
+    if(switchedMatches.length!==1||String(switchedMatches[0].storageKey||'')!==newKey)throw Error('metadata_switch_reference_invalid');
+    const resolvedNewBlob=await storage.get(newKey);
+    if(!resolvedNewBlob||!await blobValid(validateBlob,resolvedNewBlob,newMetadata)||!await binaryEqual(resolvedNewBlob,stagedBlob))throw Error('metadata_switch_blob_resolution_failed');
+    if(await verifyInvariant({phase:'metadata_switched',oldMetadataState:jsonClone(oldMetadataState),newMetadataState:jsonClone(switchedMetadataState)})!==true)throw Error('replacement_invariant_changed');
+    state='METADATA_SWITCHED_VERIFIED';
+
+    if(await storage.delete(oldKey)===false)throw Error('old_blob_delete_failed');
+    state='COMMITTED';
+    return Object.freeze({ok:true,status:'COMMITTED',state,newMetadata:jsonClone(newMetadata)});
+  }catch(error){
+    if(!metadataWriteAttempted){
+      const stagedCleanup=newWriteAttempted?await bestEffortDelete(storage,String(newMetadata?.storageKey||'')):true;
+      return fail(error,{stagedCleanup});
+    }
+
+    try{
+      await metadata.write(jsonClone(oldMetadataState));
+      const restoredMetadataState=jsonClone(await metadata.read());
+      if(!metadataEqual(restoredMetadataState,oldMetadataState))throw Error('rollback_metadata_readback_mismatch');
+      const restoredMatches=restoredMetadataState.filter(item=>String(item?.id||'')===receiptId);
+      if(restoredMatches.length!==1||String(restoredMatches[0].storageKey||'')!==String(oldMetadata.storageKey||''))throw Error('rollback_reference_invalid');
+      const restoredOldBlob=await storage.get(oldMetadata.storageKey);
+      if(!restoredOldBlob||!await blobValid(validateBlob,restoredOldBlob,oldMetadata)||!await binaryEqual(restoredOldBlob,oldBlob))throw Error('rollback_old_blob_invalid');
+      if(await verifyInvariant({phase:'rollback_verified',oldMetadataState:jsonClone(oldMetadataState),newMetadataState:jsonClone(restoredMetadataState)})!==true)throw Error('rollback_invariant_changed');
+      state='OLD_CANONICAL';
+      const stagedCleanup=await bestEffortDelete(storage,String(newMetadata.storageKey||''));
+      return fail(error,{rolledBack:true,stagedCleanup});
+    }catch(rollbackError){
+      state='INTEGRITY_BLOCKED';
+      return Object.freeze({ok:false,status:'INTEGRITY_BLOCKED',state,error:String(error?.message||error),rollbackError:String(rollbackError?.message||rollbackError)});
+    }
+  }
+}
+
 return Object.freeze({
   version:1,
   architecture:ARCHITECTURE_ID,
@@ -181,6 +280,7 @@ return Object.freeze({
   renderValidatedCropCanvas,
   renderNormalizedBitmapToCanvas,
   decodeOrientationNormalizedBitmap,
-  normalizeRasterOrientation
+  normalizeRasterOrientation,
+  executeReceiptReplacement
 });
 });
