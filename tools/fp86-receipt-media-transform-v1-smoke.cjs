@@ -83,6 +83,10 @@ const widthSensitive=coordinateRaster(31,19);
 const widthCase=mappingCase('width-height-sensitive non-square',widthSensitive,{x:17,y:7,width:9,height:8},{zoom:1.4,panX:-13,panY:5},{width:310,height:250});
 assert.throws(()=>api.renderValidatedRaster(coordinateRaster(19,31),widthCase.validation),/normalized_bitmap_dimensions_mismatch/,'renderer may not substitute swapped or independent dimensions');
 assert.throws(()=>api.renderValidatedRaster(base,{kind:'VALIDATED_CROP_RECT',rect:{x:0,y:0,width:8,height:8,sourceWidth:24,sourceHeight:16}}),/validated_crop_rect_required/,'renderer must accept only the validator-branded result');
+let canvasDrawArguments=null;
+const canvas={getContext:()=>({fillStyle:'',fillRect:()=>{},drawImage:(...args)=>{canvasDrawArguments=args}})};
+api.renderValidatedCropCanvas({image:'same-bnorm',width:24,height:16},dpr1.validation,()=>canvas);
+assert.deepStrictEqual(canvasDrawArguments,['same-bnorm',5,3,11,9,0,0,11,9],'canvas renderer must use the same Bnorm and exact validated rectangle without recomputation');
 
 const independentTransform=api.createViewerTransform({sourceWidth:24,sourceHeight:16,viewerWidth:240,viewerHeight:200,zoom:2,panX:0,panY:0});
 const independentlyMapped=api.viewerRectToRawSource(independentTransform,positivePan.visible);
@@ -213,6 +217,15 @@ const assertRestored=harness=>{
 };
 
 async function transactionTests(){
+  let decodeCalls=0,decodeOptions=null,closed=false;
+  const normalized=await api.decodeOrientationNormalizedBitmap('encoded-source',{createImageBitmap:async(source,options)=>{decodeCalls+=1;decodeOptions=options;assert.strictEqual(source,'encoded-source');return{width:22,height:14,close:()=>{closed=true}}}});
+  assert.strictEqual(decodeCalls,1,'orientation normalization decoder must run exactly once per opened image');
+  assert.deepStrictEqual(decodeOptions,{imageOrientation:'from-image'});
+  assert.deepStrictEqual({kind:normalized.kind,width:normalized.width,height:normalized.height},{kind:'ORIENTATION_NORMALIZED_BITMAP',width:22,height:14});
+  normalized.close();
+  assert.strictEqual(closed,true);
+  assert.strictEqual((moduleSource.match(/imageOrientation:'from-image'/g)||[]).length,1,'the module must have one encoded-orientation normalization point');
+
   const success=transactionHarness();
   const committed=await api.executeReceiptReplacement(success.options);
   assert.deepStrictEqual({ok:committed.ok,status:committed.status,state:committed.state},{ok:true,status:'COMMITTED',state:'COMMITTED'});
@@ -261,6 +274,9 @@ async function transactionTests(){
   assert.match(confirmSource,/executeReceiptReplacement/,'production confirm must enter the replacement transaction only after validation/rendering');
   assert.match(index,/readOperationReceiptMetadata/,'production metadata switch must have durable readback');
   assert.match(index,/validateCanonicalReceiptBlob/,'production blob staging must revalidate MIME, magic and size');
+  assert.match(index,/open\('receiptPreview'\);if\(item\.type===/,'viewer must become measurable before fit geometry is calculated');
+  assert.match(index,/pointercancel','lostpointercapture'\]\)receiptMedia\.addEventListener\(eventName,cancelReceiptPointerState\)/,'viewer pointer cancellation must clear ephemeral gesture state');
+  assert.match(index,/pointercancel','lostpointercapture'\]\)receiptCropLayer\.addEventListener\(eventName,cancelReceiptCropPointer\)/,'crop pointer cancellation must clear ephemeral crop state');
 }
 
 transactionTests().then(()=>{

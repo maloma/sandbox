@@ -217,6 +217,8 @@ assert.deepStrictEqual(api.panReceiptTransform({scale:2,x:-10,y:-20},7,-5),{scal
 assert.deepStrictEqual(api.panReceiptTransform({scale:1,x:-10,y:-20},7,-5),{scale:1,x:0,y:0},'fit state must not drift under one-finger motion');
 assert.deepStrictEqual(api.fitReceiptTransform(),{scale:1,x:0,y:0},'opening/reset must return to fit state');
 assert.match(index,/clearReceiptPreview\(\)[\s\S]*fitReceiptTransform/,'opening a different receipt must reset gesture state');
+assert.match(index,/cancelReceiptPointerState/,'pointer cancellation must clear viewer gesture state');
+assert.match(index,/cancelReceiptCropPointer/,'pointer cancellation must clear crop gesture state');
 assert.match(index,/id="receiptCropAction"/);
 assert.match(index,/id="receiptCropCancel"[\s\S]*id="receiptCropConfirm"/,'crop mode must expose explicit cancel and confirm');
 assert.match(index,/item\.type==='application\/pdf'/,'crop must be unavailable for PDF');
