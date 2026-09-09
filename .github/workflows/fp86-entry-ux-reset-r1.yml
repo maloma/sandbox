@@ -1,8 +1,8 @@
-name: FP86 Physical Input UX Correction
+name: FP86 Entry UX Reset R1
 
 on:
   pull_request:
-    branches: [fp86-physical-input-fixes-base]
+    branches: [fp86-entry-ux-reset-r1-base]
   workflow_dispatch:
 
 permissions:
@@ -20,21 +20,20 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.5.0'
-      - run: node tools/fp86-voice-v1-domain-smoke.cjs
-      - run: node tools/fp86-native-stt-contract-smoke.cjs
-      - run: node tools/fp86-native-bridge-contract-smoke.cjs
       - run: node tools/fp86-native-app-shell-contract-smoke.cjs
-      - run: node tools/fp86-physical-input-ux-smoke.cjs
-      - run: gradle -p mobile/android-app :app:assembleDebug -PvoiceLocaleTag=ru-RU
+      - run: node tools/fp86-manual-entry-ux-smoke.cjs
+      - run: node tools/fp86-entry-ux-reset-r1-smoke.cjs
+      - run: node tools/fp86-hints-off-layout-smoke.cjs
+      - run: gradle -p mobile/android-app :app:assembleDebug
       - run: test -f mobile/android-app/app/build/outputs/apk/debug/app-debug.apk
-      - name: Stage corrected Android APK
+      - name: Stage Android APK
         run: |
           mkdir -p dist
-          cp mobile/android-app/app/build/outputs/apk/debug/app-debug.apk dist/FamilyPilot-ru-RU-physical-input-fix.apk
+          cp mobile/android-app/app/build/outputs/apk/debug/app-debug.apk dist/FamilyPilot-entry-ux-reset-r1.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: FamilyPilot-ru-RU-physical-input-fix
-          path: dist/FamilyPilot-ru-RU-physical-input-fix.apk
+          name: FamilyPilot-entry-ux-reset-r1
+          path: dist/FamilyPilot-entry-ux-reset-r1.apk
           if-no-files-found: error
           retention-days: 7
 
@@ -42,11 +41,10 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - run: node tools/fp86-voice-v1-domain-smoke.cjs
-      - run: node tools/fp86-native-stt-contract-smoke.cjs
-      - run: node tools/fp86-native-bridge-contract-smoke.cjs
       - run: node tools/fp86-native-app-shell-contract-smoke.cjs
-      - run: node tools/fp86-physical-input-ux-smoke.cjs
+      - run: node tools/fp86-manual-entry-ux-smoke.cjs
+      - run: node tools/fp86-entry-ux-reset-r1-smoke.cjs
+      - run: node tools/fp86-hints-off-layout-smoke.cjs
       - run: xcodebuild -version
       - run: >-
           xcodebuild
@@ -55,5 +53,4 @@ jobs:
           -configuration Debug
           -sdk iphonesimulator
           CODE_SIGNING_ALLOWED=NO
-          FAMILY_PILOT_VOICE_LOCALE=ru-RU
           build

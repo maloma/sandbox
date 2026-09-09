@@ -10,9 +10,6 @@
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>0.1.0</string>
     <key>CFBundleVersion</key><string>1</string>
-    <key>FamilyPilotVoiceLocale</key><string>$(FAMILY_PILOT_VOICE_LOCALE)</string>
-    <key>NSMicrophoneUsageDescription</key><string>FamilyPilot использует микрофон только для локального голосового ввода операции.</string>
-    <key>NSSpeechRecognitionUsageDescription</key><string>FamilyPilot использует системное распознавание речи на устройстве для заполнения черновика операции.</string>
     <key>UILaunchScreen</key><dict/>
     <key>UISupportedInterfaceOrientations</key>
     <array><string>UIInterfaceOrientationPortrait</string></array>
