@@ -277,13 +277,16 @@ for(const[rect]of invalid)confirmCandidate(rect);
 assert.strictEqual(canonicalMutations,0,'validator rejection must happen before canonical blob/metadata mutation');
 
 const confirmStart=index.indexOf('async function confirmReceiptCrop()');
-const confirmEnd=index.indexOf('async function invokeNativeReceiptAction',confirmStart);
+const confirmEnd=index.indexOf('async function applyReceiptEditSession',confirmStart);
 const confirmSource=index.slice(confirmStart,confirmEnd);
 assert(confirmStart>=0&&confirmEnd>confirmStart);
-assert(confirmSource.indexOf('validateCropSelection')<confirmSource.indexOf("document.createElement('canvas')"));
-assert(confirmSource.indexOf('validateCropSelection')<confirmSource.indexOf('putReceiptBlob'));
 assert.match(confirmSource,/viewerRectToRawSource\(transform,receiptCropRect\)/,'crop confirm must use only inverse(T)');
-assert.match(confirmSource,/renderValidatedCropCanvas\(receiptNormalizedBitmap,validation/,'renderer must consume the same Bnorm and exact validator result');
+assert.match(confirmSource,/validateCropSelection\(\{width:image\.width,height:image\.height\},rawSource\)/,'crop confirm must retain strict validation against the current same-session raster');
+assert.doesNotMatch(confirmSource,/executeReceiptReplacement|putReceiptBlob|writeOperationReceiptMetadata/,'crop confirm must not mutate the canonical receipt before Done');
+const applyStart=index.indexOf('async function applyReceiptEditSession');
+const applyEnd=index.indexOf('async function resolveCurrentCanonicalReceiptForAction',applyStart);
+const applySource=index.slice(applyStart,applyEnd);
+assert.strictEqual((applySource.match(/executeReceiptReplacement/g)||[]).length,1,'explicit Done must enter exactly one accepted replacement transaction');
 const actionStart=index.indexOf('async function invokeNativeReceiptAction');
 const actionEnd=index.indexOf('async function openReceiptPdfExternal',actionStart);
 const actionSource=index.slice(actionStart,actionEnd);
@@ -444,7 +447,7 @@ async function transactionTests(){
   assert.strictEqual(identityResult.state,'OLD_CANONICAL');
   assert.deepStrictEqual(changedIdentity.metadataState(),oldMetadata);
 
-  assert.match(confirmSource,/executeReceiptReplacement/,'production confirm must enter the replacement transaction only after validation/rendering');
+  assert.match(applySource,/executeReceiptReplacement/,'production Done must enter the accepted replacement transaction after session validation/rendering');
   assert.match(index,/readOperationReceiptMetadata/,'production metadata switch must have durable readback');
   assert.match(index,/validateCanonicalReceiptBlob/,'production blob staging must revalidate MIME, magic and size');
   assert.match(index,/open\('receiptPreview'\);if\(item\.type===/,'viewer must become measurable before fit geometry is calculated');
