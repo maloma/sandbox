@@ -2,7 +2,7 @@ name: FP86 Entry UX Reset R1
 
 on:
   pull_request:
-    branches: [fp86-entry-ux-reset-r1-base]
+    branches: [fp86-entry-ux-reset-r1-base, fp86-receipt-media-transform-v1]
   workflow_dispatch:
 
 permissions:
@@ -24,6 +24,7 @@ jobs:
       - run: node tools/fp86-manual-entry-ux-smoke.cjs
       - run: node tools/fp86-entry-ux-reset-r1-smoke.cjs
       - run: node tools/fp86-receipt-media-transform-v1-smoke.cjs
+      - run: node tools/fp93-receipt-gallery-editor-ux-v1-smoke.cjs
       - run: node tools/fp86-hints-off-layout-smoke.cjs
       - run: gradle -p mobile/android-app :app:assembleDebug
       - run: test -f mobile/android-app/app/build/outputs/apk/debug/app-debug.apk
@@ -46,6 +47,7 @@ jobs:
       - run: node tools/fp86-manual-entry-ux-smoke.cjs
       - run: node tools/fp86-entry-ux-reset-r1-smoke.cjs
       - run: node tools/fp86-receipt-media-transform-v1-smoke.cjs
+      - run: node tools/fp93-receipt-gallery-editor-ux-v1-smoke.cjs
       - run: node tools/fp86-hints-off-layout-smoke.cjs
       - run: xcodebuild -version
       - run: >-
