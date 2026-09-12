@@ -27,6 +27,7 @@ jobs:
       - run: node tools/fp93-receipt-gallery-editor-ux-v1-smoke.cjs
       - run: node tools/fp93-receipt-gallery-editor-ux-v1-runtime-smoke.mjs
       - run: node tools/fp94-receipt-viewer-editor-ux-followup-v1-smoke.cjs
+      - run: node tools/fp94-receipt-export-completion-r1-smoke.cjs
       - run: node tools/fp94-receipt-viewer-editor-ux-followup-v1-runtime-smoke.mjs
       - run: node tools/fp86-hints-off-layout-smoke.cjs
       - run: gradle -p mobile/android-app :app:assembleDebug
@@ -53,6 +54,7 @@ jobs:
       - run: node tools/fp93-receipt-gallery-editor-ux-v1-smoke.cjs
       - run: node tools/fp93-receipt-gallery-editor-ux-v1-runtime-smoke.mjs
       - run: node tools/fp94-receipt-viewer-editor-ux-followup-v1-smoke.cjs
+      - run: node tools/fp94-receipt-export-completion-r1-smoke.cjs
       - run: node tools/fp94-receipt-viewer-editor-ux-followup-v1-runtime-smoke.mjs
       - run: node tools/fp86-hints-off-layout-smoke.cjs
       - run: xcodebuild -version

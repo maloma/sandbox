@@ -25,6 +25,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.FileProvider
 import androidx.webkit.WebViewAssetLoader
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import org.json.JSONObject
 import android.widget.FrameLayout
 
@@ -51,6 +52,7 @@ class MainActivity : ComponentActivity() {
     private var pendingCameraFile: File? = null
     private var backDispatchPending = false
     private var surfaceRecoveryScheduled = false
+    private val receiptExportInFlight = AtomicBoolean(false)
     private val pendingVisualEventScripts = linkedSetOf<String>()
     private lateinit var webViewContainer: FrameLayout
     private lateinit var webView: WebView
@@ -253,9 +255,14 @@ class MainActivity : ComponentActivity() {
         }
 
         @JavascriptInterface
-        fun exportReceipt(dataUrl: String?, mimeType: String?, displayName: String?): Boolean {
+        fun exportReceipt(dataUrl: String?, mimeType: String?, displayName: String?, transactionId: String?): Boolean {
+            val transaction = transactionId?.takeIf {
+                it.length in 1..128 && it.matches(Regex("[A-Za-z0-9._:-]+"))
+            } ?: return false
             val payload = decodeReceiptPayload(dataUrl, mimeType) ?: return false
-            Thread {
+            if (!receiptExportInFlight.compareAndSet(false, true)) return false
+            return try {
+                Thread {
                 val isPdf = payload.mimeType == "application/pdf"
                 val collection = if (isPdf) MediaStore.Downloads.EXTERNAL_CONTENT_URI
                     else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
@@ -268,20 +275,34 @@ class MainActivity : ComponentActivity() {
                     put(MediaStore.MediaColumns.IS_PENDING, 1)
                 }
                 var uri: Uri? = null
+                var success = false
                 try {
                     uri = contentResolver.insert(collection, values) ?: throw IllegalStateException("media_insert_failed")
                     contentResolver.openOutputStream(uri, "w")?.use { it.write(payload.bytes) }
                         ?: throw IllegalStateException("media_write_failed")
-                    contentResolver.update(uri, ContentValues().apply {
+                    val finalized = contentResolver.update(uri, ContentValues().apply {
                         put(MediaStore.MediaColumns.IS_PENDING, 0)
                     }, null, null)
-                    notifyReceiptResult(if (isPdf) "Копия PDF сохранена в загрузки." else "Копия фото сохранена в галерею.")
+                    if (finalized != 1) throw IllegalStateException("media_finalize_failed")
+                    success = true
                 } catch (_: Exception) {
                     uri?.let { contentResolver.delete(it, null, null) }
-                    notifyReceiptResult("Не удалось сохранить копию чека.")
+                } finally {
+                    receiptExportInFlight.set(false)
+                    notifyReceiptExportResult(
+                        transaction,
+                        success,
+                        if (success) {
+                            if (isPdf) "Копия PDF сохранена в загрузки." else "Копия фото сохранена в галерею."
+                        } else "Не удалось сохранить копию чека.",
+                    )
                 }
-            }.start()
-            return true
+                }.apply { name = "familypilot-receipt-export" }.start()
+                true
+            } catch (_: Throwable) {
+                receiptExportInFlight.set(false)
+                false
+            }
         }
     }
 
@@ -322,9 +343,22 @@ class MainActivity : ComponentActivity() {
 
     private fun notifyReceiptResult(message: String) {
         runOnUiThread {
+            if (!::webView.isInitialized || isFinishing || isDestroyed) return@runOnUiThread
             val encoded = JSONObject.quote(message)
             webView.evaluateJavascript(
                 "window.dispatchEvent(new CustomEvent('familypilot:receipt-native-result',{detail:{message:$encoded}}));",
+                null,
+            )
+        }
+    }
+
+    private fun notifyReceiptExportResult(transactionId: String, success: Boolean, message: String) {
+        runOnUiThread {
+            if (!::webView.isInitialized || isFinishing || isDestroyed) return@runOnUiThread
+            val encodedTransaction = JSONObject.quote(transactionId)
+            val encodedMessage = JSONObject.quote(message)
+            webView.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('familypilot:receipt-native-result',{detail:{action:'export',transactionId:$encodedTransaction,success:$success,message:$encodedMessage}}));",
                 null,
             )
         }

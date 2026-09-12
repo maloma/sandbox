@@ -41,11 +41,11 @@ assert(/if\(!receiptSessionHasEdit\(\)\)/.test(transition)&&/settleReceiptDirtyT
 const bypassMutant=transition.replace('if(!receiptSessionHasEdit())','if(true)');
 assert(!/if\(!receiptSessionHasEdit\(\)\)/.test(bypassMutant),'NEGATIVE 2 dirty transition bypass mutant escaped');
 
-const exportSource=section('async function exportCurrentReceipt','async function openReceiptPdfExternal');
-assert(/receiptExportState\.inFlight\|\|nowAt<receiptExportState\.suppressUntil/.test(exportSource)&&/Date\.now\(\)\+1500/.test(exportSource)&&/dataset\.state='success'/.test(exportSource)&&/setReceiptActionStatus\('Сохранено'\)/.test(exportSource),'export suppression/feedback contract missing');
+const exportSource=section('async function exportCurrentReceipt','async function openReceiptPdfExternal'),exportCompletionSource=section('function completeReceiptExport','function handleReceiptNativeResult');
+assert(/receiptExportState\.inFlight\|\|nowAt<receiptExportState\.suppressUntil/.test(exportSource)&&/Date\.now\(\)\+1500/.test(exportCompletionSource)&&/dataset\.state='success'/.test(exportCompletionSource)&&/setReceiptActionStatus\('Сохранено'\)/.test(exportCompletionSource),'export suppression/feedback contract missing');
 const duplicateMutant=exportSource.replace('if(receiptExportState.inFlight||nowAt<receiptExportState.suppressUntil)return false;','');
 assert(!/receiptExportState\.inFlight\|\|nowAt<receiptExportState\.suppressUntil/.test(duplicateMutant),'NEGATIVE 4 duplicate export mutant escaped');
-const silentSuccessMutant=exportSource.replace("action.dataset.state='success';setReceiptActionStatus('Сохранено');",'');
+const silentSuccessMutant=exportCompletionSource.replace("action.dataset.state='success';setReceiptActionStatus('Сохранено');",'');
 assert(!/setReceiptActionStatus\('Сохранено'\)/.test(silentSuccessMutant),'NEGATIVE 5 silent-success mutant escaped');
 
 const autoSource=section('async function evaluateReceiptAuto','async function openReceiptPreview');
