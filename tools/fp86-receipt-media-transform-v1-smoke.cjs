@@ -277,14 +277,14 @@ for(const[rect]of invalid)confirmCandidate(rect);
 assert.strictEqual(canonicalMutations,0,'validator rejection must happen before canonical blob/metadata mutation');
 
 const confirmStart=index.indexOf('async function confirmReceiptCrop()');
-const confirmEnd=index.indexOf('async function applyReceiptEditSession',confirmStart);
+const confirmEnd=index.indexOf('async function commitReceiptEditSession',confirmStart);
 const confirmSource=index.slice(confirmStart,confirmEnd);
 assert(confirmStart>=0&&confirmEnd>confirmStart);
 assert.match(confirmSource,/viewerRectToRawSource\(transform,receiptCropRect\)/,'crop confirm must use only inverse(T)');
 assert.match(confirmSource,/validateCropSelection\(\{width:image\.width,height:image\.height\},rawSource\)/,'crop confirm must retain strict validation against the current same-session raster');
 assert.doesNotMatch(confirmSource,/executeReceiptReplacement|putReceiptBlob|writeOperationReceiptMetadata/,'crop confirm must not mutate the canonical receipt before Done');
-const applyStart=index.indexOf('async function applyReceiptEditSession');
-const applyEnd=index.indexOf('async function resolveCurrentCanonicalReceiptForAction',applyStart);
+const applyStart=index.indexOf('async function commitReceiptEditSession');
+const applyEnd=index.indexOf('async function applyReceiptEditSession',applyStart);
 const applySource=index.slice(applyStart,applyEnd);
 assert.strictEqual((applySource.match(/executeReceiptReplacement/g)||[]).length,1,'explicit Done must enter exactly one accepted replacement transaction');
 const actionStart=index.indexOf('async function invokeNativeReceiptAction');

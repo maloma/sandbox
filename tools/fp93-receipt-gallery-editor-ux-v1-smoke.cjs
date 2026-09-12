@@ -26,7 +26,7 @@ assert.deepStrictEqual([columnCount(88),columnCount(185),columnCount(400)],[1,2,
 assert.match(section('async function removeReceipt(item)','async function decodeReceiptImage'),/confirm\(`/,'thumbnail removal must retain explicit confirmation');
 assert.match(index,/id="detailReceiptBtn"[^>]*>Добавить страницу чека/,'explicit Add flow must remain present');
 assert.doesNotMatch(section('<div id="receiptPreview"','<input id="receiptInput"'),/receiptActionToggle|receiptActionMenu|Действия|item\.name/,'viewer chrome must have no filename or Actions menu');
-for(const id of ['receiptCropAction','receiptShareAction','receiptExportAction','receiptBrightnessAction','receiptContrastAction','receiptAutoAction','receiptDoneAction'])assert.match(index,new RegExp(`id="${id}"`),`${id} must be directly reachable in the dock`);
+for(const id of ['receiptCropAction','receiptShareAction','receiptExportAction','receiptAdjustmentsAction','receiptAutoAction','receiptDoneAction'])assert.match(index,new RegExp(`id="${id}"`),`${id} must be directly reachable in the dock`);
 
 const usableGeometry=(viewport,safe,rects)=>rects.every(rect=>rect.left>=safe.left&&rect.right<=viewport-safe.right&&rect.right>rect.left);
 assert.match(index,/height:100dvh;max-height:100dvh/);
@@ -100,17 +100,17 @@ assert.strictEqual(api.selectAutoEncoding({control:[],bw:[],gray:[]}).mode,'AUTO
 const normalizedStateOracle=state=>{if(state.readable===false&&state.size!==null)throw Error('malformed_normalized_state');return state};
 assert.throws(()=>normalizedStateOracle({readable:false,size:55}),/malformed_normalized_state/,'invalid normalized logical state must be rejected');
 
-const previewSource=section('async function renderReceiptEditPreview()','function scheduleReceiptEditPreview')+section('async function confirmReceiptCrop()','async function applyReceiptEditSession');
+const previewSource=section('function renderReceiptEditPreview()','function scheduleReceiptEditPreview')+section('async function confirmReceiptCrop()','async function commitReceiptEditSession');
 const autoEvaluationSource=section('async function evaluateReceiptAuto','function receiptSessionHasEdit');
-assert(autoEvaluationSource.indexOf('decodeEncodedRaster(encoded.blob)')<autoEvaluationSource.indexOf('readabilityGuard(control,decoded)'),'readability must score decoded encoded candidate pixels');
+assert(autoEvaluationSource.indexOf('decodeEncodedRaster(encoded.blob)')<autoEvaluationSource.indexOf('readabilityGuard(cleanBaseline,decoded)'),'readability must score decoded encoded candidate pixels');
 const noCanonicalWrite=text=>!/executeReceiptReplacement|putReceiptBlob|writeOperationReceiptMetadata/.test(text);
 assert(noCanonicalWrite(previewSource),'crop/brightness/contrast/Auto preview must perform zero canonical writes');
 assert.strictEqual(noCanonicalWrite(`${previewSource};writeOperationReceiptMetadata()`),false,'PRE_DONE_CANONICAL_WRITE mutant must fail');
-const applySource=section('async function applyReceiptEditSession()','async function resolveCurrentCanonicalReceiptForAction');
-const oneCommit=text=>(text.match(/executeReceiptReplacement/g)||[]).length===1&&(text.match(/selected\|\|await encodeReceiptProfile/g)||[]).length===1;
+const applySource=section('async function commitReceiptEditSession()','async function applyReceiptEditSession');
+const oneCommit=text=>(text.match(/executeReceiptReplacement/g)||[]).length===1&&(text.match(/finalEncoding=mayReuseAuto\?selected:await encodeReceiptProfile/g)||[]).length===1;
 assert(oneCommit(applySource),'one Done must make one final encode decision and one accepted replacement transaction');
 assert.strictEqual(oneCommit(`${applySource};executeReceiptReplacement()`),false,'REPEATED_CANONICAL_RENDER_OR_COMMIT mutant must fail');
-assert.match(applySource,/if\(!receiptSessionHasEdit\(\)\)\{close\('receiptPreview'\);clearReceiptPreview\(\);return\}/,'AUTO_NO_OP-only Done must return before replacement');
+assert.match(section('async function applyReceiptEditSession()','function closeReceiptViewerNow'),/if\(!receiptSessionHasEdit\(\)/,'AUTO_NO_OP-only Done must return before replacement');
 const solePersistencePath=text=>noCanonicalWrite(previewSource)&&(text.match(/executeReceiptReplacement/g)||[]).length===1&&!/await putReceiptBlob\(|await writeOperationReceiptMetadata\(/.test(text);
 assert(solePersistencePath(applySource),'edit persistence must use only the accepted transaction');
 assert.strictEqual(solePersistencePath(`${applySource};await putReceiptBlob('second',blob)`),false,'SECOND_PERSISTENCE_PATH mutant must fail');

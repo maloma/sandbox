@@ -1,0 +1,68 @@
+name: FP94 Receipt Viewer Editor UX Follow-up V1
+
+on:
+  pull_request:
+    branches: [fp93-receipt-gallery-editor-ux-v1]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+      - run: node tools/fp86-native-app-shell-contract-smoke.cjs
+      - run: node tools/fp86-manual-entry-ux-smoke.cjs
+      - run: node tools/fp86-entry-ux-reset-r1-smoke.cjs
+      - run: node tools/fp86-receipt-media-transform-v1-smoke.cjs
+      - run: node tools/fp93-receipt-gallery-editor-ux-v1-smoke.cjs
+      - run: node tools/fp93-receipt-gallery-editor-ux-v1-runtime-smoke.mjs
+      - run: node tools/fp94-receipt-viewer-editor-ux-followup-v1-smoke.cjs
+      - run: node tools/fp94-receipt-export-completion-r1-smoke.cjs
+      - run: node tools/fp94-receipt-viewer-editor-ux-followup-v1-runtime-smoke.mjs
+      - run: node tools/fp86-hints-off-layout-smoke.cjs
+      - run: gradle -p mobile/android-app :app:assembleDebug
+      - run: test -f mobile/android-app/app/build/outputs/apk/debug/app-debug.apk
+      - name: Stage Android APK
+        run: |
+          mkdir -p dist
+          cp mobile/android-app/app/build/outputs/apk/debug/app-debug.apk dist/FamilyPilot-fp94-receipt-viewer-editor-ux-followup-v1.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FamilyPilot-fp94-receipt-viewer-editor-ux-followup-v1
+          path: dist/FamilyPilot-fp94-receipt-viewer-editor-ux-followup-v1.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  ios-build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: node tools/fp86-native-app-shell-contract-smoke.cjs
+      - run: node tools/fp86-manual-entry-ux-smoke.cjs
+      - run: node tools/fp86-entry-ux-reset-r1-smoke.cjs
+      - run: node tools/fp86-receipt-media-transform-v1-smoke.cjs
+      - run: node tools/fp93-receipt-gallery-editor-ux-v1-smoke.cjs
+      - run: node tools/fp93-receipt-gallery-editor-ux-v1-runtime-smoke.mjs
+      - run: node tools/fp94-receipt-viewer-editor-ux-followup-v1-smoke.cjs
+      - run: node tools/fp94-receipt-export-completion-r1-smoke.cjs
+      - run: node tools/fp94-receipt-viewer-editor-ux-followup-v1-runtime-smoke.mjs
+      - run: node tools/fp86-hints-off-layout-smoke.cjs
+      - run: xcodebuild -version
+      - run: >-
+          xcodebuild
+          -project mobile/ios-app/FamilyPilotApp.xcodeproj
+          -scheme FamilyPilotApp
+          -configuration Debug
+          -sdk iphonesimulator
+          CODE_SIGNING_ALLOWED=NO
+          build
