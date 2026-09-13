@@ -26,7 +26,8 @@ assert.deepStrictEqual([columnCount(88),columnCount(185),columnCount(400)],[1,2,
 assert.match(section('async function removeReceipt(item)','async function decodeReceiptImage'),/confirm\(`/,'thumbnail removal must retain explicit confirmation');
 assert.match(index,/id="detailReceiptBtn"[^>]*>Добавить страницу чека/,'explicit Add flow must remain present');
 assert.doesNotMatch(section('<div id="receiptPreview"','<input id="receiptInput"'),/receiptActionToggle|receiptActionMenu|Действия|item\.name/,'viewer chrome must have no filename or Actions menu');
-for(const id of ['receiptCropAction','receiptShareAction','receiptExportAction','receiptAdjustmentsAction','receiptAutoAction','receiptDoneAction'])assert.match(index,new RegExp(`id="${id}"`),`${id} must be directly reachable in the dock`);
+for(const id of ['receiptCropAction','receiptShareAction','receiptExportAction','receiptAdjustmentsAction','receiptDoneAction'])assert.match(index,new RegExp(`id="${id}"`),`${id} must be directly reachable in the dock`);
+assert.doesNotMatch(index,/id="receiptAutoAction"|id="receiptOpenPdfAction"/,'FP95 removes Enhance and redundant PDF viewer actions');
 
 const usableGeometry=(viewport,safe,rects)=>rects.every(rect=>rect.left>=safe.left&&rect.right<=viewport-safe.right&&rect.right>rect.left);
 assert.match(index,/height:100dvh;max-height:100dvh/);
@@ -107,7 +108,7 @@ const noCanonicalWrite=text=>!/executeReceiptReplacement|putReceiptBlob|writeOpe
 assert(noCanonicalWrite(previewSource),'crop/brightness/contrast/Auto preview must perform zero canonical writes');
 assert.strictEqual(noCanonicalWrite(`${previewSource};writeOperationReceiptMetadata()`),false,'PRE_DONE_CANONICAL_WRITE mutant must fail');
 const applySource=section('async function commitReceiptEditSession()','async function applyReceiptEditSession');
-const oneCommit=text=>(text.match(/executeReceiptReplacement/g)||[]).length===1&&(text.match(/finalEncoding=mayReuseAuto\?selected:await encodeReceiptProfile/g)||[]).length===1;
+const oneCommit=text=>(text.match(/executeReceiptReplacement/g)||[]).length===1&&(text.match(/finalEncoding=await encodeReceiptProfile/g)||[]).length===1;
 assert(oneCommit(applySource),'one Done must make one final encode decision and one accepted replacement transaction');
 assert.strictEqual(oneCommit(`${applySource};executeReceiptReplacement()`),false,'REPEATED_CANONICAL_RENDER_OR_COMMIT mutant must fail');
 assert.match(section('async function applyReceiptEditSession()','function closeReceiptViewerNow'),/if\(!receiptSessionHasEdit\(\)/,'AUTO_NO_OP-only Done must return before replacement');

@@ -46,7 +46,7 @@ assert.strictEqual(nativeCompletionOracle(nativeSingleFlightBypass),false,'NATIV
 const requestExport=section(index,'async function requestReceiptExport(','function completeReceiptExport');
 const completion=section(index,'function completeReceiptExport(','function handleReceiptNativeResult');
 const handler=section(index,'function handleReceiptNativeResult(','async function exportCurrentReceipt');
-const exportCurrent=section(index,'async function exportCurrentReceipt','async function openReceiptPdfExternal');
+const exportCurrent=section(index,'async function exportCurrentReceipt','async function openReceiptPdfDirect');
 const resetFeedback=section(index,'function resetReceiptExportFeedback','function resetReceiptEditVisualState');
 
 assert(/bridge\.exportReceipt\(dataUrl,item\.type,item\.name,transactionId\)/.test(requestExport),'web request must pass the transaction identity into Android');
