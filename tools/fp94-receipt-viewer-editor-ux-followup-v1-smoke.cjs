@@ -34,20 +34,16 @@ assert(/receiptToolbarOverflowCue/.test(markup)&&/function syncReceiptToolbarOve
 assert(/data-receipt-layout/.test(markup)&&/function syncReceiptResponsiveLayout\(\).*innerWidth.*viewport.*safeDockHeight/.test(index),'responsive landscape rule missing');
 assert(/data-receipt-dock-columns="1".*minmax\(48px/s.test(index)&&/data-receipt-dock-columns="2".*repeat\(2,minmax\(48px/s.test(index),'landscape one/two column touch-target rule missing');
 assert(/function receiptMaxZoom\(\).*Math\.min\(12,Math\.max\(4,widthFillScale\)\)/.test(index),'landscape width-fill zoom formula missing');
-assert(/window\.addEventListener\('resize',\(\)=>\{syncReceiptResponsiveLayout\(\).*applyReceiptTransform\(receiptTransform\)/.test(index),'orientation continuity recomputes by resetting session state');
+assert(/window\.addEventListener\('resize',\(\)=>\{const cropSource=activeReceiptCropSourceRect\(\);syncReceiptResponsiveLayout\(\).*applyReceiptTransform\(receiptTransform\).*restoreReceiptCropSourceRect\(cropSource\)/.test(index),'orientation continuity must preserve active crop source geometry');
 assert(/executeReceiptReplacement/.test(index)&&/resolveCanonicalReceiptForRead/.test(index)&&/receiptExportState\.inFlight/.test(index),'canonical replacement/export preservation missing');
-for(let number=1;number<=21;number++)console.log(`FP95_CONTROL_${String(number).padStart(2,'0')}_PASS`);
-console.log('FP95_RECEIPT_VIEWER_RELEASE_UX_STATIC_PASS');
-process.exit(0);
 assert(!markup.includes('Действия')&&!markup.includes('receiptBrightnessAction')&&!markup.includes('receiptContrastAction'),'one direct Adjustments destination is required');
 const redundantMutant=markup+'<button id="receiptBrightnessAction">Яркость</button><button id="receiptContrastAction">Контраст</button>';
 assert(/receiptBrightnessAction/.test(redundantMutant)&&!/receiptBrightnessAction/.test(markup),'NEGATIVE 6 redundant toolbar mutant was not detectable');
 assert(/\.receipt-adjustments\{[^}]*gap:16px/.test(index)&&/\.receipt-adjustments label\{[^}]*min-height:48px/.test(index)&&/\.receipt-adjustments input\{[^}]*min-height:48px/.test(index),'slider rows must expose 48px targets and 16px separation');
 const geometryMutant=index.replace('gap:16px;padding:10px','gap:15px;padding:10px');
 assert(!/\.receipt-adjustments\{[^}]*gap:16px/.test(geometryMutant),'NEGATIVE 7 touch geometry mutant escaped');
-assert(!new RegExp('id="receiptAutoAction"[^>]*aria-pressed').test(markup),'Enhance must never be a latched toggle');
-const latchedMutant=markup.replace('id="receiptAutoAction"','id="receiptAutoAction" aria-pressed="true"');
-assert(new RegExp('id="receiptAutoAction"[^>]*aria-pressed').test(latchedMutant),'NEGATIVE 8 latched wand mutant was not detectable');
+const restoredAutoMutant=markup.replace('id="receiptCropAction"','id="receiptAutoAction" aria-pressed="true"');
+assert(/receiptAutoAction/.test(restoredAutoMutant)&&!/receiptAutoAction/.test(markup),'NEGATIVE 8 restored latched Enhance control was not detectable');
 
 const swipe=section('function beginReceiptPointer','function blobDataUrl');
 assert(/receiptTransform\.scale===1/.test(swipe)&&/receiptTransform\.scale!==1/.test(section('function navigateReceiptBySwipe','async function resolveCurrentCanonicalReceiptForAction')),'base-zoom swipe gate missing');
@@ -60,25 +56,24 @@ assert(/if\(!receiptSessionHasEdit\(\)\)/.test(transition)&&/settleReceiptDirtyT
 const bypassMutant=transition.replace('if(!receiptSessionHasEdit())','if(true)');
 assert(!/if\(!receiptSessionHasEdit\(\)\)/.test(bypassMutant),'NEGATIVE 2 dirty transition bypass mutant escaped');
 
-const exportSource=section('async function exportCurrentReceipt','async function openReceiptPdfExternal'),exportCompletionSource=section('function completeReceiptExport','function handleReceiptNativeResult');
+const exportSource=section('async function exportCurrentReceipt','async function openReceiptPdfDirect'),exportCompletionSource=section('function completeReceiptExport','function handleReceiptNativeResult');
 assert(/receiptExportState\.inFlight\|\|nowAt<receiptExportState\.suppressUntil/.test(exportSource)&&/Date\.now\(\)\+1500/.test(exportCompletionSource)&&/dataset\.state='success'/.test(exportCompletionSource)&&/setReceiptActionStatus\('Сохранено'\)/.test(exportCompletionSource),'export suppression/feedback contract missing');
 const duplicateMutant=exportSource.replace('if(receiptExportState.inFlight||nowAt<receiptExportState.suppressUntil)return false;','');
 assert(!/receiptExportState\.inFlight\|\|nowAt<receiptExportState\.suppressUntil/.test(duplicateMutant),'NEGATIVE 4 duplicate export mutant escaped');
 const silentSuccessMutant=exportCompletionSource.replace("action.dataset.state='success';setReceiptActionStatus('Сохранено');",'');
 assert(!/setReceiptActionStatus\('Сохранено'\)/.test(silentSuccessMutant),'NEGATIVE 5 silent-success mutant escaped');
 
-const autoSource=section('async function evaluateReceiptAuto','async function openReceiptPreview');
-assert(/evaluateReceiptAuto\(session\.sourceRaster,generation\)/.test(autoSource),'Enhance must compute from clean B0');
-assert(/resetReceiptManualValues\(\)/.test(autoSource)&&/autoBaseRaster/.test(autoSource),'post-Auto manual baseline reset/cache missing');
-const stackingMutant=autoSource.replace('evaluateReceiptAuto(session.sourceRaster,generation)','evaluateReceiptAuto(controlRasterForSession(),generation)');
-assert(!/evaluateReceiptAuto\(session\.sourceRaster,generation\)/.test(stackingMutant),'NEGATIVE 9 transient-stack mutant escaped');
-assert(/Уже оптимально · без изменений/.test(autoSource),'explicit Auto no-op feedback missing');
-assert(!/Уже оптимально · без изменений/.test(autoSource.replace('Уже оптимально · без изменений','')),'NEGATIVE 10 silent no-op mutant escaped');
+const cropSource=section('function activeReceiptCropSourceRect','function openReceiptPdfDirect');
+assert(/viewerRectToRawSource/.test(cropSource)&&/sourceRectToViewer/.test(cropSource),'active crop must be represented in source coordinates across layout changes');
+const cropResetMutant=index.replace('const cropSource=activeReceiptCropSourceRect();','const cropSource=null;');
+assert(!/const cropSource=activeReceiptCropSourceRect\(\)/.test(cropResetMutant),'NEGATIVE 9 active-crop orientation restore mutant escaped');
+const pdfViewerMutant=markup.replace('id="receiptPreview"','id="receiptPreviewPdf"');
+assert(/receiptPreviewPdf/.test(pdfViewerMutant)&&!/receiptPreviewPdf/.test(markup),'NEGATIVE 10 embedded-PDF viewer restoration mutant was not detectable');
 const sliderSource=section("$('receiptCropAction').onclick",'document.querySelectorAll(\'[data-filter]\')');
 assert(!/evaluateReceiptAuto|runReceiptEnhance/.test(section("input.addEventListener('input'", "$('receiptDoneAction').onclick")),'slider pointer path reruns heavy Auto');
 assert(/scheduleReceiptEditPreview/.test(sliderSource),'manual slider preview path missing');
-const heavyMoveMutant=sliderSource.replace('scheduleReceiptEditPreview();syncReceiptEditControls()','runReceiptEnhance();scheduleReceiptEditPreview();syncReceiptEditControls()');
-assert(/runReceiptEnhance/.test(heavyMoveMutant)&&!/runReceiptEnhance/.test(section("input.addEventListener('input'", "$('receiptDoneAction').onclick")),'NEGATIVE 11 heavy pointer mutant was not detectable');
+const resetCropMutant=index.replace('if(cropSource)requestAnimationFrame(()=>restoreReceiptCropSourceRect(cropSource))','leaveReceiptCrop()');
+assert(/leaveReceiptCrop\(\)/.test(resetCropMutant)&&!/if\(cropSource\)requestAnimationFrame/.test(resetCropMutant),'NEGATIVE 11 resize-cancels-crop mutant was not detectable');
 assert(/resetReceiptEditVisualState\(\)/.test(section('function clearReceiptPreview','function receiptViewerTransform'))&&/receiptAdjustmentsAction'\)\.setAttribute\('aria-pressed','false'\)/.test(index),'discard/reopen visual reset missing');
 const staleHighlightMutant=index.replace("$('receiptAdjustmentsAction').setAttribute('aria-pressed','false');",'');
 assert(!/receiptAdjustmentsAction'\)\.setAttribute\('aria-pressed','false'\)/.test(staleHighlightMutant),'NEGATIVE 12 stale-highlight mutant escaped');
@@ -96,9 +91,9 @@ assert(/currentRaster/.test(actionSource+';const blob=receiptEditSession.current
 assert(/financialFingerprint/.test(commitSource)&&/receiptOrder/.test(commitSource),'financial/order invariant verification missing');
 const invariantMutant=commitSource.replace(/verifyInvariant:\(\)=>\{[\s\S]*?\}\}\);/,'verifyInvariant:()=>true});');
 assert(!/financialFingerprint/.test(invariantMutant)||!(/receiptOrder/.test(invariantMutant)),'NEGATIVE 16 invariant mutant escaped');
-assert(/item\.type==='application\/pdf'\?null/.test(section('async function openReceiptPreview','window.openReceiptPreview'))&&/const session=receiptEditSession,isImage=!!session/.test(index),'PDF must not enter image editor');
-const pdfMutant=index.replace("item.type==='application/pdf'?null",'null?null');
-assert(!/item\.type==='application\/pdf'\?null/.test(pdfMutant),'NEGATIVE 17 PDF editor mutant escaped');
+assert(/item\.type==='application\/pdf'\)\{if\(\$\('receiptPreview'\)\.classList\.contains\('open'\)\)closeReceiptViewerNow\(\);await openReceiptPdfDirect\(item\);return\}/.test(section('async function openReceiptPreview','window.openReceiptPreview')),'PDF must bypass the image editor');
+const pdfMutant=index.replace("if(item.type==='application/pdf'){if($('receiptPreview').classList.contains('open'))closeReceiptViewerNow();await openReceiptPdfDirect(item);return}",'if(false){await openReceiptPdfDirect(item);return}');
+assert(!/item\.type==='application\/pdf'\)\{if\(\$\('receiptPreview'\)\.classList\.contains\('open'\)\)closeReceiptViewerNow\(\);await openReceiptPdfDirect\(item\);return\}/.test(pdfMutant),'NEGATIVE 17 PDF editor mutant escaped');
 
 const rasterFromValues=values=>{const pixels=new Uint8ClampedArray(values.length*4);values.forEach((rgb,index)=>{pixels[index*4]=rgb[0];pixels[index*4+1]=rgb[1];pixels[index*4+2]=rgb[2];pixels[index*4+3]=255});return{width:100,height:100,stride:4,pixels}};
 const clippingValues=[];
