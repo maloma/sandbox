@@ -34,7 +34,9 @@ assert(/receiptToolbarOverflowCue/.test(markup)&&/function syncReceiptToolbarOve
 assert(/data-receipt-layout/.test(markup)&&/function syncReceiptResponsiveLayout\(\).*innerWidth.*viewport.*safeDockHeight/.test(index),'responsive landscape rule missing');
 assert(/data-receipt-dock-columns="1".*minmax\(48px/s.test(index)&&/data-receipt-dock-columns="2".*repeat\(2,minmax\(48px/s.test(index),'landscape one/two column touch-target rule missing');
 assert(/function receiptMaxZoom\(\).*Math\.min\(12,Math\.max\(4,widthFillScale\)\)/.test(index),'landscape width-fill zoom formula missing');
-assert(/window\.addEventListener\('resize',\(\)=>\{const cropSource=activeReceiptCropSourceRect\(\);syncReceiptResponsiveLayout\(\).*applyReceiptTransform\(receiptTransform\).*restoreReceiptCropSourceRect\(cropSource\)/.test(index),'orientation continuity must preserve active crop source geometry');
+const reflowSource=section('function syncReceiptResponsiveLayout','function clearReceiptPreview');
+assert(/const cropSource=activeReceiptCropSourceRect\(\)/.test(reflowSource)&&/receiptResponsiveCropSource=\{\.\.\.cropSource\}/.test(reflowSource)&&/receiptResponsiveReflowFrame=requestAnimationFrame/.test(reflowSource)&&/fitReceiptImageSize\(\);applyReceiptTransform\(receiptTransform\);if\(source\)restoreReceiptCropSourceRect\(source\)/.test(reflowSource),'responsive reflow must capture source crop before layout and restore it after geometry settles');
+assert(/window\.addEventListener\('resize',syncReceiptResponsiveLayout,\{passive:true\}\)/.test(index)&&/visualViewport\?\.addEventListener\?\.\('resize',syncReceiptResponsiveLayout,\{passive:true\}\)/.test(index),'window and visualViewport must share the same crop-preserving reflow authority');
 assert(/executeReceiptReplacement/.test(index)&&/resolveCanonicalReceiptForRead/.test(index)&&/receiptExportState\.inFlight/.test(index),'canonical replacement/export preservation missing');
 assert(!markup.includes('Действия')&&!markup.includes('receiptBrightnessAction')&&!markup.includes('receiptContrastAction'),'one direct Adjustments destination is required');
 const redundantMutant=markup+'<button id="receiptBrightnessAction">Яркость</button><button id="receiptContrastAction">Контраст</button>';
@@ -65,15 +67,16 @@ assert(!/setReceiptActionStatus\('Сохранено'\)/.test(silentSuccessMutan
 
 const cropSource=section('function activeReceiptCropSourceRect','function openReceiptPdfDirect');
 assert(/viewerRectToRawSource/.test(cropSource)&&/sourceRectToViewer/.test(cropSource),'active crop must be represented in source coordinates across layout changes');
-const cropResetMutant=index.replace('const cropSource=activeReceiptCropSourceRect();','const cropSource=null;');
-assert(!/const cropSource=activeReceiptCropSourceRect\(\)/.test(cropResetMutant),'NEGATIVE 9 active-crop orientation restore mutant escaped');
+function injectExactlyOnce(source,target,replacement,id){const count=source.split(target).length-1;assert.strictEqual(count,1,`${id} injection target must occur exactly once`);const mutated=source.replace(target,replacement);assert.notStrictEqual(mutated,source,`${id} injection must change production source`);return mutated}
+const cropResetMutant=injectExactlyOnce(index,'if(source)restoreReceiptCropSourceRect(source)','if(false)restoreReceiptCropSourceRect(source)','ORIENTATION_CROP_REPROJECTION');
+assert(!/if\(source\)restoreReceiptCropSourceRect\(source\)/.test(cropResetMutant),'NEGATIVE 9 active-crop orientation restore mutant escaped');
 const pdfViewerMutant=markup.replace('id="receiptPreview"','id="receiptPreviewPdf"');
 assert(/receiptPreviewPdf/.test(pdfViewerMutant)&&!/receiptPreviewPdf/.test(markup),'NEGATIVE 10 embedded-PDF viewer restoration mutant was not detectable');
 const sliderSource=section("$('receiptCropAction').onclick",'document.querySelectorAll(\'[data-filter]\')');
 assert(!/evaluateReceiptAuto|runReceiptEnhance/.test(section("input.addEventListener('input'", "$('receiptDoneAction').onclick")),'slider pointer path reruns heavy Auto');
 assert(/scheduleReceiptEditPreview/.test(sliderSource),'manual slider preview path missing');
-const resetCropMutant=index.replace('if(cropSource)requestAnimationFrame(()=>restoreReceiptCropSourceRect(cropSource))','leaveReceiptCrop()');
-assert(/leaveReceiptCrop\(\)/.test(resetCropMutant)&&!/if\(cropSource\)requestAnimationFrame/.test(resetCropMutant),'NEGATIVE 11 resize-cancels-crop mutant was not detectable');
+const resetCropMutant=injectExactlyOnce(index,'if(source)restoreReceiptCropSourceRect(source)','leaveReceiptCrop()','RESIZE_CANCELS_CROP');
+assert(/leaveReceiptCrop\(\)/.test(resetCropMutant)&&!/if\(source\)restoreReceiptCropSourceRect/.test(resetCropMutant),'NEGATIVE 11 resize-cancels-crop mutant was not detectable');
 assert(/resetReceiptEditVisualState\(\)/.test(section('function clearReceiptPreview','function receiptViewerTransform'))&&/receiptAdjustmentsAction'\)\.setAttribute\('aria-pressed','false'\)/.test(index),'discard/reopen visual reset missing');
 const staleHighlightMutant=index.replace("$('receiptAdjustmentsAction').setAttribute('aria-pressed','false');",'');
 assert(!/receiptAdjustmentsAction'\)\.setAttribute\('aria-pressed','false'\)/.test(staleHighlightMutant),'NEGATIVE 12 stale-highlight mutant escaped');
