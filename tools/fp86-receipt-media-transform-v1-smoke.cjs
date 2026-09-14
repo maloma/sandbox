@@ -288,7 +288,7 @@ const applyEnd=index.indexOf('async function applyReceiptEditSession',applyStart
 const applySource=index.slice(applyStart,applyEnd);
 assert.strictEqual((applySource.match(/executeReceiptReplacement/g)||[]).length,1,'explicit Done must enter exactly one accepted replacement transaction');
 const actionStart=index.indexOf('async function invokeNativeReceiptAction');
-const actionEnd=index.indexOf('async function openReceiptPdfExternal',actionStart);
+const actionEnd=index.indexOf('function nextReceiptExportTransactionId',actionStart);
 const actionSource=index.slice(actionStart,actionEnd);
 const actionResolverSource=index.slice(index.indexOf('async function resolveCurrentCanonicalReceiptForAction'),actionStart);
 assert(actionStart>=0&&actionEnd>actionStart);
@@ -450,7 +450,7 @@ async function transactionTests(){
   assert.match(applySource,/executeReceiptReplacement/,'production Done must enter the accepted replacement transaction after session validation/rendering');
   assert.match(index,/readOperationReceiptMetadata/,'production metadata switch must have durable readback');
   assert.match(index,/validateCanonicalReceiptBlob/,'production blob staging must revalidate MIME, magic and size');
-  assert.match(index,/open\('receiptPreview'\);if\(item\.type===/,'viewer must become measurable before fit geometry is calculated');
+  assert.match(index,/open\('receiptPreview'\);syncReceiptResponsiveLayout\(\);/,'viewer must become measurable before responsive fit geometry is calculated');
   assert.match(index,/pointercancel','lostpointercapture'\]\)receiptMedia\.addEventListener\(eventName,cancelReceiptPointerState\)/,'viewer pointer cancellation must clear ephemeral gesture state');
   assert.match(index,/pointercancel','lostpointercapture'\]\)receiptCropLayer\.addEventListener\(eventName,cancelReceiptCropPointer\)/,'crop pointer cancellation must clear ephemeral crop state');
 }
