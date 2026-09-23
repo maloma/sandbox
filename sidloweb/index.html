@@ -4,143 +4,170 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Lokál — Sídlo firmy v Bratislave</title>
-<meta name="description" content="Sídlo firmy na adrese Drieňová 1/J, Bratislava. Firemná adresa, preberanie pošty a praktické služby na jednom mieste.">
+<meta name="description" content="Sídlo firmy na adrese Drieňová 1/J, 821 01 Bratislava. Firemná adresa a preberanie korešpondencie na jednom mieste.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#f8f5ef;--paper:#fffdf9;--paper2:#f3eee5;--ink:#112842;--muted:#697586;
-  --accent:#aa772b;--accent2:#8f641f;--line:#e4ddd1;--dark:#112a42;--dark2:#0d2236;
-  --max:1200px;--radius:18px;--shadow:0 18px 60px rgba(20,35,52,.08)
+ --bg:#f8f5ef;--paper:#fffdfa;--ink:#102843;--muted:#687586;--accent:#a8782d;--accent2:#8e641f;
+ --line:#e7dfd3;--soft:#f4eee4;--dark:#102942;--max:1240px;--shadow:0 18px 55px rgba(20,35,50,.07)
 }
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif;line-height:1.55}a{color:inherit;text-decoration:none}img{display:block;width:100%;height:100%;object-fit:cover}button{font:inherit}.wrap{max-width:var(--max);margin:auto;padding:0 28px}.serif,h1,h2,h3{font-family:Fraunces,Georgia,serif;font-weight:600;letter-spacing:-.025em}
-header{position:sticky;top:0;z-index:40;background:rgba(255,253,249,.97);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}.nav{height:76px;display:flex;align-items:center;justify-content:space-between;gap:26px}.brand{font:600 31px/1 Fraunces,Georgia,serif;display:flex;align-items:center;gap:10px}.brandmark{width:28px;height:36px;border-radius:14px 14px 14px 4px;background:var(--accent);position:relative;display:inline-block}.brandmark:after{content:"";position:absolute;width:8px;height:8px;border-radius:50%;background:var(--paper);left:10px;top:9px}.links{display:flex;align-items:center;gap:27px;font-size:14px;font-weight:600}.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;border-radius:10px;padding:13px 21px;font-weight:700;border:1px solid transparent;transition:.2s}.primary{background:var(--accent);color:#fff}.primary:hover{background:var(--accent2);transform:translateY(-1px)}.secondary{border-color:#c9bba5;background:rgba(255,255,255,.35)}.secondary:hover{background:#fff}.burger{display:none;background:none;border:0;color:var(--ink);font-size:25px}
-.hero{display:grid;grid-template-columns:.93fr 1.07fr;min-height:610px;background:var(--paper)}.hero-copy{padding:82px max(28px,calc((100vw - var(--max))/2 + 28px));padding-right:58px;display:flex;flex-direction:column;justify-content:center}.eyebrow{font-size:12px;letter-spacing:.19em;text-transform:uppercase;font-weight:700;color:var(--accent)}h1{font-size:68px;line-height:1.02;margin:18px 0 22px;max-width:580px}.hero p{font-size:18px;color:var(--muted);max-width:500px;margin:0}.actions{display:flex;gap:14px;margin-top:28px;flex-wrap:wrap}.hero-note{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:13px;margin-top:24px}.pin{width:18px;height:18px;border:2px solid var(--accent);border-radius:50% 50% 50% 0;transform:rotate(-45deg);position:relative}.pin:after{content:"";position:absolute;width:4px;height:4px;border-radius:50%;background:var(--accent);left:5px;top:5px}.hero-media{min-height:610px;position:relative;overflow:hidden}.hero-media:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,253,249,.24),transparent 26%)}
-.trust{background:var(--paper);border-block:1px solid var(--line)}.trust-row{display:grid;grid-template-columns:repeat(3,1fr)}.trust-item{padding:26px 30px;display:flex;align-items:center;gap:15px;border-right:1px solid var(--line)}.trust-item:last-child{border-right:0}.ico{width:48px;height:48px;border-radius:50%;background:var(--paper2);display:grid;place-items:center;color:var(--accent);flex:0 0 auto}.ico svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8}.trust-item strong{display:block;font-size:14px}.trust-item span{font-size:13px;color:var(--muted)}
-section{padding:82px 0}.head{text-align:center;max-width:720px;margin:0 auto 40px}.head h2{font-size:46px;margin:4px 0 9px;line-height:1.06}.head p{margin:0;color:var(--muted)}
-.address-card{display:grid;grid-template-columns:1.04fr .96fr;gap:0;background:var(--paper);border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:var(--shadow)}.address-photo{min-height:500px}.address-info{padding:50px 44px;display:flex;flex-direction:column;justify-content:center}.label{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);font-weight:700}.address-info h3{font-size:50px;line-height:1;margin:10px 0 10px}.address-line{font-size:19px;font-weight:700;margin-bottom:14px}.address-info>p{color:var(--muted);margin:0 0 20px}.benefits{display:grid;gap:11px;margin:4px 0 26px}.benefit{display:flex;gap:10px;align-items:center;font-size:14px}.check{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:#fff;font-size:12px;flex:0 0 auto}.pricebox{background:var(--paper2);border-radius:14px;padding:20px 22px;display:flex;align-items:end;justify-content:space-between;gap:20px}.pricebox small{display:block;color:var(--muted);margin-bottom:4px}.pricebox strong{font:600 36px/1 Fraunces,Georgia,serif}
-.steps{background:linear-gradient(135deg,var(--dark),var(--dark2));color:#fff}.steps .head p{color:#bdc7d2}.stepgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}.step{padding:12px 14px}.num{width:44px;height:44px;border-radius:50%;background:#f1e7d8;color:var(--ink);display:grid;place-items:center;font-weight:800;margin-bottom:18px}.step strong{display:block;margin-bottom:7px}.step p{font-size:13px;color:#bdc7d2;margin:0}
-.mailgrid{display:grid;grid-template-columns:.85fr 1.15fr;gap:34px;align-items:center}.mailintro h2{font-size:44px;line-height:1.06;margin:8px 0 14px}.mailintro p{color:var(--muted);max-width:440px}.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.flowitem{background:var(--paper);border:1px solid var(--line);border-radius:15px;padding:22px 18px;min-height:180px}.flowitem .flowicon{width:40px;height:40px;border-radius:50%;background:var(--paper2);display:grid;place-items:center;color:var(--accent);margin-bottom:14px}.flowitem strong{display:block;font-size:14px;margin-bottom:5px}.flowitem p{font-size:12px;color:var(--muted);margin:0}
-.pricing{display:grid;grid-template-columns:1.08fr .92fr;gap:24px}.panel{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:30px}.service{display:grid;grid-template-columns:1fr auto;gap:28px;align-items:end}.service h3{font-size:31px;line-height:1.1;margin:0 0 8px}.service p{color:var(--muted);margin:0}.service-price{text-align:right}.service-price strong{font:600 39px/1 Fraunces,Georgia,serif}.service .cta{grid-column:1/-1;margin-top:20px}.extras h3{font-size:27px;margin:0 0 18px}.extras ul{list-style:none;padding:0;margin:0;display:grid;gap:12px}.extras li{display:flex;justify-content:space-between;gap:24px;border-bottom:1px solid var(--line);padding-bottom:10px;font-size:14px}.extras li:last-child{border-bottom:0}.extras span:last-child{font-weight:700}
-.faq{padding-top:26px}.faqlist{max-width:900px;margin:auto;border-top:1px solid var(--line)}details{border-bottom:1px solid var(--line);padding:18px 0}summary{cursor:pointer;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:20px}summary::after{content:"+";color:var(--accent);font-size:22px}details[open] summary::after{content:"−"}details p{color:var(--muted);margin:12px 0 0;max-width:780px}
-.final{padding:0;background:var(--dark2);color:#fff}.final-inner{display:grid;grid-template-columns:1.15fr .85fr;min-height:250px}.final-copy{padding:54px 28px 54px max(28px,calc((100vw - var(--max))/2 + 28px));display:flex;flex-direction:column;justify-content:center}.final h2{font-size:43px;line-height:1.05;margin:0 0 10px}.final p{color:#c5ced8;margin:0 0 22px}.final-photo{min-height:250px;position:relative;overflow:hidden}.final-photo:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,var(--dark2),transparent 55%);z-index:1}
-footer{background:var(--paper);border-top:1px solid var(--line);padding:42px 0}.footer{display:grid;grid-template-columns:1.6fr repeat(3,1fr);gap:32px;font-size:13px}footer h4{margin:0 0 11px}footer ul{list-style:none;padding:0;margin:0;display:grid;gap:7px;color:var(--muted)}.footer-brand p{color:var(--muted);max-width:270px}.legal{margin-top:30px;padding-top:18px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:15px;color:var(--muted);font-size:12px}.sticky{display:none}
-@media(max-width:960px){.links{display:none}.burger{display:block}.desktop{display:none}.nav.open .links{display:flex;position:absolute;top:76px;left:0;right:0;background:var(--paper);padding:22px 28px;flex-direction:column;align-items:flex-start;border-bottom:1px solid var(--line)}.hero{grid-template-columns:1fr}.hero-copy{padding:58px 28px 44px}h1{font-size:52px}.hero-media{min-height:430px}.trust-row{grid-template-columns:1fr}.trust-item{border-right:0;border-bottom:1px solid var(--line)}.address-card{grid-template-columns:1fr}.address-photo{min-height:420px}.mailgrid{grid-template-columns:1fr}.flow{grid-template-columns:1fr 1fr}.pricing{grid-template-columns:1fr}.stepgrid{grid-template-columns:1fr 1fr}.final-inner{grid-template-columns:1fr}.final-photo{min-height:220px}.footer{grid-template-columns:1fr 1fr}.sticky{display:flex;position:fixed;bottom:14px;left:14px;right:14px;z-index:50;background:rgba(255,253,249,.97);border:1px solid var(--line);border-radius:14px;padding:10px 12px;align-items:center;justify-content:space-between;box-shadow:0 10px 35px rgba(18,35,55,.16)}}
-@media(max-width:580px){.wrap{padding:0 18px}.hero-copy{padding:48px 20px 36px}h1{font-size:44px}.hero-media{min-height:320px}.head h2,.mailintro h2{font-size:37px}section{padding:60px 0}.address-info{padding:30px 22px}.address-info h3{font-size:40px}.pricebox,.service{grid-template-columns:1fr;display:grid;align-items:start}.service-price{text-align:left}.flow{grid-template-columns:1fr}.stepgrid{grid-template-columns:1fr}.footer{grid-template-columns:1fr}.legal{flex-direction:column;padding-bottom:76px}.final-copy{padding:46px 20px}.final h2{font-size:36px}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif;line-height:1.55}
+a{color:inherit;text-decoration:none}img{display:block;width:100%;height:100%;object-fit:cover}.wrap{max-width:var(--max);margin:auto;padding:0 30px}
+h1,h2,h3,.serif{font-family:Fraunces,Georgia,serif;font-weight:600;letter-spacing:-.025em}.eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);font-weight:700}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;border-radius:9px;padding:13px 21px;font-weight:700;border:1px solid transparent;transition:.18s}
+.btn.primary{background:var(--accent);color:white}.btn.primary:hover{background:var(--accent2);transform:translateY(-1px)}.btn.secondary{border-color:#cbbda8;background:rgba(255,255,255,.25)}
+header{position:sticky;top:0;z-index:40;background:rgba(255,253,250,.97);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
+.nav{height:72px;display:flex;align-items:center;justify-content:space-between;gap:24px}.brand{font:600 32px/1 Fraunces,Georgia,serif}.links{display:flex;gap:27px;font-size:14px;font-weight:600;align-items:center}.burger{display:none;background:none;border:0;font-size:26px;color:var(--ink)}
+.hero{display:grid;grid-template-columns:.93fr 1.07fr;min-height:565px;background:var(--paper)}.hero-copy{padding:76px max(30px,calc((100vw - var(--max))/2 + 30px));padding-right:58px;display:flex;flex-direction:column;justify-content:center}
+.hero h1{font-size:68px;line-height:1.01;margin:17px 0 22px;max-width:560px}.hero p{font-size:18px;color:var(--muted);max-width:500px;margin:0}.hero-actions{display:flex;gap:14px;flex-wrap:wrap;margin-top:28px}
+.hero-tags{display:flex;gap:24px;flex-wrap:wrap;margin-top:28px;color:var(--muted);font-size:12px}.hero-tags span{display:flex;gap:7px;align-items:center}.hero-tags b{color:var(--accent)}
+.hero-media{min-height:565px;overflow:hidden;position:relative}.hero-media:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,253,250,.22),transparent 22%)}
+.trust{background:var(--paper);border-block:1px solid var(--line)}.trust-row{display:grid;grid-template-columns:repeat(3,1fr)}.trust-item{padding:24px 30px;display:flex;align-items:center;gap:15px;border-right:1px solid var(--line)}.trust-item:last-child{border-right:0}
+.icon{width:46px;height:46px;border-radius:50%;background:var(--soft);display:grid;place-items:center;color:var(--accent);flex:0 0 auto}.icon svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.8}.trust-item strong{display:block;font-size:14px}.trust-item small{color:var(--muted)}
+section{padding:76px 0}.address-grid{display:grid;grid-template-columns:.8fr 1.08fr .62fr;gap:28px;align-items:stretch}.address-copy{display:flex;flex-direction:column;justify-content:center}.address-copy h2{font-size:47px;line-height:1.04;margin:8px 0 14px}.address-copy p{color:var(--muted);margin:0 0 20px}.bullets{display:grid;gap:10px}.bullet{display:flex;align-items:center;gap:9px;font-size:14px}.tick{width:20px;height:20px;border-radius:50%;background:var(--accent);color:white;display:grid;place-items:center;font-size:12px;flex:0 0 auto}
+.address-photo{border-radius:18px;overflow:hidden;min-height:430px;box-shadow:var(--shadow)}.address-card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:28px 24px;display:flex;flex-direction:column;justify-content:center;box-shadow:var(--shadow)}
+.address-card h3{font-size:31px;line-height:1.08;margin:8px 0 4px}.address-card .city{font-size:20px;font-weight:700;margin-bottom:24px}.address-card .price{background:var(--soft);padding:18px;border-radius:12px;margin:10px 0 18px;text-align:center}.address-card .price small{display:block;color:var(--muted)}.address-card .price strong{font:600 34px/1 Fraunces,Georgia,serif}
+.process{background:#fffaf4;border-block:1px solid var(--line)}.process-head{display:grid;grid-template-columns:.55fr 1.45fr;gap:40px;align-items:end;margin-bottom:32px}.process-head h2{font-size:45px;margin:0}.process-head p{color:var(--muted);margin:0}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}.step{position:relative;padding:10px 12px}.num{width:42px;height:42px;border:1px solid #d8c6a8;border-radius:50%;display:grid;place-items:center;font-weight:800;margin-bottom:16px}.step strong{display:block;margin-bottom:5px}.step p{font-size:13px;color:var(--muted);margin:0}
+.mail{background:linear-gradient(90deg,#f6f1e8,#fffdfa)}.mail-grid{display:grid;grid-template-columns:.72fr 1.28fr;gap:34px;align-items:start}.mail h2{font-size:44px;line-height:1.05;margin:8px 0 8px}.mail p{color:var(--muted)}
+.mail-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.mail-step{background:rgba(255,255,255,.62);border:1px solid var(--line);border-radius:14px;padding:20px 17px;min-height:165px}.mail-step .mini{width:39px;height:39px;border-radius:50%;background:var(--paper);display:grid;place-items:center;color:var(--accent);font-weight:700;margin-bottom:13px}.mail-step strong{display:block;font-size:14px}.mail-step span{font-size:12px;color:var(--muted)}
+.price-layout{display:grid;grid-template-columns:.42fr 1.58fr;gap:34px;align-items:start}.price-intro h2{font-size:44px;line-height:1.04;margin:6px 0 10px}.price-intro p{color:var(--muted)}.price-panels{display:grid;grid-template-columns:1fr 1fr;gap:18px}.panel{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:26px}.panel h3{font-size:27px;margin:0 0 7px}.main-price{display:flex;justify-content:space-between;align-items:end;gap:20px}.main-price strong{font:600 38px/1 Fraunces,Georgia,serif}.panel ul{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:10px}.panel li{display:flex;justify-content:space-between;gap:24px;border-bottom:1px solid var(--line);padding-bottom:9px;font-size:13px}.panel li:last-child{border-bottom:0}
+.faq{padding-top:20px}.faq-grid{display:grid;grid-template-columns:.42fr 1.58fr;gap:34px}.faq h2{font-size:43px;margin:8px 0 10px}.faq-list{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px}details{border:1px solid var(--line);background:rgba(255,255,255,.44);border-radius:8px;padding:13px 15px}summary{cursor:pointer;font-weight:600;list-style:none;font-size:13px;display:flex;justify-content:space-between;gap:12px}summary::after{content:"+";color:var(--accent)}details[open] summary::after{content:"−"}details p{color:var(--muted);font-size:12px;margin:10px 0 0}
+.cta{padding:20px 0 0}.cta-box{display:grid;grid-template-columns:.46fr 1.54fr;background:var(--paper);border:1px solid var(--line);border-radius:15px;overflow:hidden;min-height:150px}.cta-photo{min-height:150px}.cta-copy{padding:26px 30px;display:flex;align-items:center;justify-content:space-between;gap:25px}.cta-copy h3{font-size:29px;margin:4px 0 5px}.cta-copy p{color:var(--muted);margin:0;font-size:13px}
+footer{padding:32px 0 40px;background:var(--paper)}.footer{display:flex;align-items:center;justify-content:space-between;gap:25px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:26px}.footer .brand{color:var(--ink);font-size:27px}.footer-links{display:flex;gap:22px;flex-wrap:wrap}.sticky{display:none}
+@media(max-width:980px){.links{display:none}.burger{display:block}.nav.open .links{display:flex;position:absolute;top:72px;left:0;right:0;background:var(--paper);padding:22px 30px;flex-direction:column;align-items:flex-start;border-bottom:1px solid var(--line)}.nav>.desktop{display:none}.hero{grid-template-columns:1fr}.hero-copy{padding:56px 30px 40px}.hero h1{font-size:54px}.hero-media{min-height:420px}.trust-row{grid-template-columns:1fr}.trust-item{border-right:0;border-bottom:1px solid var(--line)}.address-grid{grid-template-columns:1fr}.address-photo{min-height:390px}.process-head,.mail-grid,.price-layout,.faq-grid{grid-template-columns:1fr}.steps,.mail-flow{grid-template-columns:1fr 1fr}.price-panels{grid-template-columns:1fr}.faq-list{grid-template-columns:1fr}.cta-box{grid-template-columns:1fr}.cta-copy{align-items:flex-start}.sticky{display:flex;position:fixed;left:14px;right:14px;bottom:14px;z-index:50;background:rgba(255,253,250,.97);border:1px solid var(--line);border-radius:13px;padding:10px 12px;justify-content:space-between;align-items:center;box-shadow:0 12px 34px rgba(18,35,50,.16)}}
+@media(max-width:580px){.wrap{padding:0 18px}.hero-copy{padding:46px 20px 34px}.hero h1{font-size:45px}.hero-media{min-height:320px}section{padding:58px 0}.address-copy h2,.process-head h2,.mail h2,.price-intro h2,.faq h2{font-size:37px}.steps,.mail-flow{grid-template-columns:1fr}.cta-copy{padding:24px 20px;flex-direction:column}.footer{align-items:flex-start;flex-direction:column;padding-bottom:76px}}
 </style>
 </head>
 <body>
-<header><div class="wrap nav" id="nav"><a class="brand" href="#top"><span class="brandmark"></span>Lokál</a><nav class="links"><a href="#sidlo">Sídlo firmy</a><a href="#posta">Poštová adresa</a><a href="#ako">Ako to funguje</a><a href="#cennik">Cenník</a><a href="#faq">FAQ</a><a href="#kontakt">Kontakt</a></nav><a class="btn primary desktop" href="#kontakt">Objednať sídlo →</a><button class="burger" aria-label="Menu" onclick="nav.classList.toggle('open')">☰</button></div></header>
+<header>
+ <div class="wrap nav" id="nav">
+   <a class="brand" href="#top">Lokál</a>
+   <nav class="links">
+     <a href="#sidlo">Sídlo firmy</a><a href="#posta">Poštová adresa</a><a href="#ako">Ako to funguje</a><a href="#cennik">Cenník</a><a href="#faq">FAQ</a><a href="#kontakt">Kontakt</a>
+   </nav>
+   <a class="btn primary desktop" href="#kontakt">Objednať sídlo</a>
+   <button class="burger" aria-label="Menu" onclick="nav.classList.toggle('open')">☰</button>
+ </div>
+</header>
+
 <main id="top">
-<div class="hero">
-  <div class="hero-copy">
-    <span class="eyebrow">Profesionálna adresa v Bratislave</span>
-    <h1>Sídlo firmy jednoducho.</h1>
-    <p>Oficiálna adresa pre vašu spoločnosť a spoľahlivé preberanie korešpondencie na jednom mieste.</p>
-    <div class="actions"><a class="btn primary" href="#kontakt">Objednať sídlo →</a><a class="btn secondary" href="#sidlo">Viac o službe</a></div>
-    <div class="hero-note"><span class="pin"></span>Drieňová 1/J, 821 01 Bratislava</div>
-  </div>
-  <div class="hero-media"><img class="premises" alt="Vstup do priestorov na adrese Drieňová 1/J v Bratislave"></div>
+<section class="hero">
+ <div class="hero-copy">
+   <span class="eyebrow">Jedna adresa. Veľké možnosti.</span>
+   <h1>Sídlo firmy jednoducho.</h1>
+   <p>Oficiálna adresa pre vašu spoločnosť a spoľahlivé preberanie korešpondencie na jednom mieste.</p>
+   <div class="hero-actions"><a class="btn primary" href="#kontakt">Objednať sídlo →</a></div>
+   <div class="hero-tags"><span><b>▣</b> Bratislava</span><span><b>◇</b> Jednoduchý proces</span><span><b>○</b> Osobný prístup</span></div>
+ </div>
+ <div class="hero-media"><img class="premises" alt="Drieňová 1/J, Bratislava"></div>
+</section>
+
+<div class="trust">
+ <div class="wrap trust-row">
+   <div class="trust-item"><div class="icon"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M15 3v4h4"/><path d="M9 12h6M9 16h6"/></svg></div><div><strong>Oficiálna adresa</strong><small>Pre sídlo spoločnosti</small></div></div>
+   <div class="trust-item"><div class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg></div><div><strong>Preberanie pošty</strong><small>Spoľahlivo a diskrétne</small></div></div>
+   <div class="trust-item"><div class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-4 3.1-6 7-6s6.2 2 7 6"/></svg></div><div><strong>Osobný prístup</strong><small>Sme tu pre vaše otázky</small></div></div>
+ </div>
 </div>
 
-<div class="trust"><div class="wrap trust-row">
-  <div class="trust-item"><div class="ico"><svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5v8.5H4z"/><path d="M9 19v-5h6v5"/></svg></div><div><strong>Oficiálna adresa</strong><span>Pre vašu spoločnosť</span></div></div>
-  <div class="trust-item"><div class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg></div><div><strong>Preberanie pošty</strong><span>Spoľahlivo a diskrétne</span></div></div>
-  <div class="trust-item"><div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-4 3.1-6 7-6s6.2 2 7 6"/></svg></div><div><strong>Osobný prístup</strong><span>Sme tu pre vaše otázky</span></div></div>
-</div></div>
+<section id="sidlo">
+ <div class="wrap address-grid">
+   <div class="address-copy">
+     <span class="eyebrow">Naša adresa</span>
+     <h2>Jedno miesto pre vaše podnikanie.</h2>
+     <p>Konkrétna adresa v Bratislave, kde môžete mať sídlo firmy a využívať dohodnuté služby spojené s korešpondenciou.</p>
+     <div class="bullets">
+       <div class="bullet"><span class="tick">✓</span>Drieňová 1/J, Bratislava</div>
+       <div class="bullet"><span class="tick">✓</span>Preberanie a evidencia pošty</div>
+       <div class="bullet"><span class="tick">✓</span>Upozornenie na zásielku</div>
+       <div class="bullet"><span class="tick">✓</span>Doplnkové služby podľa dohody</div>
+     </div>
+   </div>
+   <div class="address-photo"><img class="premises" alt="Priestory na adrese Drieňová 1/J"></div>
+   <aside class="address-card">
+     <span class="eyebrow">Naša adresa</span>
+     <h3>Drieňová 1/J</h3>
+     <div class="city">821 01 Bratislava</div>
+     <div class="price"><small>Sídlo firmy už od</small><strong>XX € / rok</strong></div>
+     <a class="btn primary" href="#kontakt">Objednať sídlo →</a>
+   </aside>
+ </div>
+</section>
 
-<section id="sidlo"><div class="wrap">
-  <div class="head"><span class="eyebrow">Naša adresa</span><h2>Jedno miesto. Jasná služba.</h2><p>Žiadny katalóg adries. Jedna konkrétna lokalita a jeden jednoduchý proces.</p></div>
-  <div class="address-card">
-    <div class="address-photo"><img class="premises" alt="Priestory na Drieňovej ulici v Bratislave"></div>
-    <div class="address-info">
-      <span class="label">Bratislava</span>
-      <h3>Drieňová 1/J</h3>
-      <div class="address-line">821 01 Bratislava</div>
-      <p>Moderné administratívne priestory v dobre dostupnej lokalite. Firemná adresa, preberanie korešpondencie a súvisiace služby na jednom mieste.</p>
-      <div class="benefits">
-        <div class="benefit"><span class="check">✓</span>Oficiálna adresa pre vašu spoločnosť</div>
-        <div class="benefit"><span class="check">✓</span>Preberanie a evidencia pošty</div>
-        <div class="benefit"><span class="check">✓</span>Upozornenie na novú zásielku</div>
-        <div class="benefit"><span class="check">✓</span>Možnosť preposielania pošty</div>
-      </div>
-      <div class="pricebox"><div><small>Sídlo firmy</small><strong>od XX €</strong> / rok</div><a class="btn primary" href="#kontakt">Objednať sídlo →</a></div>
-    </div>
-  </div>
-</div></section>
+<section class="process" id="ako">
+ <div class="wrap">
+   <div class="process-head"><div><span class="eyebrow">Ako to funguje</span><h2>Štyri jednoduché kroky</h2></div><p>Od objednávky po používanie adresy bez zbytočného komplikovania.</p></div>
+   <div class="steps">
+     <div class="step"><div class="num">1</div><strong>Objednávka</strong><p>Vyplníte krátky formulár.</p></div>
+     <div class="step"><div class="num">2</div><strong>Príprava dokumentov</strong><p>Pripravíme potrebné podklady podľa služby.</p></div>
+     <div class="step"><div class="num">3</div><strong>Dokumenty použijete</strong><p>Podklady využijete pri zápise alebo zmene sídla.</p></div>
+     <div class="step"><div class="num">4</div><strong>Hotovo</strong><p>Po aktivácii služby začína dohodnuté poskytovanie.</p></div>
+   </div>
+ </div>
+</section>
 
-<section class="steps" id="ako"><div class="wrap">
-  <div class="head"><span class="eyebrow">Ako to funguje</span><h2>Štyri jednoduché kroky</h2><p>Proces navrhujeme tak, aby bol čo najkratší a zrozumiteľný.</p></div>
-  <div class="stepgrid">
-    <div class="step"><div class="num">1</div><strong>Objednáte službu</strong><p>Vyplníte krátky formulár a základné údaje.</p></div>
-    <div class="step"><div class="num">2</div><strong>Pripravíme podklady</strong><p>Pripravíme dokumenty podľa dohodnutého rozsahu služby.</p></div>
-    <div class="step"><div class="num">3</div><strong>Použijete dokumenty</strong><p>Podklady využijete pri zápise alebo zmene sídla.</p></div>
-    <div class="step"><div class="num">4</div><strong>My sa postaráme</strong><p>Preberáme vašu poštu podľa dohodnutých podmienok.</p></div>
-  </div>
-</div></section>
+<section class="mail" id="posta">
+ <div class="wrap mail-grid">
+   <div><span class="eyebrow">Poštová adresa</span><h2>Vaša pošta v bezpečných rukách.</h2><p>Jednoduchý proces od doručenia zásielky po ďalšie spracovanie podľa zvolenej služby.</p></div>
+   <div class="mail-flow">
+     <div class="mail-step"><div class="mini">1</div><strong>Prevezmeme</strong><span>Zásielku prevezmeme na adrese.</span></div>
+     <div class="mail-step"><div class="mini">2</div><strong>Zaevidujeme</strong><span>Priradíme ju k vašej spoločnosti.</span></div>
+     <div class="mail-step"><div class="mini">3</div><strong>Informujeme</strong><span>Upozornenie podľa dohodnutého režimu.</span></div>
+     <div class="mail-step"><div class="mini">4</div><strong>Spracujeme</strong><span>Vyzdvihnutie, skenovanie alebo preposlanie podľa služby.</span></div>
+   </div>
+ </div>
+</section>
 
-<section id="posta"><div class="wrap mailgrid">
-  <div class="mailintro"><span class="eyebrow">Poštová adresa</span><h2>Keď príde zásielka, máte v tom jasno.</h2><p>Poštu prevezmeme, zaevidujeme a podľa zvolenej služby vás upozorníme alebo zabezpečíme ďalšie spracovanie.</p></div>
-  <div class="flow">
-    <div class="flowitem"><div class="flowicon">1</div><strong>Zásielka doručená</strong><p>Poštu prevezmeme na adrese.</p></div>
-    <div class="flowitem"><div class="flowicon">2</div><strong>Zaevidovaná</strong><p>Zásielku priradíme k vašej spoločnosti.</p></div>
-    <div class="flowitem"><div class="flowicon">3</div><strong>Upozornenie</strong><p>Informovanie podľa dohodnutého režimu.</p></div>
-    <div class="flowitem"><div class="flowicon">4</div><strong>Ďalšie spracovanie</strong><p>Vyzdvihnutie, skenovanie alebo preposlanie podľa služby.</p></div>
-  </div>
-</div></section>
+<section id="cennik">
+ <div class="wrap price-layout">
+   <div class="price-intro"><span class="eyebrow">Cenník</span><h2>Transparentne a bez chaosu.</h2><p>Finálne ceny doplníme po potvrdení obchodných podmienok.</p></div>
+   <div class="price-panels">
+     <div class="panel"><h3>Sídlo firmy</h3><div class="main-price"><span>Firemná adresa a základná služba</span><strong>XX € / rok</strong></div><div style="margin-top:18px"><a class="btn primary" href="#kontakt">Objednať sídlo</a></div></div>
+     <div class="panel"><h3>Doplnkové služby</h3><ul><li><span>Preposielanie pošty</span><span>XX €</span></li><li><span>Osobné prevzatie</span><span>XX €</span></li><li><span>Skenovanie zásielok</span><span>XX €</span></li><li><span>Individuálne požiadavky</span><span>na vyžiadanie</span></li></ul></div>
+   </div>
+ </div>
+</section>
 
-<section id="cennik"><div class="wrap">
-  <div class="head"><span class="eyebrow">Cenník</span><h2>Transparentné ceny</h2><p>Konečné ceny a presný rozsah služieb doplníme po potvrdení obchodných podmienok.</p></div>
-  <div class="pricing">
-    <div class="panel">
-      <div class="service">
-        <div><h3>Sídlo firmy</h3><p>Oficiálna adresa na Drieňovej 1/J a základný servis podľa zmluvy.</p></div>
-        <div class="service-price"><strong>od XX €</strong> / rok</div>
-        <div class="cta"><a class="btn primary" href="#kontakt">Objednať sídlo →</a></div>
-      </div>
-    </div>
-    <div class="panel extras">
-      <h3>Doplnkové služby</h3>
-      <ul>
-        <li><span>Preposielanie pošty</span><span>XX €</span></li>
-        <li><span>Skenovanie zásielok</span><span>XX €</span></li>
-        <li><span>Osobné prevzatie</span><span>XX €</span></li>
-        <li><span>Ďalšie služby podľa dohody</span><span>—</span></li>
-      </ul>
-    </div>
-  </div>
-</div></section>
+<section class="faq" id="faq">
+ <div class="wrap faq-grid">
+   <div><span class="eyebrow">Často kladené otázky</span><h2>Rýchle odpovede.</h2><p style="color:var(--muted)">Obsah otázok ešte doladíme podľa finálnych podmienok služby.</p></div>
+   <div class="faq-list">
+     <details><summary>Je adresa reálna?</summary><p>Áno, ide o fyzické priestory na adrese Drieňová 1/J, 821 01 Bratislava.</p></details>
+     <details><summary>Ako funguje preberanie pošty?</summary><p>Poštu prevezmeme a zaevidujeme; ďalšie spracovanie závisí od zvolenej služby.</p></details>
+     <details><summary>Môžem si poštu vyzdvihnúť osobne?</summary><p>Presné podmienky osobného prevzatia doplníme do finálnej ponuky.</p></details>
+     <details><summary>Ako rýchlo viem začať?</summary><p>Presný termín aktivácie doplníme po uzavretí finálneho procesu objednávky.</p></details>
+     <details><summary>Je možné preposielať poštu?</summary><p>Preposielanie je plánované ako doplnková služba.</p></details>
+     <details><summary>Čo ak mám ďalšie otázky?</summary><p>Kontaktné údaje doplníme po finálnom nastavení značky a obsluhy služby.</p></details>
+   </div>
+ </div>
+</section>
 
-<section class="faq" id="faq"><div class="wrap">
-  <div class="head"><span class="eyebrow">Časté otázky</span><h2>Máte otázky?</h2><p>Najdôležitejšie odpovede na jednom mieste.</p></div>
-  <div class="faqlist">
-    <details><summary>Je adresa reálna?</summary><p>Áno. Ide o fyzické priestory na adrese Drieňová 1/J, 821 01 Bratislava.</p></details>
-    <details><summary>Ako prebieha preberanie pošty?</summary><p>Doručenú korešpondenciu prevezmeme a zaevidujeme. Konkrétny spôsob upozornenia a ďalšieho spracovania bude určený podľa zvolenej služby.</p></details>
-    <details><summary>Aké dokumenty dostanem?</summary><p>Presný rozsah dokumentov bude uvedený v konkrétnej ponuke a zmluvných podmienkach.</p></details>
-    <details><summary>Ako rýchlo môžem začať používať sídlo?</summary><p>Presný termín doplníme po nastavení finálneho objednávkového procesu.</p></details>
-  </div>
-</div></section>
-
-<section class="final" id="kontakt"><div class="final-inner">
-  <div class="final-copy"><h2>Ste pripravení na nové sídlo?</h2><p>Firemná adresa na Drieňovej 1/J v Bratislave bez zbytočného komplikovania.</p><div><a class="btn primary" href="#top">Objednať sídlo →</a></div></div>
-  <div class="final-photo"><img class="premises" alt="Priestory Lokál"></div>
-</div></section>
+<section class="cta" id="kontakt">
+ <div class="wrap"><div class="cta-box">
+   <div class="cta-photo"><img class="premises" alt="Drieňová 1/J"></div>
+   <div class="cta-copy"><div><span class="eyebrow">Začnite ešte dnes</span><h3>Vaše podnikanie si zaslúži stabilné miesto.</h3><p>Sídlo firmy v Bratislave. Jedna adresa, jeden jednoduchý proces.</p></div><a class="btn primary" href="#top">Objednať sídlo →</a></div>
+ </div></div>
+</section>
 </main>
 
-<footer><div class="wrap">
-  <div class="footer">
-    <div class="footer-brand"><div class="brand"><span class="brandmark"></span>Lokál</div><p>Firemná adresa a preberanie korešpondencie na jednom mieste.</p></div>
-    <div><h4>Služby</h4><ul><li><a href="#sidlo">Sídlo firmy</a></li><li><a href="#posta">Poštová adresa</a></li><li><a href="#ako">Ako to funguje</a></li><li><a href="#cennik">Cenník</a></li></ul></div>
-    <div><h4>Informácie</h4><ul><li><a href="#faq">FAQ</a></li><li><a href="#kontakt">Kontakt</a></li></ul></div>
-    <div><h4>Právne informácie</h4><ul><li>Obchodné podmienky</li><li>Ochrana osobných údajov</li><li>Cookies</li></ul></div>
-  </div>
-  <div class="legal"><span>© 2026 Lokál. Všetky práva vyhradené.</span><span>Drieňová 1/J, 821 01 Bratislava</span></div>
-</div></footer>
+<footer>
+ <div class="wrap footer">
+   <div><div class="brand">Lokál</div><div>Koncept firemného webu.</div></div>
+   <div class="footer-links"><span>Obchodné podmienky</span><span>Ochrana údajov</span><span>Kontakt</span></div>
+   <div>© 2026 Lokál</div>
+ </div>
+</footer>
 
-<div class="sticky"><span>Sídlo firmy · od XX € / rok</span><a class="btn primary" href="#kontakt">Objednať</a></div>
+<div class="sticky"><span>Sídlo firmy · XX € / rok</span><a class="btn primary" href="#kontakt">Objednať</a></div>
+
 <script>
-fetch('premises.b64').then(r=>r.text()).then(b64=>document.querySelectorAll('.premises').forEach(i=>i.src='data:image/jpeg;base64,'+b64.trim()));
-document.querySelectorAll('.links a').forEach(a=>a.addEventListener('click',()=>nav.classList.remove('open')));
+fetch('premises.b64').then(r=>r.text()).then(b64=>{
+ document.querySelectorAll('.premises').forEach(img=>img.src='data:image/jpeg;base64,'+b64.trim())
+})
+document.querySelectorAll('.links a').forEach(a=>a.addEventListener('click',()=>nav.classList.remove('open')))
 </script>
-</body></html>
+</body>
+</html>
