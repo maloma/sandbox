@@ -2,8 +2,11 @@
 
 const assert=require('node:assert/strict');
 const transfers=require('../familypilot-wallet-transfers.js');
+require('../familypilot-financial-truth.js');
+assert.equal(typeof globalThis.FamilyPilotFinancialTruth?.financialTruthSnapshot,'function','Production Financial Truth API is unavailable');
 require('../familypilot-scope.js');
 const scope=globalThis.FamilyPilotScope;
+assert.equal(typeof scope?.capitalSnapshot,'function','FamilyPilot scope capital snapshot API is unavailable');
 
 const state={
   schemaVersion:7,

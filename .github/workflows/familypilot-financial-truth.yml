@@ -1,0 +1,38 @@
+name: FamilyPilot Financial Truth
+
+on:
+  pull_request:
+    paths:
+      - 'familypilot-financial-truth.js'
+      - 'familypilot-debts.js'
+      - 'tools/familypilot-financial-truth-smoke.mjs'
+      - '.github/workflows/familypilot-financial-truth.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  financial-truth:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Quiet exact-head checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git fetch -q --depth=1 origin "${HEAD_SHA}"
+          git checkout -q --detach FETCH_HEAD
+      - name: Verify exact checked-out head
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse HEAD)" = "${HEAD_SHA}"
+      - name: Check syntax
+        run: |
+          node --check familypilot-financial-truth.js
+          node --check familypilot-debts.js
+          node --check tools/familypilot-financial-truth-smoke.mjs
+      - name: Run bounded financial truth cases
+        run: node tools/familypilot-financial-truth-smoke.mjs

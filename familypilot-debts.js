@@ -23,6 +23,17 @@
     return 0;
   }
   function actionCashKind(action){if(action==='borrow'||action==='receive')return'debt_inflow';if(action==='repay'||action==='lend')return'debt_outflow';return null}
+  function resolveDebtContext(input={},context={}){
+    const action=sourceActions.has(input?.action)?input.action:null;
+    if(!action)return{ok:false,error:'Выберите действие с долгом.'};
+    const scope=context.scope==='personal'?'personal':'household';
+    const requiresMoneyWallet=cashActions.has(action);
+    const scopeWalletId=String(context.scopeWalletId||context.walletId||input.scopeWalletId||(!requiresMoneyWallet?input.walletId:'')||'').trim();
+    if(!scopeWalletId)return{ok:false,error:'Не удалось определить финансовый контекст долга.'};
+    const walletId=requiresMoneyWallet?String(input.walletId||'').trim():null;
+    if(requiresMoneyWallet&&!walletId)return{ok:false,error:'Выберите кошелёк для движения денег.'};
+    return{ok:true,value:{scope,scopeWalletId,walletId,requiresMoneyWallet}};
+  }
   function directionFromBalance(balance){return balance>EPSILON?'receivable':(balance<-EPSILON?'liability':'zero')}
   function revision(target,changes,actorId,at=Date.now(),source='user'){
     const actual=changes.filter(change=>String(change.oldValue??'')!==String(change.newValue??''));
@@ -35,7 +46,8 @@
     return{id:raw?.id||makeId('counterparty',at),name,normalizedName:normalizeName(raw?.normalizedName||name),kind:raw?.kind==='organization'?'organization':'person',note:String(raw?.note||''),createdAt:asNumber(raw?.createdAt,at),createdByMemberId:raw?.createdByMemberId||'member-anna',lastEditedAt:asNumber(raw?.lastEditedAt,raw?.createdAt||at),lastEditedByMemberId:raw?.lastEditedByMemberId||raw?.createdByMemberId||'member-anna',archivedAt:raw?.archivedAt==null?null:asNumber(raw.archivedAt,null),revisions:history(raw?.revisions)};
   }
   function normalizeChain(raw,at=Date.now()){
-    return{id:raw?.id||makeId('debt-chain',at),counterpartyId:String(raw?.counterpartyId||''),walletId:String(raw?.walletId||'wallet-household-main'),currency:String(raw?.currency||'EUR'),status:raw?.status==='closed'?'closed':'active',openedAt:asNumber(raw?.openedAt,raw?.createdAt||at),closedAt:raw?.closedAt==null?null:asNumber(raw.closedAt,null),closureEventId:raw?.closureEventId||null,currentBalance:rounded(raw?.currentBalance),currentDirection:directionFromBalance(raw?.currentBalance),createdAt:asNumber(raw?.createdAt,at),createdByMemberId:raw?.createdByMemberId||'member-anna',lastEditedAt:asNumber(raw?.lastEditedAt,raw?.createdAt||at),lastEditedByMemberId:raw?.lastEditedByMemberId||raw?.createdByMemberId||'member-anna',revisions:history(raw?.revisions)};
+    const scopeWalletId=String(raw?.scopeWalletId||raw?.walletId||'wallet-household-main');
+    return{id:raw?.id||makeId('debt-chain',at),counterpartyId:String(raw?.counterpartyId||''),scopeWalletId,walletId:String(raw?.walletId||scopeWalletId),currency:String(raw?.currency||'EUR'),status:raw?.status==='closed'?'closed':'active',openedAt:asNumber(raw?.openedAt,raw?.createdAt||at),closedAt:raw?.closedAt==null?null:asNumber(raw.closedAt,null),closureEventId:raw?.closureEventId||null,currentBalance:rounded(raw?.currentBalance),currentDirection:directionFromBalance(raw?.currentBalance),createdAt:asNumber(raw?.createdAt,at),createdByMemberId:raw?.createdByMemberId||'member-anna',lastEditedAt:asNumber(raw?.lastEditedAt,raw?.createdAt||at),lastEditedByMemberId:raw?.lastEditedByMemberId||raw?.createdByMemberId||'member-anna',revisions:history(raw?.revisions)};
   }
   function normalizeEvent(raw,at=Date.now()){
     const type=raw?.type==='derived'?'derived':'source';
@@ -59,9 +71,11 @@
     const counterparty=normalizeCounterparty({name,kind,note:input?.counterpartyNote,createdAt:at,createdByMemberId:actorId},at);state.debtCounterparties.push(counterparty);return{counterparty,created:true};
   }
   function activeChain(state,counterpartyId,walletId,currency){return state.debtChains.find(item=>item.status==='active'&&item.counterpartyId===counterpartyId&&item.walletId===walletId&&item.currency===currency)||null}
-  function ensureActiveChain(state,counterpartyId,walletId,currency,actorId='member-anna',at=Date.now()){
-    const existing=activeChain(state,counterpartyId,walletId,currency);if(existing)return existing;
-    const chain=normalizeChain({counterpartyId,walletId,currency,status:'active',openedAt:at,createdAt:at,createdByMemberId:actorId},at);state.debtChains.push(chain);return chain;
+  function ensureActiveChain(state,counterpartyId,scopeWalletId,currency,actorId='member-anna',at=Date.now()){
+    const scopeId=String(scopeWalletId||'').trim();
+    const existing=state.debtChains.find(item=>item.status==='active'&&item.counterpartyId===counterpartyId&&String(item.scopeWalletId||item.walletId||'')===scopeId&&item.currency===currency)||null;
+    if(existing)return existing;
+    const chain=normalizeChain({counterpartyId,scopeWalletId:scopeId,walletId:scopeId,currency,status:'active',openedAt:at,createdAt:at,createdByMemberId:actorId},at);state.debtChains.push(chain);return chain;
   }
   function sourceEvents(state,chainId){return state.debtEvents.filter(item=>item.chainId===chainId&&item.type==='source'&&item.status==='active').sort((a,b)=>a.occurredAt-b.occurredAt||a.createdAt-b.createdAt||a.id.localeCompare(b.id))}
   function linkedOperation(state,event){return event.linkedOperationId?state.operations.find(item=>item.id===event.linkedOperationId)||null:null}
@@ -99,19 +113,28 @@
     return{ok:true,chain,derivedEvents:created,balance:chain.currentBalance};
   }
   function recalculateAll(state,at=Date.now()){for(const chain of state.debtChains)recalculateChain(state,chain.id,at);return state}
-  function validateSourceInput(input){
+  function validateSourceInput(input,context={}){
     const action=sourceActions.has(input?.action)?input.action:null,amount=rounded(asNumber(input?.amount,NaN)),occurredAt=asNumber(input?.occurredAt,NaN);
     if(!action)return{ok:false,error:'Выберите действие с долгом.'};
     if(!Number.isFinite(amount)||amount<=0||amount>999999.99)return{ok:false,error:'Основная сумма должна быть от 0,01 до 999 999,99.'};
     if(!Number.isFinite(occurredAt))return{ok:false,error:'Выберите дату операции.'};
-    if(!input?.walletId)return{ok:false,error:'Выберите кошелёк.'};
-    return{ok:true,value:{action,amount,occurredAt,walletId:String(input.walletId),currency:String(input.currency||'EUR'),comment:String(input.comment||'').trim()}};
+    const debtContext=resolveDebtContext(input,{...context,scopeWalletId:context.scopeWalletId||input?.scopeWalletId||input?.walletId});
+    if(!debtContext.ok)return debtContext;
+    return{ok:true,value:{action,amount,occurredAt,scope:debtContext.value.scope,scopeWalletId:debtContext.value.scopeWalletId,walletId:debtContext.value.walletId,currency:String(input.currency||'EUR'),comment:String(input.comment||'').trim()}};
   }
   function createSourceEvent(state,input,actorId='member-anna',at=Date.now()){
-    normalizeState(state,at);const validated=validateSourceInput(input);if(!validated.ok)return validated;
+    normalizeState(state,at);
+    const explicitScopeWallet=(state.wallets||[]).find(wallet=>wallet.id===input?.scopeWalletId)||null;
+    const activeWallet=(state.wallets||[]).find(wallet=>wallet.id===state.activeWalletId)||null;
+    const inputWallet=(state.wallets||[]).find(wallet=>wallet.id===input?.walletId)||null;
+    const contextWallet=explicitScopeWallet||activeWallet||inputWallet||null;
+    const personal=contextWallet?.type==='personal';
+    const householdDefault=(state.wallets||[]).find(wallet=>wallet.type==='household_default'&&!wallet.archivedAt)||null;
+    const scopeWalletId=String(input?.scopeWalletId||(personal?contextWallet?.id:(householdDefault?.id||contextWallet?.id||'wallet-household-main'))).trim();
+    const validated=validateSourceInput(input,{scope:personal?'personal':'household',scopeWalletId});if(!validated.ok)return validated;
     const cpResult=findOrCreateCounterparty(state,input,actorId,at);if(cpResult.error)return{ok:false,error:cpResult.error};
-    const value=validated.value,chain=ensureActiveChain(state,cpResult.counterparty.id,value.walletId,value.currency,actorId,at);
-    const event=normalizeEvent({type:'source',chainId:chain.id,counterpartyId:cpResult.counterparty.id,action:value.action,amount:value.amount,currency:value.currency,walletId:value.walletId,occurredAt:value.occurredAt,comment:value.comment,createdAt:at,createdByMemberId:actorId},at);
+    const value=validated.value,chain=ensureActiveChain(state,cpResult.counterparty.id,value.scopeWalletId,value.currency,actorId,at),eventWalletId=value.walletId||value.scopeWalletId;
+    const event=normalizeEvent({type:'source',chainId:chain.id,counterpartyId:cpResult.counterparty.id,action:value.action,amount:value.amount,currency:value.currency,walletId:eventWalletId,occurredAt:value.occurredAt,comment:value.comment,createdAt:at,createdByMemberId:actorId},at);
     state.debtEvents.push(event);const operation=createMoneyOperation(state,event,actorId,at),result=recalculateChain(state,chain.id,at);
     return{ok:true,counterparty:cpResult.counterparty,chain:eventChain(state,event),event,operation,derivedEvents:result.derivedEvents,zero:Math.abs(result.balance)<=EPSILON};
   }
@@ -119,9 +142,10 @@
   function updateSourceEvent(state,eventId,input,actorId='member-anna',at=Date.now()){
     const event=state.debtEvents.find(item=>item.id===eventId&&item.type==='source');if(!event)return{ok:false,error:'Исходное движение долга не найдено.'};
     const oldChain=eventChain(state,event);if(!oldChain)return{ok:false,error:'Цепочка долга не найдена.'};if(oldChain.status==='closed')return{ok:false,error:'Закрытая цепочка доступна только для чтения.'};
-    const validated=validateSourceInput(input);if(!validated.ok)return validated;const cpResult=findOrCreateCounterparty(state,input,actorId,at);if(cpResult.error)return{ok:false,error:cpResult.error};
-    const value=validated.value,targetChain=ensureActiveChain(state,cpResult.counterparty.id,value.walletId,value.currency,actorId,at);
-    const proposed={chainId:targetChain.id,counterpartyId:cpResult.counterparty.id,action:value.action,amount:value.amount,currency:value.currency,walletId:value.walletId,occurredAt:value.occurredAt,comment:value.comment};
+    const scopeWalletId=String(oldChain.scopeWalletId||oldChain.walletId||'').trim(),scopeWallet=(state.wallets||[]).find(wallet=>wallet.id===scopeWalletId)||null,personal=scopeWallet?.type==='personal';
+    const validated=validateSourceInput(input,{scope:personal?'personal':'household',scopeWalletId});if(!validated.ok)return validated;const cpResult=findOrCreateCounterparty(state,input,actorId,at);if(cpResult.error)return{ok:false,error:cpResult.error};
+    const value=validated.value,targetChain=ensureActiveChain(state,cpResult.counterparty.id,value.scopeWalletId,value.currency,actorId,at),eventWalletId=value.walletId||value.scopeWalletId;
+    const proposed={chainId:targetChain.id,counterpartyId:cpResult.counterparty.id,action:value.action,amount:value.amount,currency:value.currency,walletId:eventWalletId,occurredAt:value.occurredAt,comment:value.comment};
     revision(event,Object.entries(proposed).map(([field,newValue])=>({field,oldValue:event[field],newValue})),actorId,at,'debt_source_edit');Object.assign(event,proposed,{lastEditedByMemberId:actorId,lastEditedAt:at});syncMoneyOperation(state,event,actorId,at);
     recalculateChain(state,oldChain.id,at);if(targetChain.id!==oldChain.id)recalculateChain(state,targetChain.id,at);
     const currentTarget=state.debtChains.find(item=>item.id===targetChain.id);return{ok:true,event,chain:currentTarget,counterparty:cpResult.counterparty,operation:linkedOperation(state,event),zero:Math.abs(currentTarget.currentBalance)<=EPSILON};
@@ -135,12 +159,12 @@
   }
   function keepChainOpen(state,chainId){const chain=state.debtChains.find(item=>item.id===chainId);return chain?{ok:true,chain}:{ok:false,error:'Цепочка долга не найдена.'}}
   function visibleWalletIds(state,scopeDescriptor,accessibleWallets,isPersonalWallet){if(scopeDescriptor?.scope==='personal')return new Set([scopeDescriptor.wallet?.id].filter(Boolean));const wallets=Array.isArray(accessibleWallets)?accessibleWallets:state.wallets||[];return new Set(wallets.filter(wallet=>!(isPersonalWallet?.(wallet)??wallet.type==='personal')).map(wallet=>wallet.id))}
-  function visibleChains(state,walletIds,options={}){const allowed=walletIds instanceof Set?walletIds:new Set(walletIds||[]),includeClosed=options.includeClosed!==false;recalculateAll(state,options.at||Date.now());return state.debtChains.filter(chain=>allowed.has(chain.walletId)&&(includeClosed||chain.status==='active')).sort((a,b)=>(a.status===b.status?Math.abs(b.currentBalance)-Math.abs(a.currentBalance):(a.status==='active'?-1:1))||b.openedAt-a.openedAt)}
+  function visibleChains(state,walletIds,options={}){const allowed=walletIds instanceof Set?walletIds:new Set(walletIds||[]),includeClosed=options.includeClosed!==false;recalculateAll(state,options.at||Date.now());return state.debtChains.filter(chain=>allowed.has(chain.scopeWalletId||chain.walletId)&&(includeClosed||chain.status==='active')).sort((a,b)=>(a.status===b.status?Math.abs(b.currentBalance)-Math.abs(a.currentBalance):(a.status==='active'?-1:1))||b.openedAt-a.openedAt)}
   function chainHistory(state,chainId){const rank={source:0,offset:1,reciprocal:2,closed:3};return state.debtEvents.filter(item=>item.chainId===chainId).sort((a,b)=>a.occurredAt-b.occurredAt||(rank[a.type==='source'?'source':a.derivedKind]||0)-(rank[b.type==='source'?'source':b.derivedKind]||0)||a.createdAt-b.createdAt)}
   function scopeTotals(state,walletIds){let receivable=0,liability=0;for(const chain of visibleChains(state,walletIds,{includeClosed:false})){if(chain.currentBalance>EPSILON)receivable+=chain.currentBalance;if(chain.currentBalance<-EPSILON)liability+=Math.abs(chain.currentBalance)}return{receivable:rounded(receivable),liability:rounded(liability),net:rounded(receivable-liability)}}
   function counterpartyName(state,id){return state.debtCounterparties.find(item=>item.id===id)?.name||'Контрагент'}
   function actionLabel(action){return({opening_liability:'Начальный долг: я должен',opening_receivable:'Начальный долг: мне должны',borrow:'Мне дали',repay:'Я вернул',lend:'Я дал',receive:'Мне вернули'})[action]||'Движение долга'}
   function eventDirection(event){const kind=actionCashKind(event.action);if(kind==='debt_inflow')return'inflow';if(kind==='debt_outflow')return'outflow';if(event.action==='opening_receivable')return'inflow';if(event.action==='opening_liability')return'outflow';return'neutral'}
 
-  return Object.freeze({EPSILON,sourceActions,cashActions,makeId,normalizeName,normalizeState,findOrCreateCounterparty,ensureActiveChain,actionDelta,actionCashKind,actionLabel,eventDirection,directionFromBalance,createSourceEvent,updateSourceEvent,recalculateChain,recalculateAll,closeChain,keepChainOpen,visibleWalletIds,visibleChains,chainHistory,scopeTotals,counterpartyName,linkedOperation,sourceEnabled,validateSourceInput});
+  return Object.freeze({EPSILON,sourceActions,cashActions,makeId,normalizeName,normalizeState,findOrCreateCounterparty,ensureActiveChain,actionDelta,actionCashKind,resolveDebtContext,actionLabel,eventDirection,directionFromBalance,createSourceEvent,updateSourceEvent,recalculateChain,recalculateAll,closeChain,keepChainOpen,visibleWalletIds,visibleChains,chainHistory,scopeTotals,counterpartyName,linkedOperation,sourceEnabled,validateSourceInput});
 });
