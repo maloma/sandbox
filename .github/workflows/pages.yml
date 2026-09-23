@@ -10,6 +10,7 @@ on:
       - 'src/familypilot.html'
       - 'src/familypilot-*.js'
       - 'crmos-boss-handoff-demo/**'
+      - 'sidloweb/**'
       - '.nojekyll'
       - 'README.md'
       - '.github/workflows/pages.yml'
